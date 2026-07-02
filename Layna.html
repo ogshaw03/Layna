@@ -1785,11 +1785,16 @@ function openReel(){
       }
       off+=cf;
     });
-    /* 未送信（現クリップ） */
-    const co=gOffset(reelUI.cur);const pdur=parseInt(durS.value)||1;
+    /* 未送信マーカー：全クリップ分をそれぞれの位置に描画（跨いでも消えない） */
+    const pdur=parseInt(durS.value)||1;
     ctx.fillStyle='rgba(224,138,74,.5)';
-    for(const p of RV.pending)if(p.f!=null)ctx.fillRect((co+p.f)*fw,10,Math.max(2.5,fw*pdur),5);
+    let poff=0;
+    cs.forEach(c=>{
+      for(const p of (c.pending||[]))if(p.f!=null)ctx.fillRect((poff+p.f)*fw,10,Math.max(2.5,fw*pdur),5);
+      poff+=clipFrames(c);
+    });
     /* プレイヘッド（全体位置） */
+    const co=gOffset(reelUI.cur);
     const x=(co+dispF())*fw+fw/2;
     ctx.fillStyle='#fff';ctx.fillRect(x-1,0,2,H);
   }
