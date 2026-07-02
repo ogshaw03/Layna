@@ -167,6 +167,13 @@ textarea.form-input{height:70px;resize:vertical}
 .tmpl-opt:hover{border-color:var(--accent)}
 .tmpl-opt .tn{font-weight:600;font-size:13px}
 .tmpl-opt .ts{font-size:11px;color:var(--text3);margin-top:3px}
+.seg{display:flex;gap:6px}
+.seg-opt{flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:13px;text-align:center;line-height:1.5}
+.seg-opt small{display:block;font-size:10px;color:var(--text3)}
+.seg-opt.active{border-color:var(--accent);background:rgba(124,111,255,.14);color:var(--text)}
+.seg-opt.active small{color:var(--text2)}
+.type-chip{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--text2);white-space:nowrap}
+.vcard-type{position:absolute;bottom:6px;left:8px;font-size:10px;color:rgba(255,255,255,.85);background:rgba(0,0,0,.5);padding:1px 7px;border-radius:8px;z-index:3}
 .gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
 .gate-box{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:44px 36px;max-width:520px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5)}
 .gate-logo{font-family:var(--font-head);font-size:40px;font-weight:700}
@@ -322,6 +329,8 @@ async function boot(){
   else DB=migrate(raw);                    // v1 → v2
   if(!Array.isArray(DB.nodes))DB.nodes=[];
   if(!Array.isArray(DB.templates)||!DB.templates.length)DB.templates=defaultTemplates();
+  // ページ種別の補完（未設定は: 動画があればレビュー、なければセクション）
+  for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
   await persist();
   updateFolderStatus();initSizeBtns();
   state.currentId=null;go(null);
@@ -352,8 +361,10 @@ function renderTreeNode(container,node,depth){
   if(kids.length)tg.onclick=e=>{e.stopPropagation();if(state.expanded.has(node.id))state.expanded.delete(node.id);else state.expanded.add(node.id);renderSidebar()};
   row.appendChild(tg);
   const dot=el('span','tree-dot');dot.style.background=STATUS[nodeStatus(node)].color;row.appendChild(dot);
+  const ico=el('span',null,node.type==='review'?'🎬':'📁');ico.style.cssText='font-size:11px;flex-shrink:0';row.appendChild(ico);
   row.appendChild(el('span','tree-name',node.name));
-  if(node.versions&&node.versions.length)row.appendChild(el('span','tree-badge','▶'+node.versions.length));
+  if(node.type==='review'&&node.versions.length)row.appendChild(el('span','tree-badge','▶'+node.versions.length));
+  else if(kids.length)row.appendChild(el('span','tree-badge','📁'+kids.length));
   row.onclick=()=>go(node.id);
   container.appendChild(row);
   if(kids.length&&state.expanded.has(node.id)){const wrap=el('div');for(const c of kids)renderTreeNode(wrap,c,depth+1);container.appendChild(wrap)}
@@ -371,74 +382,73 @@ function renderMainHead(){
   const h=$('#mainHead');h.innerHTML='';const cur=state.currentId?getNode(state.currentId):null;
   const box=el('div');
   const title=el('h1');
-  if(cur){const b=el('span','badge badge-'+nodeStatus(cur).replace('empty','empty'));const st=STATUS[nodeStatus(cur)];b.className='badge badge-'+st.cls;b.textContent=st.label;title.appendChild(document.createTextNode(cur.name));title.appendChild(b)}
-  else title.textContent='プロジェクト一覧';
+  if(cur){
+    title.appendChild(document.createTextNode(cur.name));
+    const st=STATUS[nodeStatus(cur)];title.appendChild(el('span','badge badge-'+st.cls,st.label));
+    title.appendChild(el('span','type-chip',cur.type==='review'?'🎬 レビュー':'📁 セクション'));
+  }else title.textContent='プロジェクト一覧';
   box.appendChild(title);
   if(cur&&cur.description)box.appendChild(el('div','desc',cur.description));
   h.appendChild(box);h.appendChild(el('div','spacer'));
   if(cur){
-    const rn=el('button','btn btn-ghost btn-sm','名称変更');rn.onclick=()=>openRename(cur);h.appendChild(rn);
+    const rn=el('button','btn btn-ghost btn-sm','設定');rn.onclick=()=>openRename(cur);h.appendChild(rn);
     const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>deleteNode(cur);h.appendChild(del);
   }
-  $('#addBtn').textContent=cur?'+ 項目':'+ プロジェクト';
+  const addBtn=$('#addBtn');
+  if(cur&&cur.type==='review')addBtn.style.display='none';
+  else{addBtn.style.display='';addBtn.textContent=cur?'+ 項目':'+ プロジェクト'}
 }
 
-/* 本体 */
+/* 本体：ページ種別で分岐 */
 function renderBody(){
   const s=$('#scroll');s.innerHTML='';
   const cur=state.currentId?getNode(state.currentId):null;
-  const parentId=state.currentId;
+  if(cur&&cur.type==='review')renderReviewBody(s,cur);
+  else renderSectionBody(s,cur);
+}
+
+/* セクションページ（子項目タイルのみ・動画追加不可） */
+function renderSectionBody(s,cur){
+  const parentId=cur?cur.id:null;
   const q=state.search.trim().toLowerCase();
   let kids=childrenOf(parentId);
   if(q)kids=kids.filter(n=>n.name.toLowerCase().includes(q));
-
-  // 子項目セクション
   const secl=el('div','section-label');secl.appendChild(el('span',null,cur?'サブ項目 / 工程':'プロジェクト'));
   const acts=el('div','acts');
   const addBtn=el('button','btn btn-ghost btn-sm','+ 追加');addBtn.onclick=()=>openAddModal(parentId);acts.appendChild(addBtn);
   if(cur){const tb=el('button','btn btn-ghost btn-sm','テンプレートから作成');tb.onclick=()=>openTemplateModal(parentId);acts.appendChild(tb)}
   secl.appendChild(acts);s.appendChild(secl);
+  if(!kids.length){s.appendChild(el('div','empty',cur?'まだ項目がありません。「+ 追加」で工程（レビュー）や下位セクションを作成してください。':'プロジェクトがまだありません。「+ プロジェクト」から作成してください。'));return}
+  const grid=el('div','grid');
+  for(const n of kids)grid.appendChild(nodeCard(n));
+  const addTile=el('div','add-tile');addTile.innerHTML='<div class="p">＋</div><div>追加</div>';addTile.onclick=()=>openAddModal(parentId);grid.appendChild(addTile);
+  s.appendChild(grid);
+}
 
-  if(!kids.length&&!(cur&&cur.versions.length)){
-    const e=el('div','empty',cur?'まだ何もありません。「+ 追加」で下の階層（工程やショット）を作成、または下の「動画ログ」に直接アップロードできます。':'プロジェクトがまだありません。「+ プロジェクト」から作成してください。');
-    s.appendChild(e);
-  }
-  if(kids.length){
-    const grid=el('div','grid');
-    for(const n of kids)grid.appendChild(nodeCard(n));
-    const addTile=el('div','add-tile');addTile.innerHTML='<div class="p">＋</div><div>追加</div>';addTile.onclick=()=>openAddModal(parentId);grid.appendChild(addTile);
-    s.appendChild(grid);
-  }
-
-  // 動画ログセクション（ノード内のとき）
-  if(cur){
-    const ll=el('div','section-label');ll.appendChild(el('span',null,'動画ログ / ディレクターチェック'));s.appendChild(ll);
-    // アップロード
-    const drop=el('label','file-drop');drop.innerHTML='<div>クリックして動画・画像をアップロード（この工程のログに追加されます）</div>';
-    const fi=el('input');fi.type='file';fi.accept='image/*,video/*';drop.appendChild(fi);
-    const prog=el('div','uploading hidden');const bar=el('div','bar');const bi=el('i');bar.appendChild(bi);const pct=el('span',null,'処理中...');prog.appendChild(bar);prog.appendChild(pct);
-    fi.onchange=()=>{if(fi.files[0])uploadVersion(cur,fi.files[0],{prog,bi,pct})};
-    s.appendChild(drop);s.appendChild(prog);
-    // ログ一覧（新しい順）
-    if(!cur.versions.length)s.appendChild(el('div','empty','まだ動画・画像がアップされていません。'));
-    else{
-      const log=el('div','log');
-      [...cur.versions].reverse().forEach(v=>log.appendChild(logItem(cur,v)));
-      s.appendChild(log);
-    }
-  }
+/* レビューページ（動画FBログを縦に蓄積・ShotGrid型／子項目なし） */
+function renderReviewBody(s,cur){
+  const ll=el('div','section-label');ll.appendChild(el('span',null,'動画FBログ / ディレクターチェック'));s.appendChild(ll);
+  const drop=el('label','file-drop');drop.innerHTML='<div>クリックして動画・画像をアップロード（このレビューのログに追加されます）</div>';
+  const fi=el('input');fi.type='file';fi.accept='image/*,video/*';drop.appendChild(fi);
+  const prog=el('div','uploading hidden');const bar=el('div','bar');const bi=el('i');bar.appendChild(bi);const pct=el('span',null,'処理中...');prog.appendChild(bar);prog.appendChild(pct);
+  fi.onchange=()=>{if(fi.files[0])uploadVersion(cur,fi.files[0],{prog,bi,pct})};
+  s.appendChild(drop);s.appendChild(prog);
+  if(!cur.versions.length){s.appendChild(el('div','empty','まだ動画・画像がアップされていません。上のエリアから追加してください。'));return}
+  const log=el('div','log');
+  [...cur.versions].reverse().forEach(v=>log.appendChild(logItem(cur,v)));
+  s.appendChild(log);
 }
 
 function nodeCard(node){
-  const kids=childrenOf(node.id);const card=el('div','vcard');
+  const isRev=node.type==='review';const kids=childrenOf(node.id);const card=el('div','vcard');
   const tw=el('div','vcard-thumb');
   if(node.thumbnail){const img=el('img');img.dataset.ref=node.thumbnail;tw.appendChild(img);const lv=node.versions[node.versions.length-1];if(lv&&lv.type==='video')tw.appendChild(el('div','vcard-play','▶'))}
-  else{const ni=el('div','vcard-noimg');ni.appendChild(el('div','g',kids.length?'▦':'◷'));ni.appendChild(el('div','lab',kids.length?(kids.length+' 項目'):'空'));tw.appendChild(ni)}
-  const st=STATUS[nodeStatus(node)];const bd=el('div','vcard-badge badge-'+st.cls,st.label);tw.appendChild(bd);
-  if(kids.length)tw.appendChild(el('div','vcard-cnt','📁 '+kids.length));
-  else if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length));
+  else{const ni=el('div','vcard-noimg');ni.appendChild(el('div','g',isRev?'🎬':'▦'));ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
+  const st=STATUS[nodeStatus(node)];tw.appendChild(el('div','vcard-badge badge-'+st.cls,st.label));
+  if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
+  else if(kids.length)tw.appendChild(el('div','vcard-cnt','📁 '+kids.length));
   const a=el('div','vcard-actions');const d=el('button','vcard-act','🗑');d.title='削除';d.onclick=e=>{e.stopPropagation();deleteNode(node)};a.appendChild(d);tw.appendChild(a);
-  const ov=el('div','vcard-ov');ov.appendChild(el('div','t',node.name));tw.appendChild(ov);
+  const ov=el('div','vcard-ov');ov.appendChild(el('div','t',(isRev?'🎬 ':'📁 ')+node.name));tw.appendChild(ov);
   card.appendChild(tw);card.onclick=()=>go(node.id);return card;
 }
 
@@ -468,28 +478,43 @@ function mFoot(body,btns){const f=el('div','modal-footer');for(const b of btns)f
 function frow(label,type){const r=el('div','form-row');r.appendChild(el('label','form-label',label));const f=type==='textarea'?el('textarea','form-input'):type==='select'?el('select','form-input'):el('input','form-input');r.appendChild(f);return{r,f}}
 
 /* 追加（単体） */
+function typeSelector(initial){
+  let sel=initial||'section';
+  const row=el('div','form-row');row.appendChild(el('label','form-label','ページ種別'));
+  const seg=el('div','seg');
+  const optS=el('button','seg-opt','📁 セクション');optS.type='button';optS.innerHTML='📁 セクション<small>工程・階層を管理／動画は不可</small>';
+  const optR=el('button','seg-opt','🎬 レビュー');optR.type='button';optR.innerHTML='🎬 レビュー<small>動画FBログを縦に残す</small>';
+  const apply=()=>{optS.classList.toggle('active',sel==='section');optR.classList.toggle('active',sel==='review')};
+  optS.onclick=()=>{sel='section';apply()};optR.onclick=()=>{sel='review';apply()};apply();
+  seg.appendChild(optS);seg.appendChild(optR);row.appendChild(seg);
+  return{row,get:()=>sel};
+}
 function openAddModal(parentId){
   openModal(body=>{
     const cur=parentId?getNode(parentId):null;
     const inner=mHead(body,'項目を追加',cur?('親: '+cur.name):'新規プロジェクト');
     const nameRow=frow(cur?'名前（例: ショット01 / レイアウト / モデリング など自由）':'プロジェクト名','input');
     const descRow=frow('説明（任意）','textarea');
-    inner.appendChild(nameRow.r);inner.appendChild(descRow.r);
-    if(cur){inner.appendChild(el('div','form-label','※ この項目の下にさらに階層を作ることも、動画ログを付けることもできます。'))}
+    inner.appendChild(nameRow.r);
+    // ルート直下(プロジェクト)もセクション/レビューを選べる。既定はセクション
+    const ts=typeSelector('section');inner.appendChild(ts.row);
+    inner.appendChild(descRow.r);
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','追加');
-    save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');const id=addNode(parentId,nameRow.f.value.trim(),descRow.f.value.trim());await persist();closeModal();go(parentId===null?parentId:parentId);state.expanded.add(parentId);render();resolveThumbs()};
+    save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');addNode(parentId,nameRow.f.value.trim(),descRow.f.value.trim(),ts.get());await persist();closeModal();if(parentId)state.expanded.add(parentId);render();resolveThumbs()};
     mFoot(body,[cancel,save]);
   });
 }
-function addNode(parentId,name,description){const node={id:newId('nd'),parentId:parentId,name,description:description||'',thumbnail:null,createdAt:nowIso(),versions:[]};DB.nodes.push(node);return node.id}
+function addNode(parentId,name,description,type){const node={id:newId('nd'),parentId:parentId,name,type:type||'section',description:description||'',thumbnail:null,createdAt:nowIso(),versions:[]};DB.nodes.push(node);return node.id}
 
 /* テンプレートから一括作成 */
 function openTemplateModal(parentId){
   openModal(body=>{
     const inner=mHead(body,'テンプレートから作成','選んだ工程を子項目として一括追加します');
+    const ts=typeSelector('review');inner.appendChild(ts.row);
+    inner.appendChild(el('div','form-label','作成する各項目の種別。工程（動画FBを上げる）なら「レビュー」、さらに枝分かれさせるなら「セクション」。'));
     const pick=el('div','tmpl-pick');
-    for(const t of DB.templates){const o=el('div','tmpl-opt');o.appendChild(el('div','tn',t.name));o.appendChild(el('div','ts',t.steps.map(s=>s.name).join(' ・ ')));o.onclick=async()=>{for(const st of t.steps)addNode(parentId,st.name,'');await persist();closeModal();state.expanded.add(parentId);render();resolveThumbs();toast(t.steps.length+'件の項目を追加しました')};pick.appendChild(o)}
+    for(const t of DB.templates){const o=el('div','tmpl-opt');o.appendChild(el('div','tn',t.name));o.appendChild(el('div','ts',t.steps.map(s=>s.name).join(' ・ ')));o.onclick=async()=>{for(const st of t.steps)addNode(parentId,st.name,'',ts.get());await persist();closeModal();state.expanded.add(parentId);render();resolveThumbs();toast(t.steps.length+'件の項目を追加しました')};pick.appendChild(o)}
     inner.appendChild(pick);
     inner.appendChild(el('div','divider'));
     inner.appendChild(el('div','form-label','独自の工程セットを作りたい場合は、上の「+ 追加」で1件ずつ自由に作成できます。'));
@@ -500,12 +525,16 @@ function openTemplateModal(parentId){
 /* 名称変更 */
 function openRename(node){
   openModal(body=>{
-    const inner=mHead(body,'名称・説明の変更');
+    const inner=mHead(body,'項目の設定',node.name);
     const nameRow=frow('名前','input');nameRow.f.value=node.name;
+    inner.appendChild(nameRow.r);
+    const ts=typeSelector(node.type);inner.appendChild(ts.row);
+    const kids=childrenOf(node.id).length,vers=node.versions.length;
+    if(kids||vers)inner.appendChild(el('div','form-label','※ 種別を変えてもデータは消えません（レビューにすると子項目は非表示、セクションにすると動画ログは非表示になります）。現在: 子'+kids+'件 / 動画'+vers+'本'));
     const descRow=frow('説明','textarea');descRow.f.value=node.description||'';
-    inner.appendChild(nameRow.r);inner.appendChild(descRow.r);
+    inner.appendChild(descRow.r);
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();await persist();closeModal();render()};
+    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();await persist();closeModal();render();resolveThumbs()};
     mFoot(body,[cancel,save]);
   });
 }
