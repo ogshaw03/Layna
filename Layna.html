@@ -117,16 +117,24 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .add-tile .p{font-size:26px}
 .empty{color:var(--text3);text-align:center;padding:50px 20px;border:1px dashed var(--border);border-radius:var(--radius)}
 
-/* LOG */
-.log{display:flex;flex-direction:column;gap:8px}
-.log-item{display:flex;gap:12px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;cursor:pointer;transition:border-color .15s}
+/* LOG（縦積み・大型タイル / ShotGrid風） */
+.log{display:flex;flex-direction:column;gap:18px;max-width:960px}
+.log-item{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .15s}
 .log-item:hover{border-color:var(--border2)}
-.log-thumb{width:104px;height:59px;border-radius:5px;background:#111 center/cover no-repeat;flex-shrink:0;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--text3)}
-.log-thumb .play{position:absolute;font-size:20px;color:rgba(255,255,255,.85)}
-.log-main{flex:1;min-width:0}
-.log-title{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
-.log-meta{font-size:11px;color:var(--text3);margin-top:3px}
-.log-note{font-size:12px;color:var(--text2);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-media{position:relative;background:#000;cursor:pointer}
+.log-media video,.log-media img{width:100%;display:block;max-height:62vh;object-fit:contain;background:#000}
+.log-media .ph{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:34px}
+.log-head{display:flex;align-items:center;gap:10px;padding:12px 16px 0}
+.log-title{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.log-meta{font-size:11px;color:var(--text3);white-space:nowrap}
+.log-notes{padding:10px 16px 14px;display:flex;flex-direction:column;gap:8px}
+.log-note{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px}
+.log-note .m{font-size:11px;color:var(--text3);margin-bottom:4px}
+.log-note .t{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word;line-height:1.65}
+.log-note-input{display:flex;gap:8px;padding:0 16px 16px}
+.log-note-input textarea{flex:1;min-height:38px;max-height:140px;resize:vertical;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;line-height:1.5}
+.log-note-input textarea:focus{outline:none;border-color:var(--border2)}
+.log-empty-note{font-size:12px;color:var(--text3)}
 .file-drop{border:1px dashed var(--border2);border-radius:10px;padding:16px;text-align:center;color:var(--text3);font-size:13px;cursor:pointer;margin-bottom:12px}
 .file-drop:hover{border-color:var(--accent);color:var(--text2)}
 .file-drop input{display:none}
@@ -474,14 +482,45 @@ function nodeCard(node){
 
 function logItem(node,v){
   const it=el('div','log-item');
-  const th=el('div','log-thumb');if(v.thumb){th.dataset.ref=v.thumb;if(v.type==='video')th.appendChild(el('div','play','▶'))}else th.textContent=v.type==='video'?'▶':'🖼';
-  it.appendChild(th);
-  const main=el('div','log-main');
-  const title=el('div','log-title');title.appendChild(document.createTextNode(v.name));const st=STATUS[v.review.status];const b=el('span','badge badge-'+st.cls,st.label);b.style.fontSize='10px';b.style.padding='1px 8px';title.appendChild(b);main.appendChild(title);
-  main.appendChild(el('div','log-meta','by '+(v.uploadedBy||'-')+'・'+fmt(v.uploadedAt)+'・💬 '+v.review.notes.length));
-  const last=v.review.notes[v.review.notes.length-1];if(last)main.appendChild(el('div','log-note','“'+last.text+'”'));
-  it.appendChild(main);
-  it.onclick=()=>openReview(node.id,v.id);
+  // 大型メディア（動画はインライン再生可・画像はそのまま表示）
+  const media=el('div','log-media');
+  if(v.type==='video'){
+    const vid=el('video');vid.dataset.vref=v.file;if(v.thumb)vid.dataset.poster=v.thumb;
+    vid.controls=true;vid.preload='metadata';vid.playsInline=true;
+    media.appendChild(vid);
+  }else{
+    const img=el('img');img.dataset.ref=v.file;img.alt=v.name;
+    img.style.cursor='zoom-in';img.onclick=()=>openReview(node.id,v.id);
+    media.appendChild(img);
+  }
+  it.appendChild(media);
+  // ヘッダ行：バージョン名・判定・メタ・詳細ボタン
+  const head=el('div','log-head');
+  const title=el('div','log-title');title.appendChild(document.createTextNode(v.name));
+  const st=STATUS[v.review.status];title.appendChild(el('span','badge badge-'+st.cls,st.label));
+  head.appendChild(title);
+  head.appendChild(el('span','log-meta','by '+(v.uploadedBy||'-')+'・'+fmt(v.uploadedAt)));
+  const detail=el('button','btn btn-ghost btn-sm','チェック / 詳細');detail.onclick=()=>openReview(node.id,v.id);head.appendChild(detail);
+  it.appendChild(head);
+  // コメント全文（改行込み）をタイルの下に表示
+  const notes=el('div','log-notes');
+  if(!v.review.notes.length)notes.appendChild(el('div','log-empty-note','コメントはまだありません。'));
+  for(const n of v.review.notes){
+    const note=el('div','log-note');
+    note.appendChild(el('div','m',n.author+'・'+fmt(n.time)));
+    note.appendChild(el('div','t',n.text));
+    notes.appendChild(note);
+  }
+  it.appendChild(notes);
+  // インラインのコメント入力（Shift+Enterで改行、Enterで送信）
+  const iw=el('div','log-note-input');
+  const ta=el('textarea');ta.placeholder='コメントを書く…（Shift+Enterで改行）';
+  const sb=el('button','btn btn-primary btn-sm','送信');
+  const send=async()=>{const txt=ta.value.trim();if(!txt)return;v.review.notes.push({author:currentUser(),text:txt,time:nowIso()});await persist();renderBody();resolveThumbs()};
+  sb.onclick=send;
+  ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
+  iw.appendChild(ta);iw.appendChild(sb);
+  it.appendChild(iw);
   return it;
 }
 
