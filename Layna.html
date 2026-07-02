@@ -180,10 +180,20 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .clr-row{display:inline-flex;gap:4px;align-items:center}
 .clr-chip{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
 .clr-chip.sel{border-color:#fff;transform:scale(1.15)}
-.layer-row{display:inline-flex;gap:3px;align-items:center}
-.layer-chip{min-width:24px;height:24px;border-radius:5px;border:1px solid var(--border);color:var(--text3);font-size:11px;display:flex;align-items:center;justify-content:center}
-.layer-chip.act{border-color:#e8e8ec;color:#e8e8ec;background:rgba(255,255,255,.1)}
-.layer-chip.off{opacity:.35;text-decoration:line-through}
+/* レイヤーパネル（FB画面右側・プレビュー付き） */
+.fb-layers{width:152px;border-left:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;min-height:0;flex-shrink:0}
+.fb-layers-head{font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;padding:10px 10px 6px}
+.fb-layers-list{flex:1;overflow-y:auto;padding:0 8px 8px;display:flex;flex-direction:column;gap:6px}
+.lyr-card{border:1px solid var(--border);border-radius:8px;background:var(--bg3);cursor:pointer;overflow:hidden;flex-shrink:0}
+.lyr-card.act{border-color:#e8e8ec}
+.lyr-card.off{opacity:.4}
+.lyr-head{display:flex;align-items:center;gap:6px;padding:4px 7px;font-size:11px;color:var(--text2)}
+.lyr-head .nm{flex:1;font-family:var(--font-head);font-weight:700}
+.lyr-eye{font-size:11px;color:var(--text3);cursor:pointer;padding:1px 4px;border-radius:4px}
+.lyr-eye:hover{color:var(--text)}
+.lyr-prev{display:block;width:100%;background:#101013}
+.lyr-add{margin:2px 0 10px;padding:7px;border:1px dashed var(--border2);border-radius:8px;color:var(--text3);font-size:12px;flex-shrink:0}
+.lyr-add:hover{color:var(--text);border-color:#e8e8ec}
 .fb-controls{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg2);border-top:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
 .fb-tl-wrap{background:var(--bg2);border-top:1px solid var(--border);padding:8px 12px 2px;flex-shrink:0}
 .fb-timeline{display:block;width:100%;height:46px;cursor:ew-resize;touch-action:none;border-radius:6px}
@@ -789,7 +799,7 @@ function openReview(nodeId,versionId){
   const ov=el('div','fb-overlay');ov.id='fbOverlay';
 
   let FPS=v.fps||24,totalFrames=1,lastFrame=-1;
-  let drawMode=false,pending=[],stroke=null;
+  let tool=null,erasing=false,pending=[],stroke=null;
 
   function close(){document.removeEventListener('keydown',onKey);ov.remove();render();resolveThumbs()}
 
@@ -849,17 +859,22 @@ function openReview(nodeId,versionId){
   const ghostBtn=el('button','btn btn-ghost btn-sm tool','ゴースト');ghostBtn.title='前後フレームのアノテーションを半透明表示';
   const eyeBtn=el('button','btn btn-ghost btn-sm tool active','👁');eyeBtn.title='アノテーションの表示/非表示';
   const traceBtn=el('button','btn btn-ghost btn-sm','トレペ 0%');traceBtn.title='白レイヤー（トラッキングペーパー）の濃さを25%ずつ切替';
-  /* レイヤー L1〜L5（クリック=選択 / 選択中を再クリック=表示切替） */
-  const layerRow=el('span','layer-row');layerRow.title='レイヤー：クリックで選択、選択中をもう一度クリックで表示/非表示';
+  const eraserBtn=el('button','btn btn-ghost btn-sm tool','◌ 消しゴム');eraserBtn.title='未送信の線をドラッグで消す';
   const undoBtn=el('button','btn btn-ghost btn-sm','↩');undoBtn.title='直前の線を取り消し';
   const clearBtn=el('button','btn btn-ghost btn-sm','クリア');clearBtn.title='未送信の描画を消す';
   if(isVideo){ctr.appendChild(playBtn);ctr.appendChild(prevBtn);ctr.appendChild(nextBtn);ctr.appendChild(frameLab);ctr.appendChild(fpsSel)}
-  ctr.appendChild(drawBtn);ctr.appendChild(clrRow);ctr.appendChild(colorIn);
+  ctr.appendChild(drawBtn);ctr.appendChild(eraserBtn);ctr.appendChild(clrRow);ctr.appendChild(colorIn);
   if(isVideo){ctr.appendChild(durSel);ctr.appendChild(ghostBtn)}
-  ctr.appendChild(eyeBtn);ctr.appendChild(traceBtn);ctr.appendChild(layerRow);
+  ctr.appendChild(eyeBtn);ctr.appendChild(traceBtn);
   ctr.appendChild(undoBtn);ctr.appendChild(clearBtn);
   stage.appendChild(ctr);
   body.appendChild(stage);
+
+  /* --- レイヤーパネル（動画右側・プレビュー付き縦並び） --- */
+  const layersPanel=el('div','fb-layers');
+  layersPanel.appendChild(el('div','fb-layers-head','レイヤー'));
+  const lyrList=el('div','fb-layers-list');layersPanel.appendChild(lyrList);
+  body.appendChild(layersPanel);
 
   /* --- サイドパネル（コメント） --- */
   const side=el('div','fb-side');
@@ -988,14 +1003,52 @@ function openReview(nodeId,versionId){
   const durOf=n=>{const d=parseInt(n.dur);return isNaN(d)?1:d};
   const visibleAt=(n,f)=>!isVideo||(n.frame!=null&&f>=n.frame&&f<n.frame+durOf(n));
   const layerOn=s=>layerVis[((s.layer||1)-1)];
-  /* レイヤーチップ */
-  function redrawLayers(){[...layerRow.children].forEach((c,i)=>{c.classList.toggle('act',activeLayer===i+1);c.classList.toggle('off',!layerVis[i])})}
-  for(let i=1;i<=5;i++){
-    const c=el('button','layer-chip',String(i));
-    c.onclick=()=>{if(activeLayer===i)layerVis[i-1]=!layerVis[i-1];else activeLayer=i;redrawLayers();drawAll()};
-    layerRow.appendChild(c);
+  /* レイヤーパネル：既存データの最大レイヤーから初期枚数を決定 */
+  let layerCount=1;
+  for(const n of v.review.notes)for(const s of (n.drawing||[]))layerCount=Math.max(layerCount,s.layer||1);
+  const lyrCards=[];
+  function buildLayerPanel(){
+    lyrList.innerHTML='';lyrCards.length=0;
+    for(let i=1;i<=layerCount;i++){
+      const card=el('div','lyr-card');
+      const h=el('div','lyr-head');
+      h.appendChild(el('span','nm','L'+i));
+      const eye=el('span','lyr-eye','👁');eye.title='このレイヤーの表示/非表示';
+      eye.onclick=ev=>{ev.stopPropagation();layerVis[i-1]=!layerVis[i-1];drawAll()};
+      h.appendChild(eye);card.appendChild(h);
+      const cv=el('canvas','lyr-prev');cv.width=134;cv.height=75;card.appendChild(cv);
+      card.onclick=()=>{activeLayer=i;drawAll()};
+      lyrList.appendChild(card);lyrCards.push({card,cv,eye,i});
+    }
+    if(layerCount<5){
+      const add=el('button','lyr-add','＋ レイヤーを追加');
+      add.onclick=()=>{layerCount++;activeLayer=layerCount;buildLayerPanel();drawAll()};
+      lyrList.appendChild(add);
+    }
+    updateLayerPanel();
   }
-  redrawLayers();
+  function updateLayerPanel(){
+    const f=dispFrame?dispFrame():null;
+    const pdur=parseInt(durSel.value)||1;
+    const inWin=p=>!isVideo||(p.f!=null&&f>=p.f&&f<p.f+pdur);
+    for(const {card,cv,eye,i} of lyrCards){
+      card.classList.toggle('act',activeLayer===i);
+      card.classList.toggle('off',!layerVis[i-1]);
+      eye.textContent=layerVis[i-1]?'👁':'—';
+      const c=cv.getContext('2d');c.fillStyle='#101013';c.fillRect(0,0,cv.width,cv.height);
+      const list=[];
+      for(const n of v.review.notes)if(n.drawing&&n.drawing.length&&visibleAt(n,f))for(const s of n.drawing)if((s.layer||1)===i)list.push(s);
+      for(const p of pending)if(inWin(p)&&(p.layer||1)===i)list.push(p);
+      if(stroke&&inWin(stroke)&&(stroke.layer||1)===i)list.push(stroke);
+      for(const s of list){
+        if(!s.points||s.points.length<2)continue;
+        c.strokeStyle=s.color||'#ff4d4d';c.lineWidth=1.6;c.lineJoin=c.lineCap='round';
+        c.beginPath();c.moveTo(s.points[0][0]*cv.width,s.points[0][1]*cv.height);
+        for(let k=1;k<s.points.length;k++)c.lineTo(s.points[k][0]*cv.width,s.points[k][1]*cv.height);
+        c.stroke();
+      }
+    }
+  }
   eyeBtn.onclick=()=>{annotVisible=!annotVisible;eyeBtn.classList.toggle('active',annotVisible);eyeBtn.textContent=annotVisible?'👁':'—';drawAll()};
   traceBtn.onclick=()=>{traceOp=(traceOp+25)%125;trace.style.opacity=traceOp/100;traceBtn.textContent='トレペ '+traceOp+'%'};
   function paintStrokes(ctx,list,alpha){
@@ -1031,16 +1084,42 @@ function openReview(nodeId,versionId){
     const pend=pending.filter(p=>inWin(p)&&layerOn(p));
     if(stroke&&inWin(stroke)&&layerOn(stroke))pend.push(stroke);
     paintStrokes(ctx,pend,1);
+    updateLayerPanel();
   }
   durSel.onchange=()=>{drawAll();drawTimeline()};
   ghostBtn.onclick=()=>{ghostOn=!ghostOn;ghostBtn.classList.toggle('active',ghostOn);drawAll()};
   const pt=e=>{const r=canvas.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
-  drawBtn.onclick=()=>{drawMode=!drawMode;drawBtn.classList.toggle('active',drawMode);canvas.style.pointerEvents=drawMode?'auto':'none';if(drawMode&&isVideo)media.pause()};
-  canvas.onpointerdown=e=>{if(!drawMode)return;canvas.setPointerCapture(e.pointerId);stroke={color:colorIn.value,points:[pt(e)],f:dispFrame(),layer:activeLayer}};
-  canvas.onpointermove=e=>{if(stroke){stroke.points.push(pt(e));drawAll()}};
-  canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll()}};
+  /* ツール切替（描画 / 消しゴム） */
+  function setTool(t){
+    tool=t;
+    drawBtn.classList.toggle('active',tool==='draw');
+    eraserBtn.classList.toggle('active',tool==='erase');
+    canvas.style.pointerEvents=tool?'auto':'none';
+    if(tool&&isVideo)media.pause();
+  }
+  drawBtn.onclick=()=>setTool(tool==='draw'?null:'draw');
+  eraserBtn.onclick=()=>setTool(tool==='erase'?null:'erase');
+  /* 消しゴム：カーソル付近の未送信ストロークを削除 */
+  function eraseAt(e){
+    const [x,y]=pt(e);const r=12/canvas.width;const f=dispFrame();
+    const pdur=parseInt(durSel.value)||1;
+    const inWin=p=>!isVideo||(p.f!=null&&f>=p.f&&f<p.f+pdur);
+    const before=pending.length;
+    pending=pending.filter(p=>{
+      if(!inWin(p)||!layerOn(p))return true;
+      return !p.points.some(q=>Math.hypot(q[0]-x,(q[1]-y)*canvas.height/canvas.width)<r);
+    });
+    if(pending.length!==before)drawAll();
+  }
+  canvas.onpointerdown=e=>{
+    if(tool==='draw'){canvas.setPointerCapture(e.pointerId);stroke={color:colorIn.value,points:[pt(e)],f:dispFrame(),layer:activeLayer}}
+    else if(tool==='erase'){canvas.setPointerCapture(e.pointerId);erasing=true;eraseAt(e)}
+  };
+  canvas.onpointermove=e=>{if(stroke){stroke.points.push(pt(e));drawAll()}else if(erasing)eraseAt(e)};
+  canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll()}erasing=false};
   undoBtn.onclick=()=>{pending.pop();drawAll()};
   clearBtn.onclick=()=>{pending=[];stroke=null;drawAll()};
+  buildLayerPanel();
 
   /* --- 再生同期（フレーム表示・そのフレームの描画・タイムライン） --- */
   function sync(force){
