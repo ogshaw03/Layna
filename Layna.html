@@ -82,6 +82,10 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .main-head .desc{color:var(--text3);font-size:12px;margin-top:3px}
 .main-head .spacer{flex:1}
 .scroll{flex:1;overflow-y:auto;padding:14px 20px 28px}
+/* 単色ラインアイコン */
+.ico{width:1.05em;height:1.05em;vertical-align:-0.16em;flex-shrink:0}
+button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-chip .ico{margin-right:.4em}
+.ico+*{vertical-align:middle}
 /* プロジェクトのタイムライン・ホーム */
 .home-flex{display:flex;gap:20px;align-items:flex-start}
 .home-main{flex:1;min-width:0}
@@ -98,7 +102,11 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .tl-path{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl-title{font-size:14px;font-weight:600;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tl-stage{display:inline-block;padding:1px 9px;border-radius:5px;font-size:10px;font-weight:700;color:#101013}
+.tl-kind{font-size:10px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:0 6px}
+.tl-fchip{font-size:10px;color:#9ec5ff;border:1px solid rgba(96,165,255,.5);border-radius:4px;padding:0 6px}
+.tl-comment{font-size:13px;color:var(--text);margin-top:5px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
 .tl-meta{font-size:11px;color:var(--text3);margin-top:4px}
+.tl-item.is-comment .tl-thumb{opacity:.85}
 .filter-dd{position:relative;display:inline-block}
 .filter-panel{position:absolute;right:0;top:calc(100% + 6px);background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;min-width:210px;max-height:340px;overflow-y:auto;z-index:30;box-shadow:0 8px 26px rgba(0,0,0,.55)}
 .filter-panel.hidden{display:none}
@@ -335,12 +343,12 @@ textarea.form-input{height:70px;resize:vertical}
   <button class="home-btn" id="homeBtn" title="トップへ">◐</button>
   <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
-    <button class="btn btn-ghost" id="shotListBtn" title="ショットリスト — 全ショットの最新動画をタイル一覧（別ウィンドウ）">📋 ショット</button>
-    <button class="btn btn-ghost" id="progressBtn" title="進捗管理 — 工程ごとのステータスを表と円グラフで確認（別ウィンドウ）">📊 進捗</button>
-    <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）">🎞 REEL</button>
+    <button class="btn btn-ghost" id="shotListBtn" title="ショットリスト — 全ショットの最新動画をタイル一覧（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5.5h11M6 10h11M6 14.5h11"/><path d="M3 5.5h.01M3 10h.01M3 14.5h.01"/></svg>ショット</button>
+    <button class="btn btn-ghost" id="progressBtn" title="進捗管理 — 工程ごとのステータスを表と円グラフで確認（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v14h14"/><path d="M7 13v-3M10.5 13V7M14 13v-5"/></svg>進捗</button>
+    <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
-    <label class="user-field" id="nameField"><span>👤</span><input id="currentUser" type="text" placeholder="名前" /></label>
+    <label class="user-field" id="nameField"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4.5 16.5a5.5 5.5 0 0 1 11 0"/></svg><input id="currentUser" type="text" placeholder="名前" /></label>
     <div class="hd-user hidden" id="authUserBox"></div>
     <button class="btn btn-primary" id="addBtn">+ 追加</button>
   </div>
@@ -460,6 +468,24 @@ function reviewToStatus(st){return st}
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+/* --- 単色ラインアイコン（currentColor でツールの色味に追従） --- */
+const ICONS={
+  folder:'<path d="M2.5 5.5A1.5 1.5 0 0 1 4 4h3.3l1.5 1.8H16A1.5 1.5 0 0 1 17.5 7.3v7.2A1.5 1.5 0 0 1 16 16H4a1.5 1.5 0 0 1-1.5-1.5z"/>',
+  film:'<rect x="2.5" y="4" width="15" height="12" rx="1.5"/><path d="M6.5 4v12M13.5 4v12M2.5 8h4M13.5 8h4M2.5 12h4M13.5 12h4"/>',
+  chart:'<path d="M3 3v14h14"/><path d="M7 13v-3M10.5 13V7M14 13v-5"/>',
+  reel:'<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/>',
+  list:'<path d="M6 5.5h11M6 10h11M6 14.5h11"/><path d="M3 5.5h.01M3 10h.01M3 14.5h.01"/>',
+  user:'<circle cx="10" cy="7" r="3"/><path d="M4.5 16.5a5.5 5.5 0 0 1 11 0"/>',
+  trash:'<path d="M4 6h12M8 6V4.5A1 1 0 0 1 9 3.5h2a1 1 0 0 1 1 1V6M6.5 6l.6 9a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-9"/>',
+  comment:'<path d="M4 4.5h12A1.5 1.5 0 0 1 17.5 6v6A1.5 1.5 0 0 1 16 13.5H8l-4 3v-3A1.5 1.5 0 0 1 2.5 12V6A1.5 1.5 0 0 1 4 4.5z"/>',
+  upload:'<path d="M10 13V4M6.5 7.5 10 4l3.5 3.5M4 16h12"/>',
+  home:'<path d="M3.5 9.5 10 4l6.5 5.5M5 8.5V16h10V8.5"/>',
+  play:'<path d="M6.5 4.5v11l9-5.5z"/>',
+  section:'<path d="M2.5 5.5A1.5 1.5 0 0 1 4 4h3.3l1.5 1.8H16A1.5 1.5 0 0 1 17.5 7.3v7.2A1.5 1.5 0 0 1 16 16H4a1.5 1.5 0 0 1-1.5-1.5z"/>',
+};
+function icoEl(name,doc){doc=doc||document;const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','ico');svg.setAttribute('viewBox','0 0 20 20');svg.setAttribute('width','1em');svg.setAttribute('height','1em');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.55');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.style.verticalAlign='-0.16em';svg.style.flexShrink='0';svg.innerHTML=ICONS[name]||'';return svg}
+/* アイコン＋テキストの要素を作る（el 相当）。textは任意 */
+function elIco(tag,cls,name,text){const e=el(tag,cls);e.appendChild(icoEl(name));if(text!=null){e.appendChild(document.createTextNode(text))}return e}
 let authUser=null; // {name,email,photo,role} when Google認証時
 const currentUser=()=>authUser?authUser.name:(($('#currentUser').value||'').trim()||'anonymous');
 function toast(m){const t=el('div','toast',m);document.body.appendChild(t);setTimeout(()=>t.remove(),2400)}
@@ -517,6 +543,9 @@ function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody
 /* サイドバー：ツリー */
 function renderSidebar(){
   const sb=$('#sidebar');sb.innerHTML='';
+  /* ホーム画面（プロジェクト選択）ではサイドバーを表示しない */
+  if(!state.currentId){sb.style.display='none';return}
+  sb.style.display='';
   const lab=el('div','sidebar-label');lab.appendChild(el('span',null,'プロジェクト'));const add=el('span','add','＋');add.title='プロジェクトを追加';add.onclick=()=>openAddModal(null);lab.appendChild(add);sb.appendChild(lab);
   const roots=childrenOf(null);
   if(!roots.length){sb.appendChild(el('div','tree-empty','プロジェクトなし'));return}
@@ -531,10 +560,10 @@ function renderTreeNode(container,node,depth){
   if(kids.length)tg.onclick=e=>{e.stopPropagation();if(state.expanded.has(node.id))state.expanded.delete(node.id);else state.expanded.add(node.id);renderSidebar()};
   row.appendChild(tg);
   const dot=el('span','tree-dot');dot.style.background=stInfo(node).color;row.appendChild(dot);
-  const ico=el('span',null,node.type==='review'?'🎬':'📁');ico.style.cssText='font-size:11px;flex-shrink:0';row.appendChild(ico);
+  const ico=icoEl(node.type==='review'?'film':'folder');ico.style.flexShrink='0';row.appendChild(ico);
   row.appendChild(el('span','tree-name',node.name));
   if(node.type==='review'&&node.versions.length)row.appendChild(el('span','tree-badge','▶'+node.versions.length));
-  else if(kids.length)row.appendChild(el('span','tree-badge','📁'+kids.length));
+  else if(kids.length){const tb=elIco('span','tree-badge','folder',String(kids.length));row.appendChild(tb)}
   row.onclick=()=>go(node.id);
   container.appendChild(row);
   if(kids.length&&state.expanded.has(node.id)){const wrap=el('div');for(const c of kids)renderTreeNode(wrap,c,depth+1);container.appendChild(wrap)}
@@ -543,8 +572,17 @@ function renderTreeNode(container,node,depth){
 /* パンくず */
 function renderBreadcrumb(){
   const bc=$('#breadcrumb');bc.innerHTML='';
-  const home=el('a',null,'▦ トップ');home.onclick=()=>go(null);bc.appendChild(home);
-  for(const n of pathOf(state.currentId)){bc.appendChild(el('span','sep','/'));const isCur=n.id===state.currentId;const a=el(isCur?'span':'a',isCur?'cur':null,n.name);if(!isCur)a.onclick=()=>go(n.id);bc.appendChild(a)}
+  const path=pathOf(state.currentId);
+  /* プロジェクト選択画面（ホーム）はヘッダーのホームボタンからのみ。
+     プロジェクト内のパンくずはプロジェクトを起点にし、ホームには戻さない */
+  if(!path.length){bc.appendChild(elIco('span','cur','home','ホーム'));return}
+  path.forEach((n,i)=>{
+    if(i>0)bc.appendChild(el('span','sep','/'));
+    const isCur=n.id===state.currentId;
+    const a=el(isCur?'span':'a',isCur?'cur':null,n.name);
+    if(!isCur)a.onclick=()=>go(n.id);
+    bc.appendChild(a);
+  });
 }
 
 /* メインヘッダ */
@@ -555,7 +593,7 @@ function renderMainHead(){
   if(cur){
     title.appendChild(document.createTextNode(cur.name));
     const st=stInfo(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;title.appendChild(bg);
-    title.appendChild(el('span','type-chip',cur.type==='review'?'🎬 レビュー':'📁 セクション'));
+    title.appendChild(elIco('span','type-chip',cur.type==='review'?'film':'folder',cur.type==='review'?'レビュー':'セクション'));
   }else title.textContent='プロジェクト一覧';
   box.appendChild(title);
   if(cur&&cur.description)box.appendChild(el('div','desc',cur.description));
@@ -614,10 +652,19 @@ function renderBody(){
   else renderSectionBody(s,cur);
 }
 
-/* プロジェクト（ルート）配下の更新イベント（バージョンアップロード）を新着順で */
+/* プロジェクト（ルート）配下の更新イベントを新着順で。
+   アップロード＋各コメント/アノテーションをすべて含む活動フィード */
 function projectUpdates(rootId){
   const evs=[];
-  for(const n of descendants(rootId))if(n.type==='review')for(const v of (n.versions||[]))evs.push({node:n,v,time:v.uploadedAt||'',stage:n.name});
+  for(const n of descendants(rootId))if(n.type==='review')for(const v of (n.versions||[])){
+    const notes=(v.review&&v.review.notes)||[];
+    const upNote=notes.find(x=>x.kind==='upload');
+    evs.push({type:'upload',node:n,v,time:v.uploadedAt||'',stage:n.name,comment:upNote?upNote.text:null});
+    for(const nt of notes){
+      if(nt.kind==='upload')continue;
+      evs.push({type:'comment',node:n,v,note:nt,time:nt.time||v.uploadedAt||'',stage:n.name});
+    }
+  }
   evs.sort((a,b)=>a.time<b.time?1:a.time>b.time?-1:0);
   return evs;
 }
@@ -628,8 +675,7 @@ function tlHiddenSet(rootId){if(state.tlHiddenFor!==rootId){state.tlHiddenFor=ro
 
 /* プロジェクトのトップ＝タイムライン＋右サイドバー（下階層の縦並び） */
 function renderProjectHome(s,cur){
-  const wrap=el('div','home-flex');
-  const main=el('div','home-main');const side=el('div','home-side');
+  const main=el('div','home-main');
   const hidden=tlHiddenSet(cur.id);
   const evs=projectUpdates(cur.id).filter(e=>!hidden.has(e.stage));
   const lab=el('div','section-label');lab.appendChild(el('span',null,'最新の更新タイムライン'));
@@ -639,7 +685,8 @@ function renderProjectHome(s,cur){
   }else{
     const tl=el('div','tl');
     for(const e of evs){
-      const it=el('div','tl-item');
+      const isC=e.type==='comment';
+      const it=el('div','tl-item'+(isC?' is-comment':''));
       const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;th.onclick=()=>go(e.node.id);
       it.appendChild(th);
       const bd=el('div','tl-body');
@@ -648,28 +695,23 @@ function renderProjectHome(s,cur){
       const t=el('div','tl-title');
       const sb=el('span','tl-stage',e.stage);sb.style.background=stageColor(e.stage);t.appendChild(sb);
       t.appendChild(el('span',null,(shot?shot.name+'　':'')+e.v.name));
+      t.appendChild(elIco('span','tl-kind',isC?'comment':'upload',isC?'コメント':'アップロード'));
+      if(isC&&e.note.frame!=null)t.appendChild(el('span','tl-fchip','F'+e.note.frame));
+      if(isC&&e.note.drawing&&e.note.drawing.length)t.appendChild(el('span','tl-fchip','アノテ'));
       bd.appendChild(t);
+      const txt=isC?e.note.text:e.comment;
+      if(txt)bd.appendChild(el('div','tl-comment',txt));
       const st=stInfo(e.node);
-      bd.appendChild(el('div','tl-meta','by '+(e.v.uploadedBy||'-')+'・'+fmt(e.v.uploadedAt)+'　［'+st.label+'］'));
+      const who=isC?(e.note.author||'-'):(e.v.uploadedBy||'-');
+      const when=isC?e.note.time:e.v.uploadedAt;
+      bd.appendChild(el('div','tl-meta','by '+who+'・'+fmt(when)+(isC?'':'　［'+st.label+'］')));
       it.appendChild(bd);
       const open=el('button','btn btn-ghost btn-sm','開く');open.style.alignSelf='center';open.onclick=()=>go(e.node.id);it.appendChild(open);
       tl.appendChild(it);
     }
     main.appendChild(tl);
   }
-  side.appendChild(el('h3',null,'プロジェクト下階層'));
-  const kids=childrenOf(cur.id);
-  if(!kids.length)side.appendChild(el('div','empty','項目がありません'));
-  for(const k of kids){
-    const it=el('div','hs-item');
-    it.appendChild(el('span','ic',k.type==='review'?'🎬':'📁'));
-    it.appendChild(el('span','nm',k.name));
-    it.appendChild(el('span','ct',k.type==='review'?((k.versions&&k.versions.length||0)+'本'):(childrenOf(k.id).length+'項目')));
-    it.onclick=()=>go(k.id);
-    side.appendChild(it);
-  }
-  wrap.appendChild(main);wrap.appendChild(side);
-  s.appendChild(wrap);
+  s.appendChild(main);
 }
 
 /* セクションページ（子項目タイルのみ・動画追加不可） */
@@ -726,17 +768,17 @@ function nodeCard(node,isRoot){
       const img=el('img');img.dataset.ref=node.thumbnail;tw.appendChild(img);
     }
   }
-  else{const ni=el('div','vcard-noimg');ni.appendChild(el('div','g',isRev?'🎬':'▦'));ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
+  else{const ni=el('div','vcard-noimg');const g=el('div','g');g.appendChild(icoEl(isRev?'film':'section'));ni.appendChild(g);ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
   const stI=stInfo(node);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
   if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
-  else if(kids.length)tw.appendChild(el('div','vcard-cnt','📁 '+kids.length));
+  else if(kids.length)tw.appendChild(elIco('div','vcard-cnt','folder',' '+kids.length));
   /* このショットのいずれかのバージョンを含む保存済みリール（紐づけを可視化） */
   if(isRev){
     const rls=(DB.reels||[]).filter(r=>r.clips.some(c=>node.versions.some(v=>v.id===c.vId)));
-    if(rls.length){const rb=el('div','vcard-reel','🎞 '+rls.map(r=>r.name).join(' / '));rb.title='このショットを含むリール';rb.onclick=e=>{e.stopPropagation();openReelFromSaved(rls[0].id)};tw.appendChild(rb)}
+    if(rls.length){const rb=elIco('div','vcard-reel','reel',' '+rls.map(r=>r.name).join(' / '));rb.title='このショットを含むリール';rb.onclick=e=>{e.stopPropagation();openReelFromSaved(rls[0].id)};tw.appendChild(rb)}
   }
-  const a=el('div','vcard-actions');const d=el('button','vcard-act','🗑');d.title='削除';d.onclick=e=>{e.stopPropagation();deleteNode(node)};a.appendChild(d);tw.appendChild(a);
-  if(!isRoot){const ov=el('div','vcard-ov');ov.appendChild(el('div','t',(isRev?'🎬 ':'📁 ')+node.name));tw.appendChild(ov)}
+  const a=el('div','vcard-actions');const d=el('button','vcard-act');d.appendChild(icoEl('trash'));d.title='削除';d.onclick=e=>{e.stopPropagation();deleteNode(node)};a.appendChild(d);tw.appendChild(a);
+  if(!isRoot){const ov=el('div','vcard-ov');ov.appendChild(elIco('div','t',isRev?'film':'folder',' '+node.name));tw.appendChild(ov)}
   card.appendChild(tw);
   /* プロジェクト一覧では名前をタイルの外（下）に大きく表示 */
   if(isRoot)card.appendChild(el('div','vcard-name-big',node.name));
@@ -910,10 +952,10 @@ function logItem(node,v){
   const title=el('div','log-title');title.appendChild(document.createTextNode(v.name));
   head.appendChild(title);
   head.appendChild(el('span','log-meta','by '+(v.uploadedBy||'-')+'・'+fmt(v.uploadedAt)));
-  if(v.type==='video'){const rb=el('button','btn btn-ghost btn-sm','🎞');rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);head.appendChild(rb)}
+  if(v.type==='video'){const rb=el('button','btn btn-ghost btn-sm');rb.appendChild(icoEl('reel'));rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);head.appendChild(rb)}
   /* この動画が含まれる保存済みリール */
   for(const r of (DB.reels||[]).filter(r=>r.clips.some(c=>c.vId===v.id)).slice(0,2)){
-    const lb=el('button','btn btn-ghost btn-sm','🎞 '+r.name);lb.title='保存済みリールを開く';
+    const lb=elIco('button','btn btn-ghost btn-sm','reel',' '+r.name);lb.title='保存済みリールを開く';
     lb.onclick=()=>openReelFromSaved(r.id);head.appendChild(lb);
   }
   const detail=el('button','btn btn-ghost btn-sm','チェック / 詳細');detail.onclick=()=>openReview(node.id,v.id);head.appendChild(detail);
@@ -977,8 +1019,10 @@ function typeSelector(initial){
   let sel=initial||'section';
   const row=el('div','form-row');row.appendChild(el('label','form-label','ページ種別'));
   const seg=el('div','seg');
-  const optS=el('button','seg-opt','📁 セクション');optS.type='button';optS.innerHTML='📁 セクション<small>工程・階層を管理／動画は不可</small>';
-  const optR=el('button','seg-opt','🎬 レビュー');optR.type='button';optR.innerHTML='🎬 レビュー<small>動画FBログを縦に残す</small>';
+  const svgS='<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">'+ICONS.folder+'</svg>';
+  const svgR='<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">'+ICONS.film+'</svg>';
+  const optS=el('button','seg-opt');optS.type='button';optS.innerHTML=svgS+'セクション<small>工程・階層を管理／動画は不可</small>';
+  const optR=el('button','seg-opt');optR.type='button';optR.innerHTML=svgR+'レビュー<small>動画FBログを縦に残す</small>';
   const apply=()=>{optS.classList.toggle('active',sel==='section');optR.classList.toggle('active',sel==='review')};
   optS.onclick=()=>{sel='section';apply()};optR.onclick=()=>{sel='review';apply()};apply();
   seg.appendChild(optS);seg.appendChild(optR);row.appendChild(seg);
@@ -1083,7 +1127,7 @@ async function uploadVersion(node,file,ui,opts){
     /* 名前：入力があればそれ、空欄なら動画のタイトル（拡張子なしのファイル名） */
     const vname=(opts.name&&opts.name.trim())||file.name.replace(/\.[^.]+$/,'');
     const version={id:newId('ver'),name:vname,type:isVideo?'video':'image',file:mediaRef,thumb:thumbRef,uploadedBy:currentUser(),uploadedAt:nowIso(),review:{status:'pending',notes:[]}};
-    if(opts.comment&&opts.comment.trim())version.review.notes.push({author:currentUser(),text:opts.comment.trim(),time:nowIso()});
+    if(opts.comment&&opts.comment.trim())version.review.notes.push({author:currentUser(),text:opts.comment.trim(),time:nowIso(),kind:'upload'});
     node.versions.push(version);if(thumbRef)node.thumbnail=thumbRef;
     await persist();ui.bi.style.width='100%';render();resolveThumbs();toast('アップロード完了: '+version.name);
   }catch(e){ui.prog.classList.add('hidden');toast('アップロード失敗: '+e.message)}
@@ -1140,8 +1184,8 @@ function openReview(nodeId,versionId){
     b.onclick=async()=>{node.status=stt.id;await persist();updSt()};
     top.appendChild(b);
   }
-  if(isVideo){const rb=el('button','btn btn-ghost btn-sm','🎞');rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);top.appendChild(rb)}
-  const delBtn=el('button','btn btn-danger btn-sm','🗑');delBtn.title='このバージョンを削除';
+  if(isVideo){const rb=el('button','btn btn-ghost btn-sm');rb.appendChild(icoEl('reel'));rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);top.appendChild(rb)}
+  const delBtn=el('button','btn btn-danger btn-sm');delBtn.appendChild(icoEl('trash'));delBtn.title='このバージョンを削除';
   delBtn.onclick=async()=>{if(!confirm(v.name+' を削除しますか？'))return;await storage.delMedia(v.file);await storage.delMedia(v.thumb);node.versions=node.versions.filter(x=>x.id!==v.id);node.thumbnail=node.versions.length?node.versions[node.versions.length-1].thumb:null;await persist();close()};
   top.appendChild(delBtn);
   const x=el('button','modal-close','×');x.onclick=close;top.appendChild(x);
@@ -1606,7 +1650,7 @@ function slBuild(){
   for(const n of revs){
     const v=[...n.versions].reverse().find(x=>x.type==='video');
     const tile=ce2('div','tile');
-    const th=ce2('div','th','🎬');
+    const th=ce2('div','th');th.appendChild(icoEl('film',th.ownerDocument));
     if(v.thumb)storage.getURL(v.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
     tile.appendChild(th);
     const bd=ce2('div','bd');
@@ -1835,7 +1879,7 @@ function pgBuild(){
     const grid=ce2('div','grid');
     for(const ps of hits){
       const tile=ce2('div','tile');
-      const th=ce2('div','th','🎬');
+      const th=ce2('div','th');th.appendChild(icoEl('film',th.ownerDocument));
       const lv=ps.latest;
       if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
       tile.appendChild(th);
@@ -1969,7 +2013,7 @@ function openReel(){
   d.head.appendChild(st);
   /* ヘッダ */
   const hd=ce(d,'div','hd');
-  const lg=ce(d,'div','logo');lg.innerHTML='🎞 REEL <b>/ Layna</b>';hd.appendChild(lg);
+  const lg=ce(d,'div','logo');lg.innerHTML='<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">'+ICONS.reel+'</svg> REEL <b>/ Layna</b>';hd.appendChild(lg);
   hd.appendChild(ce(d,'span','sub','シーケンスプレイヤー — メインから動画を送って並べる'));
   hd.appendChild(ce(d,'div','sp'));
   const totalLab=ce(d,'span','sub','計 0:00');hd.appendChild(totalLab);
@@ -2002,7 +2046,7 @@ function openReel(){
   /* プレビュー */
   const stage=ce(d,'div','stage');
   const video=ce(d,'video');video.controls=false;video.playsInline=true;stage.appendChild(video);
-  const empty=ce(d,'div','empty');empty.innerHTML='クリップがありません。<br>左のショットリスト、またはメインの 🎞 ボタンで追加してください。';stage.appendChild(empty);
+  const empty=ce(d,'div','empty');empty.innerHTML='クリップがありません。<br>左のショットリスト、またはメインの REEL ボタンで追加してください。';stage.appendChild(empty);
   maincol.appendChild(stage);
   /* コントロール */
   const ctr=ce(d,'div','ctr');
@@ -2316,7 +2360,7 @@ function openReel(){
       const vids=n.versions.filter(x=>x.type==='video');
       const latest=vids[vids.length-1];
       const card=ce(d,'div','snode');
-      const th=ce(d,'div','th','🎬');th.title='最新の動画を追加';
+      const th=ce(d,'div','th');th.appendChild(icoEl('film',d));th.title='最新の動画を追加';
       if(latest.thumb)storage.getURL(latest.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
       th.onclick=async()=>{await reelAddClip(getNode(n.id),latest)};
       card.appendChild(th);
@@ -2325,7 +2369,7 @@ function openReel(){
       const r2=ce(d,'div','nm2');
       const tg=ce(d,'button','addb','▸');tg.title='中の動画（バージョン）を表示';
       r2.appendChild(tg);
-      r2.appendChild(ce(d,'span','sp2','🎬 '+n.name));
+      const sp=ce(d,'span','sp2');sp.appendChild(icoEl('film',d));sp.appendChild(d.createTextNode(' '+n.name));r2.appendChild(sp);
       r2.appendChild(ce(d,'span','pth',latest.name));
       bd.appendChild(r2);
       card.appendChild(bd);
