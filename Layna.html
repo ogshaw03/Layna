@@ -587,7 +587,7 @@ function updateHeaderForContext(){
   const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
   setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#shotListBtn',!home);
   setD('#progressBtn',!home);setD('#reelBtn',!home);setD('#sizeBtns',!home);
-  setD('#addBtn',!home);setD('#mainHead',!home);setD('#breadcrumb',!home);
+  setD('#addBtn',true);setD('#mainHead',!home);setD('#breadcrumb',!home);
 }
 function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
 
@@ -783,10 +783,7 @@ function renderHome(s){
     card.onclick=()=>go(r.id);
     grid.appendChild(card);
   }
-  const add=el('div','proj-card proj-add');add.appendChild(el('div','p','＋'));add.appendChild(el('div',null,'新規プロジェクト'));
-  add.onclick=()=>openAddModal(null);
-  grid.appendChild(add);
-  if(!roots.length)wrap.appendChild(el('div','proj-empty','まだプロジェクトがありません。下の「新規プロジェクト」から作成してください。'));
+  if(!roots.length)grid.appendChild(el('div','proj-empty','まだプロジェクトがありません。右上の「＋ プロジェクト」から作成してください。'));
   wrap.appendChild(grid);
   s.appendChild(wrap);
 }
