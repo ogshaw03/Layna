@@ -104,6 +104,8 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .vcard-act{width:26px;height:26px;border-radius:5px;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
 .vcard-act:hover{background:rgba(255,90,90,.55)}
 .vcard-cnt{position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.5);padding:1px 6px;border-radius:8px;z-index:3}
+.vcard-reel{position:absolute;bottom:6px;left:8px;max-width:70%;font-size:10px;color:rgba(255,255,255,.9);background:rgba(96,165,255,.32);border:1px solid rgba(96,165,255,.5);padding:1px 6px;border-radius:8px;z-index:4;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcard-reel:hover{background:rgba(96,165,255,.5)}
 .vcard-ov{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 9px;background:linear-gradient(transparent,rgba(0,0,0,.9));z-index:2;pointer-events:none}
 .vcard-ov .t{font-size:12px;font-weight:500;color:#fff;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .vcard-name-big{font-family:var(--font-head);font-size:18px;font-weight:700;padding:10px 12px 12px;line-height:1.3}
@@ -310,6 +312,7 @@ textarea.form-input{height:70px;resize:vertical}
   <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
     <button class="btn btn-ghost" id="shotListBtn" title="ショットリスト — 全ショットの最新動画をタイル一覧（別ウィンドウ）">📋 ショット</button>
+    <button class="btn btn-ghost" id="progressBtn" title="進捗管理 — 工程ごとのステータスを表と円グラフで確認（別ウィンドウ）">📊 進捗</button>
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）">🎞 REEL</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
@@ -485,7 +488,7 @@ function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;t
    ナビ / レンダリング
    ============================================================ */
 function go(id){state.currentId=id;state.search='';$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);render()}
-function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();resolveThumbs()}
+function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();resolveThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
 
 /* サイドバー：ツリー */
 function renderSidebar(){
@@ -617,6 +620,11 @@ function nodeCard(node,isRoot){
   const stI=stInfo(node);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
   if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
   else if(kids.length)tw.appendChild(el('div','vcard-cnt','📁 '+kids.length));
+  /* このショットのいずれかのバージョンを含む保存済みリール（紐づけを可視化） */
+  if(isRev){
+    const rls=(DB.reels||[]).filter(r=>r.clips.some(c=>node.versions.some(v=>v.id===c.vId)));
+    if(rls.length){const rb=el('div','vcard-reel','🎞 '+rls.map(r=>r.name).join(' / '));rb.title='このショットを含むリール';rb.onclick=e=>{e.stopPropagation();openReelFromSaved(rls[0].id)};tw.appendChild(rb)}
+  }
   const a=el('div','vcard-actions');const d=el('button','vcard-act','🗑');d.title='削除';d.onclick=e=>{e.stopPropagation();deleteNode(node)};a.appendChild(d);tw.appendChild(a);
   if(!isRoot){const ov=el('div','vcard-ov');ov.appendChild(el('div','t',(isRev?'🎬 ':'📁 ')+node.name));tw.appendChild(ov)}
   card.appendChild(tw);
@@ -1260,7 +1268,13 @@ function openReview(nodeId,versionId){
   const lyrCards=[];
   function buildLayerPanel(){
     lyrList.innerHTML='';lyrCards.length=0;
-    for(let i=1;i<=layerCount;i++){
+    if(layerCount<5){
+      const add=el('button','lyr-add','＋ レイヤーを追加');
+      add.onclick=()=>{layerCount++;activeLayer=layerCount;buildLayerPanel();drawAll()};
+      lyrList.appendChild(add);
+    }
+    /* 上が上層・一番下が最下層（L1）になるよう降順で並べる */
+    for(let i=layerCount;i>=1;i--){
       const card=el('div','lyr-card');
       const h=el('div','lyr-head');
       h.appendChild(el('span','nm','L'+i));
@@ -1270,11 +1284,6 @@ function openReview(nodeId,versionId){
       const cv=el('canvas','lyr-prev');cv.width=134;cv.height=75;card.appendChild(cv);
       card.onclick=()=>{activeLayer=i;drawAll()};
       lyrList.appendChild(card);lyrCards.push({card,cv,eye,i});
-    }
-    if(layerCount<5){
-      const add=el('button','lyr-add','＋ レイヤーを追加');
-      add.onclick=()=>{layerCount++;activeLayer=layerCount;buildLayerPanel();drawAll()};
-      lyrList.appendChild(add);
     }
     updateLayerPanel();
   }
@@ -1500,6 +1509,120 @@ function slBuild(){
 }
 
 /* ============================================================
+   進捗管理（別ウィンドウ）
+   プロジェクト（ルート）ごとに、工程＝ステータスの分布を
+   表と円グラフ（ドーナツ）で可視化する。
+   ============================================================ */
+let pgWin=null;const pgUI={};
+function progressData(){
+  /* ルートプロジェクトごとに、配下レビューページのステータス分布を集計 */
+  const roots=DB.nodes.filter(n=>!n.parentId);
+  return roots.map(root=>{
+    const revs=[root,...descendants(root.id)].filter(n=>n.type==='review');
+    const sts=projStatuses(root);
+    const buckets=sts.map(s=>({id:s.id,label:s.label,color:s.color,count:0}));
+    const emptyB={id:'empty',label:'未着手',color:'#5a5a6a',count:0};
+    const byId=Object.fromEntries(buckets.map(b=>[b.id,b]));
+    for(const r of revs){
+      const id=nodeStatus(r);
+      if(id==='empty'||!byId[id])emptyB.count++;else byId[id].count++;
+    }
+    const rows=buckets.concat(emptyB.count?[emptyB]:[]);
+    return {root,total:revs.length,rows};
+  });
+}
+function drawDonut(cv,rows,total){
+  const c=cv.getContext('2d');const W=cv.width,H=cv.height;c.clearRect(0,0,W,H);
+  const cx=W/2,cy=H/2,rO=Math.min(W,H)/2-6,rI=rO*0.6;
+  if(!total){c.strokeStyle='#2a2a2f';c.lineWidth=rO-rI;c.beginPath();c.arc(cx,cy,(rO+rI)/2,0,Math.PI*2);c.stroke();return}
+  let a=-Math.PI/2;
+  for(const r of rows){
+    if(!r.count)continue;
+    const frac=r.count/total;const a2=a+frac*Math.PI*2;
+    c.beginPath();c.moveTo(cx,cy);c.arc(cx,cy,rO,a,a2);c.closePath();c.fillStyle=r.color;c.fill();
+    a=a2;
+  }
+  /* 中央くり抜き */
+  c.beginPath();c.arc(cx,cy,rI,0,Math.PI*2);c.fillStyle='#141416';c.fill();
+  c.fillStyle='#e8e8ec';c.textAlign='center';c.font='700 26px system-ui,sans-serif';
+  c.fillText(String(total),cx,cy-2);
+  c.fillStyle='#8a8a9a';c.font='11px system-ui,sans-serif';c.fillText('ショット',cx,cy+16);
+}
+function openProgress(){
+  if(pgWin&&!pgWin.closed){pgWin.focus();pgBuild();return}
+  pgWin=window.open('','layna_progress','width=1180,height=880');
+  if(!pgWin){toast('ポップアップがブロックされました。許可してください');return}
+  const d=pgWin.document;
+  d.open();d.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>Layna 進捗管理</title></head><body></body></html>');d.close();
+  const st=d.createElement('style');
+  st.textContent='*{margin:0;padding:0;box-sizing:border-box}body{background:#0d0d0f;color:#e8e8ec;font-family:system-ui,"Noto Sans JP",sans-serif;font-size:13px;display:flex;flex-direction:column;height:100vh;overflow:hidden}'
+  +'.hd{display:flex;align-items:center;gap:12px;padding:9px 14px;background:#141416;border-bottom:1px solid rgba(96,165,255,.7);box-shadow:0 1px 10px rgba(96,165,255,.22);flex-shrink:0}'
+  +'.hd .logo{font-weight:700;font-size:16px}.hd .sub{color:#5a5a6a;font-size:11px}.hd .sp{flex:1}'
+  +'.btn{background:none;border:1px solid #2a2a2f;color:#9a9aaa;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap}.btn:hover{color:#e8e8ec;border-color:#3a3a42}'
+  +'.wrap{flex:1;min-height:0;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:18px}'
+  +'.pcard{border:1px solid #2a2a2f;border-radius:12px;background:#141416;padding:16px 18px}'
+  +'.pcard .ph{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}'
+  +'.pcard .pn{font-size:16px;font-weight:700}.pcard .pc{color:#5a5a6a;font-size:11px}'
+  +'.pbody{display:flex;gap:26px;align-items:center;flex-wrap:wrap}'
+  +'.pbody canvas{flex-shrink:0}'
+  +'.ptbl{flex:1;min-width:320px;border-collapse:collapse;width:100%}'
+  +'.ptbl th{text-align:left;font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #2a2a2f}'
+  +'.ptbl td{padding:6px 8px;border-bottom:1px solid #1f1f24;vertical-align:middle}'
+  +'.ptbl tr:last-child td{border-bottom:none}'
+  +'.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}'
+  +'.pct{color:#8a8a9a;font-variant-numeric:tabular-nums}'
+  +'.bar{height:7px;border-radius:4px;background:#1c1c1f;overflow:hidden;min-width:80px}'
+  +'.bar>i{display:block;height:100%;border-radius:4px}'
+  +'.num{font-variant-numeric:tabular-nums;text-align:right}'
+  +'.trow.done td{color:#5a5a6a}'
+  +'.empty{color:#5a5a6a;padding:50px;text-align:center}';
+  d.head.appendChild(st);
+  const ce2=(t,c,x)=>{const e=d.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const hd=ce2('div','hd');
+  hd.appendChild(ce2('div','logo','📊 進捗管理 / Layna'));
+  hd.appendChild(ce2('span','sub','工程（ステータス）ごとの進捗を円グラフと表で確認'));
+  hd.appendChild(ce2('div','sp'));
+  const rf=ce2('button','btn','↻ 更新');hd.appendChild(rf);
+  d.body.appendChild(hd);
+  const wrap=ce2('div','wrap');d.body.appendChild(wrap);
+  Object.assign(pgUI,{ce2,wrap});
+  rf.onclick=()=>pgBuild();
+  pgBuild();
+}
+function pgBuild(){
+  if(!pgWin||pgWin.closed)return;
+  const {ce2,wrap}=pgUI;wrap.innerHTML='';
+  const data=progressData();
+  if(!data.length){wrap.appendChild(ce2('div','empty','プロジェクトがありません'));return}
+  for(const p of data){
+    const card=ce2('div','pcard');
+    const ph=ce2('div','ph');
+    ph.appendChild(ce2('span','pn',p.root.name));
+    ph.appendChild(ce2('span','pc','レビューページ '+p.total+' 件'));
+    card.appendChild(ph);
+    const body=ce2('div','pbody');
+    const cv=ce2('canvas');cv.width=180;cv.height=180;body.appendChild(cv);
+    drawDonut(cv,p.rows,p.total);
+    const tbl=ce2('table','ptbl');
+    const thead=ce2('tr');['工程 / ステータス','件数','割合','進捗'].forEach(h=>thead.appendChild(ce2('th',null,h)));
+    tbl.appendChild(thead);
+    for(const r of p.rows){
+      const tr=ce2('tr','trow'+(r.id==='empty'?' done':''));
+      const c1=ce2('td');const sw=ce2('span','sw');sw.style.background=r.color;c1.appendChild(sw);c1.appendChild(d3txt(ce2,r.label));tr.appendChild(c1);
+      tr.appendChild(ce2('td','num',String(r.count)));
+      const pct=p.total?Math.round(r.count/p.total*100):0;
+      tr.appendChild(ce2('td','pct',pct+'%'));
+      const c4=ce2('td');const bar=ce2('div','bar');const fill=ce2('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4);
+      tbl.appendChild(tr);
+    }
+    body.appendChild(tbl);
+    card.appendChild(body);
+    wrap.appendChild(card);
+  }
+}
+function d3txt(ce2,t){return ce2('span',null,t)}
+
+/* ============================================================
    REEL — シーケンスプレイヤー（別ウィンドウ）
    メインから動画を送り、タイムラインに並べて順番に再生する。
    ============================================================ */
@@ -1701,7 +1824,13 @@ function openReel(){
     RV.layerCount=Math.max(RV.layerCount||1,dataMax);
     if(RV.activeLayer>RV.layerCount)RV.activeLayer=RV.layerCount;
     lyrList.innerHTML='';lyrCards.length=0;
-    for(let i=1;i<=RV.layerCount;i++){
+    if(RV.layerCount<5){
+      const add=ce(d,'button','lyr-add','＋ レイヤーを追加');
+      add.onclick=()=>{RV.layerCount++;RV.activeLayer=RV.layerCount;buildLayerPanel();drawAnno()};
+      lyrList.appendChild(add);
+    }
+    /* 上が上層・一番下が最下層（L1）になるよう降順で並べる */
+    for(let i=RV.layerCount;i>=1;i--){
       const card=ce(d,'div','lyr-card');
       const h=ce(d,'div','lyr-head');
       h.appendChild(ce(d,'span','nm','L'+i));
@@ -1711,11 +1840,6 @@ function openReel(){
       const cv=ce(d,'canvas','lyr-prev');cv.width=134;cv.height=75;card.appendChild(cv);
       card.onclick=()=>{RV.activeLayer=i;drawAnno()};
       lyrList.appendChild(card);lyrCards.push({card,cv,eye,i});
-    }
-    if(RV.layerCount<5){
-      const add=ce(d,'button','lyr-add','＋ レイヤーを追加');
-      add.onclick=()=>{RV.layerCount++;RV.activeLayer=RV.layerCount;buildLayerPanel();drawAnno()};
-      lyrList.appendChild(add);
     }
     updateLayerPanel();
   }
@@ -2050,6 +2174,7 @@ $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
 $('#shotListBtn').onclick=()=>{if(storage.mode)openShotList()};
+$('#progressBtn').onclick=()=>{if(storage.mode)openProgress()};
 
 /* エクスプローラーからの D&D アップロード（レビューページ表示中のみ） */
 let dragDepth=0;
