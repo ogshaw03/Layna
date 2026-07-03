@@ -394,6 +394,30 @@ textarea.form-input{height:70px;resize:vertical}
 .hd-user .lo:hover{color:var(--text);border-color:var(--border2)}
 .deny-email{font-size:13px;color:var(--text3);margin:8px 0 18px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);padding:11px 18px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:2000;font-size:13px}
+/* 通知 */
+.hd-bell{position:relative;background:none;border:1px solid var(--border);color:var(--text2);width:34px;height:34px;border-radius:var(--radius2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.hd-bell:hover{color:var(--text);border-color:var(--border2)}
+.hd-bell .ico{width:17px;height:17px}
+.nb-badge{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:#ff5a5a;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--bg2)}
+.nb-badge.hidden{display:none}
+.notif-panel{position:fixed;top:52px;right:14px;width:346px;max-height:460px;overflow-y:auto;background:var(--bg2);border:1px solid var(--edge);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.55),0 0 14px var(--edgeglow);z-index:300}
+.notif-panel.hidden{display:none}
+.notif-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2)}
+.notif-hd .t{font-weight:700;font-size:13px}
+.notif-hd .clr{background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 4px}
+.notif-hd .clr:hover{color:var(--text)}
+.notif-list{display:flex;flex-direction:column}
+.notif-item{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+.notif-item:last-child{border-bottom:none}
+.notif-item:hover{background:var(--bg3)}
+.notif-item.unread{background:rgba(96,165,255,.08)}
+.notif-item .dot{width:7px;height:7px;border-radius:50%;background:var(--edge);flex-shrink:0;margin-top:5px}
+.notif-item.read .dot{background:transparent;box-shadow:inset 0 0 0 1px var(--border2)}
+.notif-item .bd{flex:1;min-width:0}
+.notif-item .nt{font-size:13px;font-weight:600}
+.notif-item .nx{font-size:12px;color:var(--text2);margin-top:3px;white-space:pre-wrap;word-break:break-word}
+.notif-item .nm{font-size:10px;color:var(--text3);margin-top:5px}
+.notif-empty{color:var(--text3);padding:40px 14px;text-align:center;font-size:12px}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:6px;border:2px solid var(--bg)}
 
@@ -417,11 +441,13 @@ textarea.form-input{height:70px;resize:vertical}
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
+    <button class="hd-bell" id="notifBtn" title="通知"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a4 4 0 0 1 8 0c0 4 1.5 5 1.5 5h-11S6 12 6 8z"/><path d="M8.5 16a1.7 1.7 0 0 0 3 0"/></svg><span class="nb-badge hidden" id="notifBadge">0</span></button>
     <label class="user-field" id="nameField"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4.5 16.5a5.5 5.5 0 0 1 11 0"/></svg><input id="currentUser" type="text" placeholder="名前" /></label>
     <div class="hd-user hidden" id="authUserBox"></div>
     <button class="btn btn-primary" id="addBtn">+ 追加</button>
   </div>
 </header>
+<div class="notif-panel hidden" id="notifPanel"></div>
 <div class="app-body">
   <aside class="sidebar" id="sidebar"></aside>
   <main class="main">
@@ -492,7 +518,7 @@ const storage={
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
 const state={currentId:null,search:'',expanded:new Set(),frameOrder:false};
-function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[],reels:[]}}
+function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[],reels:[],notifications:[]}}
 async function persist(){await storage.saveDb(DB)}
 
 /* v1(projects/shots) → v2(nodes) 移行 */
@@ -606,16 +632,73 @@ async function boot(){
   else DB=migrate(raw);                    // v1 → v2
   if(!Array.isArray(DB.nodes))DB.nodes=[];
   if(!Array.isArray(DB.reels))DB.reels=[];
+  if(!Array.isArray(DB.notifications))DB.notifications=[];
   if(!Array.isArray(DB.templates)||!DB.templates.length)DB.templates=defaultTemplates();
   // ページ種別の補完（未設定は: 動画があればレビュー、なければセクション）
   for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
   // ステータスをレビューページ単位へ移行（旧: 最新バージョンの判定を引き継ぐ）
   for(const n of DB.nodes)if(n.type==='review'&&n.status==null&&n.versions&&n.versions.length){const lv=n.versions[n.versions.length-1];n.status=(lv.review&&lv.review.status)||'pending'}
   await persist();
-  updateFolderStatus();initSizeBtns();
+  updateFolderStatus();initSizeBtns();updateNotifBadge();
   state.currentId=null;go(null);
 }
 function updateFolderStatus(){$('#folderStatus').classList.toggle('connected',!!storage.mode);$('#folderName').textContent=storage.folderLabel()}
+
+/* ============================================================
+   通知（基盤）— 何を通知するかは後日 notify(...) を呼ぶ側で実装
+   ============================================================ */
+function notifs(){if(!DB||!Array.isArray(DB.notifications))return [];return DB.notifications}
+function unreadNotif(){return notifs().filter(n=>!n.read).length}
+/* 通知を追加。title 必須、text 任意。opts:{nodeId} で対象ページにジャンプ可能 */
+function notify(title,text,opts){
+  opts=opts||{};
+  if(!DB)return null;
+  if(!Array.isArray(DB.notifications))DB.notifications=[];
+  const n={id:newId('ntf'),title:title||'通知',text:text||'',time:nowIso(),read:false,nodeId:opts.nodeId||null};
+  DB.notifications.unshift(n);
+  if(DB.notifications.length>300)DB.notifications.length=300;
+  persist();updateNotifBadge();
+  const p=$('#notifPanel');if(p&&!p.classList.contains('hidden'))renderNotifPanel();
+  return n;
+}
+function updateNotifBadge(){
+  const b=$('#notifBadge');if(!b)return;
+  const c=unreadNotif();
+  b.textContent=c>99?'99+':String(c);
+  b.classList.toggle('hidden',c<=0);
+}
+function markAllNotifRead(){for(const n of notifs())n.read=true;persist();updateNotifBadge();renderNotifPanel()}
+function openNotif(n){
+  n.read=true;persist();updateNotifBadge();
+  $('#notifPanel').classList.add('hidden');
+  if(n.nodeId&&getNode(n.nodeId))go(n.nodeId);else renderNotifPanel();
+}
+function renderNotifPanel(){
+  const p=$('#notifPanel');if(!p)return;p.innerHTML='';
+  const hd=el('div','notif-hd');hd.appendChild(el('div','t','通知'));
+  const clr=el('button','clr','すべて既読');clr.onclick=e=>{e.stopPropagation();markAllNotifRead()};hd.appendChild(clr);
+  p.appendChild(hd);
+  const list=notifs();
+  if(!list.length){p.appendChild(el('div','notif-empty','通知はまだありません。'));return}
+  const wrap=el('div','notif-list');
+  for(const n of list){
+    const it=el('div','notif-item '+(n.read?'read':'unread'));
+    it.appendChild(el('div','dot'));
+    const bd=el('div','bd');
+    bd.appendChild(el('div','nt',n.title));
+    if(n.text)bd.appendChild(el('div','nx',n.text));
+    bd.appendChild(el('div','nm',fmt(n.time)+(n.nodeId&&getNode(n.nodeId)?'・クリックで開く':'')));
+    it.appendChild(bd);
+    it.onclick=()=>openNotif(n);
+    wrap.appendChild(it);
+  }
+  p.appendChild(wrap);
+}
+function toggleNotifPanel(){
+  const p=$('#notifPanel');if(!p)return;
+  const willOpen=p.classList.contains('hidden');
+  if(willOpen){renderNotifPanel();p.classList.remove('hidden')}else p.classList.add('hidden');
+}
 function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}document.documentElement.style.setProperty('--cols',cols);[['S',6],['M',4],['L',3]].forEach(([lab,n])=>{const b=el('button','size-btn'+(n===cols?' active':''),lab);b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};wrap.appendChild(b)})}
 
 /* ============================================================
@@ -2697,8 +2780,12 @@ $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
-/* 工程フィルタのプルダウンを外側クリックで閉じる */
-document.addEventListener('click',e=>{const p=document.querySelector('.filter-panel:not(.hidden)');if(p){const dd=p.closest('.filter-dd');if(!dd||!dd.contains(e.target))p.classList.add('hidden')}});
+$('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifPanel()};
+/* 工程フィルタ・通知パネルを外側クリックで閉じる */
+document.addEventListener('click',e=>{
+  const p=document.querySelector('.filter-panel:not(.hidden)');if(p){const dd=p.closest('.filter-dd');if(!dd||!dd.contains(e.target))p.classList.add('hidden')}
+  const np=$('#notifPanel');if(np&&!np.classList.contains('hidden')&&!np.contains(e.target)&&e.target.closest('#notifBtn')===null)np.classList.add('hidden');
+});
 
 /* エクスプローラーからの D&D アップロード（レビューページ表示中のみ） */
 let dragDepth=0;
