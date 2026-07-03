@@ -1080,12 +1080,13 @@ function openReview(nodeId,versionId){
   const eraseSel=el('select');[8,16,28,44,64].forEach(n=>eraseSel.appendChild(new Option('消し '+n,n)));eraseSel.value='16';eraseSel.title='消しゴムサイズ(px)';
   const undoBtn=el('button','btn btn-ghost btn-sm','↩');undoBtn.title='直前の線を取り消し';
   const clearBtn=el('button','btn btn-ghost btn-sm','クリア');clearBtn.title='未送信の描画を消す';
+  const layBtn=el('button','btn btn-ghost btn-sm tool active','▤ レイヤー');layBtn.title='レイヤーバーの表示/非表示（ドリル）';
   /* ブラシ・消しゴム等の描画ツールは動画の上側に */
   const tbTop=el('div','fb-controls');
   tbTop.style.borderTop='none';tbTop.style.borderBottom='1px solid var(--edge)';
   tbTop.appendChild(drawBtn);tbTop.appendChild(brushSel);tbTop.appendChild(eraserBtn);tbTop.appendChild(eraseSel);tbTop.appendChild(clrRow);tbTop.appendChild(colorIn);
   if(isVideo){tbTop.appendChild(durSel);tbTop.appendChild(ghostBtn)}
-  tbTop.appendChild(eyeBtn);tbTop.appendChild(traceBtn);tbTop.appendChild(undoBtn);tbTop.appendChild(clearBtn);
+  tbTop.appendChild(eyeBtn);tbTop.appendChild(traceBtn);tbTop.appendChild(layBtn);tbTop.appendChild(undoBtn);tbTop.appendChild(clearBtn);
   stage.insertBefore(tbTop,wrap);
   /* 再生・ズーム系は下側 */
   if(isVideo){ctr.appendChild(playBtn);ctr.appendChild(prevBtn);ctr.appendChild(nextBtn);ctr.appendChild(frameLab);ctr.appendChild(fpsSel)}
@@ -1124,6 +1125,7 @@ function openReview(nodeId,versionId){
   layersPanel.appendChild(el('div','fb-layers-head','レイヤー'));
   const lyrList=el('div','fb-layers-list');layersPanel.appendChild(lyrList);
   body.appendChild(layersPanel);
+  layBtn.onclick=()=>{const on=layersPanel.style.display==='none';layersPanel.style.display=on?'':'none';layBtn.classList.toggle('active',on)};
 
   /* --- サイドパネル（コメント） --- */
   const side=el('div','fb-side');
@@ -1356,10 +1358,10 @@ function openReview(nodeId,versionId){
   const sizeRing=el('div','size-ring');wrap.appendChild(sizeRing);
   let szAdj=null;
   function setSizeSel(sel,val,prefix){let o=[...sel.options].find(x=>x.dataset.live);if(!o){o=new Option('','');o.dataset.live='1';sel.appendChild(o)}const rv=Math.round(val);o.value=String(rv);o.textContent=prefix+rv+'px';sel.value=o.value}
-  function fbShowRing(cx,cy){const r=wrap.getBoundingClientRect();const sz=(szAdj.tool==='erase'?eraseW:brushW)*Zm.s;sizeRing.style.display='block';sizeRing.style.left=(cx-r.left)+'px';sizeRing.style.top=(cy-r.top)+'px';sizeRing.style.width=sz+'px';sizeRing.style.height=sz+'px'}
+  function fbShowRing(){const sz=(szAdj.tool==='erase'?eraseW:brushW)*Zm.s;sizeRing.style.display='block';sizeRing.style.left=szAdj.rl+'px';sizeRing.style.top=szAdj.rt+'px';sizeRing.style.width=sz+'px';sizeRing.style.height=sz+'px'}
   canvas.addEventListener('contextmenu',e=>{if(e.altKey)e.preventDefault()});
-  canvas.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!tool)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);szAdj={x:e.clientX,start:tool==='erase'?eraseW:brushW,tool};fbShowRing(e.clientX,e.clientY)});
-  canvas.addEventListener('pointermove',e=>{if(!szAdj)return;const ns=Math.max(1,Math.min(200,szAdj.start+(e.clientX-szAdj.x)*0.4));if(szAdj.tool==='erase'){eraseW=ns;setSizeSel(eraseSel,ns,'消し ')}else{brushW=ns;setSizeSel(brushSel,ns,'ブラシ ')}fbShowRing(e.clientX,e.clientY)});
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!tool)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const r=wrap.getBoundingClientRect();szAdj={x:e.clientX,rl:e.clientX-r.left,rt:e.clientY-r.top,start:tool==='erase'?eraseW:brushW,tool};fbShowRing()});
+  canvas.addEventListener('pointermove',e=>{if(!szAdj)return;const ns=Math.max(1,Math.min(200,szAdj.start+(e.clientX-szAdj.x)*0.4));if(szAdj.tool==='erase'){eraseW=ns;setSizeSel(eraseSel,ns,'消し ')}else{brushW=ns;setSizeSel(brushSel,ns,'ブラシ ')}fbShowRing()});
   canvas.addEventListener('pointerup',()=>{if(szAdj){szAdj=null;sizeRing.style.display='none'}});
   undoBtn.onclick=()=>{pending.pop();drawAll();drawTimeline()};
   clearBtn.onclick=()=>{pending=[];stroke=null;drawAll();drawTimeline()};
@@ -1432,19 +1434,20 @@ function openShotList(){
   +'.hd{display:flex;align-items:center;gap:12px;padding:9px 14px;background:#141416;border-bottom:1px solid rgba(96,165,255,.7);box-shadow:0 1px 10px rgba(96,165,255,.22);flex-shrink:0}'
   +'.hd .logo{font-weight:700;font-size:16px}.hd .sub{color:#5a5a6a;font-size:11px}.hd .sp{flex:1}'
   +'.btn{background:none;border:1px solid #2a2a2f;color:#9a9aaa;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap}.btn:hover{color:#e8e8ec;border-color:#3a3a42}'
-  +'.viewer{flex:1;min-height:0;display:flex;flex-direction:column;background:#000}'
-  +'.viewer .vwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}'
-  +'.viewer video{max-width:100%;max-height:100%}'
-  +'.vinfo{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#141416;border-top:1px solid #2a2a2f}'
-  +'.vinfo .nm{font-weight:700}.vinfo .pth{color:#5a5a6a;font-size:11px}'
-  +'.gridwrap{height:275px;overflow-y:auto;background:#141416;border-top:1px solid rgba(96,165,255,.7);box-shadow:0 -1px 10px rgba(96,165,255,.22);padding:12px 14px;flex-shrink:0}'
-  +'.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}'
+  +'.gridwrap{flex:1;min-height:0;overflow-y:auto;background:#0d0d0f;padding:16px}'
+  +'.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}'
   +'.tile{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;cursor:pointer;background:#1c1c1f}'
-  +'.tile:hover{border-color:#3a3a42}.tile.sel{border-color:#e8e8ec}'
+  +'.tile:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 10px rgba(96,165,255,.22)}'
   +'.tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:22px}'
-  +'.tile .bd{padding:6px 8px}.tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  +'.tile .bd{padding:7px 9px}.tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
   +'.tile .pth{font-size:10px;color:#5a5a6a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
-  +'.empty{color:#5a5a6a;padding:40px;text-align:center;grid-column:1/-1}';
+  +'.empty{color:#5a5a6a;padding:40px;text-align:center;grid-column:1/-1}'
+  +'.mod{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;flex-direction:column;z-index:50}'
+  +'.mod.on{display:flex}'
+  +'.mod .mtop{display:flex;align-items:center;gap:10px;padding:10px 16px}'
+  +'.mod .mnm{font-weight:700}.mod .mpth{color:#8a8a9a;font-size:11px}.mod .msp{flex:1}'
+  +'.mod .mbody{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 16px 16px}'
+  +'.mod video{max-width:100%;max-height:100%}';
   d.head.appendChild(st);
   const ce2=(t,c,x)=>{const e=d.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
   const hd=ce2('div','hd');
@@ -1453,32 +1456,34 @@ function openShotList(){
   hd.appendChild(ce2('div','sp'));
   const rf=ce2('button','btn','↻ 更新');hd.appendChild(rf);
   d.body.appendChild(hd);
-  const viewer=ce2('div','viewer');const vwrap=ce2('div','vwrap');
-  const video=ce2('video');video.controls=true;video.playsInline=true;vwrap.appendChild(video);
-  viewer.appendChild(vwrap);
-  const vinfo=ce2('div','vinfo');const nm=ce2('span','nm','—');const pth=ce2('span','pth','タイルを選択してください');
-  vinfo.appendChild(nm);vinfo.appendChild(pth);viewer.appendChild(vinfo);
-  d.body.appendChild(viewer);
   const gw=ce2('div','gridwrap');const grid=ce2('div','grid');gw.appendChild(grid);d.body.appendChild(gw);
-  Object.assign(slUI,{ce2,video,nm,pth,grid});
-  rf.onclick=()=>slBuild(false);
-  slBuild(true);
+  const mod=ce2('div','mod');const mtop=ce2('div','mtop');
+  const mnm=ce2('span','mnm','—');const mpth=ce2('span','mpth','');const msp=ce2('div','msp');
+  const mclose=ce2('button','btn','✕ 閉じる');
+  mtop.appendChild(mnm);mtop.appendChild(mpth);mtop.appendChild(msp);mtop.appendChild(mclose);
+  const mbody=ce2('div','mbody');const video=ce2('video');video.controls=true;video.playsInline=true;mbody.appendChild(video);
+  mod.appendChild(mtop);mod.appendChild(mbody);d.body.appendChild(mod);
+  const closeMod=()=>{mod.classList.remove('on');video.pause();video.removeAttribute('src');video.load()};
+  mclose.onclick=closeMod;
+  mod.onclick=e=>{if(e.target===mod)closeMod()};
+  d.addEventListener('keydown',e=>{if(e.key==='Escape')closeMod()});
+  Object.assign(slUI,{ce2,video,mod,mnm,mpth,grid});
+  rf.onclick=()=>slBuild();
+  slBuild();
 }
-async function slSelect(n,v,tile){
-  const {video,nm,pth,grid}=slUI;
-  [...grid.querySelectorAll('.tile')].forEach(t=>t.classList.remove('sel'));
-  if(tile)tile.classList.add('sel');
-  nm.textContent=n.name+'　'+v.name;
-  pth.textContent=pathOf(n.id).slice(0,-1).map(x=>x.name).join(' / ')||'—';
+async function slSelect(n,v){
+  const {video,mod,mnm,mpth}=slUI;
+  mnm.textContent=n.name+'　'+v.name;
+  mpth.textContent=pathOf(n.id).slice(0,-1).map(x=>x.name).join(' / ')||'—';
+  mod.classList.add('on');
   const url=await storage.getURL(v.file);
   if(url){video.src=url;video.play().catch(()=>{})}
 }
-function slBuild(autosel){
+function slBuild(){
   if(!slWin||slWin.closed)return;
   const {ce2,grid}=slUI;grid.innerHTML='';
   const revs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
   if(!revs.length){grid.appendChild(ce2('div','empty','動画のあるショットがありません'));return}
-  let first=null;
   for(const n of revs){
     const v=[...n.versions].reverse().find(x=>x.type==='video');
     const tile=ce2('div','tile');
@@ -1489,11 +1494,9 @@ function slBuild(autosel){
     bd.appendChild(ce2('div','nm',n.name+'　'+v.name));
     bd.appendChild(ce2('div','pth',pathOf(n.id).slice(0,-1).map(x=>x.name).join(' / ')||'—'));
     tile.appendChild(bd);
-    tile.onclick=()=>slSelect(n,v,tile);
+    tile.onclick=()=>slSelect(n,v);
     grid.appendChild(tile);
-    if(!first)first={n,v,tile};
   }
-  if(autosel&&first)slSelect(first.n,first.v,first.tile);
 }
 
 /* ============================================================
@@ -1541,14 +1544,17 @@ function openReel(){
    +'.clr{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.3);cursor:pointer;padding:0}'
    +'.ntxt{flex:1;min-width:110px;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:6px;color:#e8e8ec;padding:5px 8px;font-size:12px;font-family:inherit}'
    /* ショットリスト（左） */
-   +'.rside{width:230px;border-right:1px solid rgba(96,165,255,.5);box-shadow:1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
+   +'.rside{width:320px;border-right:1px solid rgba(96,165,255,.5);box-shadow:1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.rside-h{font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:10px 10px 6px;display:flex;justify-content:space-between;align-items:center}'
-   +'.rlist{flex:1;overflow-y:auto;padding:0 8px 10px;display:flex;flex-direction:column;gap:6px}'
-   +'.snode{border:1px solid #2a2a2f;border-radius:8px;padding:7px 9px}'
-   +'.snode:hover{border-color:#3a3a42}'
-   +'.snode .pth{font-size:10px;color:#5a5a6a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
-   +'.snode .nm2{font-size:12px;color:#e8e8ec;display:flex;align-items:center;gap:6px;margin-top:2px}'
+   +'.rlist{flex:1;overflow-y:auto;padding:0 10px 10px;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));align-content:start}'
+   +'.snode{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;background:#1c1c1f;display:flex;flex-direction:column}'
+   +'.snode:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 8px rgba(96,165,255,.2)}'
+   +'.snode .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:20px;cursor:pointer}'
+   +'.snode .bd{padding:6px 8px}'
+   +'.snode .pth{font-size:9px;color:#5a5a6a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.snode .nm2{font-size:11px;color:#e8e8ec;display:flex;align-items:center;gap:5px;margin-top:2px}'
    +'.snode .sp2{flex:1}'
+   +'.snode .vl{padding:0 8px 8px;display:flex;flex-direction:column;gap:4px}'
    +'.addb{border:1px solid #2a2a2f;border-radius:5px;background:none;color:#9a9aaa;font-size:11px;padding:2px 8px;cursor:pointer;white-space:nowrap}'
    +'.addb:hover{color:#16161a;background:#ececf0;border-color:#ececf0}'
    /* レイヤーパネル（FBと同じ挙動） */
@@ -1651,9 +1657,10 @@ function openReel(){
   const durS=d.createElement('select');[[1,'表示 1F'],[2,'表示 2F'],[3,'表示 3F'],[5,'表示 5F'],[10,'表示 10F'],[9999,'持続']].forEach(([v2,l])=>opt(durS,l,v2));
   const eyeB=mkB('👁','アノテーション表示/非表示');eyeB.classList.add('on');
   const undoB=mkB('↩'),clrB=mkB('クリア');
+  const layB=mkB('▤ レイヤー','レイヤーバーの表示/非表示（ドリル）');layB.classList.add('on');
   /* 描画ツールは動画の上側、フレーム操作は下側 */
   const fbarTop=ce(d,'div','ctr');fbarTop.style.cssText='border-top:none;border-bottom:1px solid rgba(96,165,255,.7)';
-  [drawB,brushS,eraseB,eraseS,clrs,colorI,durS,eyeB,undoB,clrB].forEach(x=>fbarTop.appendChild(x));
+  [drawB,brushS,eraseB,eraseS,clrs,colorI,durS,eyeB,layB,undoB,clrB].forEach(x=>fbarTop.appendChild(x));
   maincol.insertBefore(fbarTop,stage);
   [pF,nF,fLab,fpsS].forEach(x=>fbar.appendChild(x));
   maincol.appendChild(fbar);
@@ -1664,6 +1671,7 @@ function openReel(){
   layersPanel.appendChild(ce(d,'div','fb-layers-head','レイヤー'));
   const lyrList=ce(d,'div','fb-layers-list');layersPanel.appendChild(lyrList);
   rowEl.appendChild(layersPanel);
+  layB.onclick=()=>{const on=layersPanel.style.display==='none';layersPanel.style.display=on?'':'none';layB.classList.toggle('on',on)};
   /* コメントパネル（FBと同じ・noteBlock共用） */
   const cside=ce(d,'div','fb-side');
   cside.appendChild(ce(d,'div','fb-side-head','コメント / FB'));
@@ -1845,13 +1853,13 @@ function openReel(){
   /* Alt+右ドラッグでブラシ/消しゴムサイズ調整（サイズプレビュー円付き） */
   brushS.onchange=()=>{RV.brushW=parseInt(brushS.value)||RV.brushW};
   eraseS.onchange=()=>{RV.eraseW=parseInt(eraseS.value)||RV.eraseW};
-  const szRing=ce(d,'div');szRing.style.cssText='position:absolute;border:2px solid rgba(255,255,255,.9);border-radius:50%;pointer-events:none;z-index:9;box-shadow:0 0 0 1px rgba(0,0,0,.6);transform:translate(-50%,-50%);display:none';stage.appendChild(szRing);
+  const szRing=ce(d,'div','sz-ring');szRing.style.cssText='position:absolute;border:2px solid rgba(255,255,255,.9);border-radius:50%;pointer-events:none;z-index:9;box-shadow:0 0 0 1px rgba(0,0,0,.6);transform:translate(-50%,-50%);display:none';stage.appendChild(szRing);
   let rvSz=null;
   function liveOpt(sel,val,prefix){let o=[...sel.options].find(x=>x.dataset.live);if(!o){o=d.createElement('option');o.dataset.live='1';sel.appendChild(o)}const rv=Math.round(val);o.value=String(rv);o.textContent=prefix+rv+'px';sel.value=o.value}
-  function rvShowRing(cx,cy){const r=stage.getBoundingClientRect();const sz=(rvSz.tool==='erase'?RV.eraseW:RV.brushW);szRing.style.display='block';szRing.style.left=(cx-r.left)+'px';szRing.style.top=(cy-r.top)+'px';szRing.style.width=sz+'px';szRing.style.height=sz+'px'}
+  function rvShowRing(){const sz=(rvSz.tool==='erase'?RV.eraseW:RV.brushW);szRing.style.display='block';szRing.style.left=rvSz.rl+'px';szRing.style.top=rvSz.rt+'px';szRing.style.width=sz+'px';szRing.style.height=sz+'px'}
   anno.addEventListener('contextmenu',e=>{if(e.altKey)e.preventDefault()});
-  anno.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!RV.tool)return;e.preventDefault();anno.setPointerCapture(e.pointerId);rvSz={x:e.clientX,start:RV.tool==='erase'?RV.eraseW:RV.brushW,tool:RV.tool};rvShowRing(e.clientX,e.clientY)});
-  anno.addEventListener('pointermove',e=>{if(!rvSz)return;const ns=Math.max(1,Math.min(200,rvSz.start+(e.clientX-rvSz.x)*0.4));if(rvSz.tool==='erase'){RV.eraseW=ns;liveOpt(eraseS,ns,'消し ')}else{RV.brushW=ns;liveOpt(brushS,ns,'ブラシ ')}drawAnno();rvShowRing(e.clientX,e.clientY)});
+  anno.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!RV.tool)return;e.preventDefault();anno.setPointerCapture(e.pointerId);const r=stage.getBoundingClientRect();rvSz={x:e.clientX,rl:e.clientX-r.left,rt:e.clientY-r.top,start:RV.tool==='erase'?RV.eraseW:RV.brushW,tool:RV.tool};rvShowRing()});
+  anno.addEventListener('pointermove',e=>{if(!rvSz)return;const ns=Math.max(1,Math.min(200,rvSz.start+(e.clientX-rvSz.x)*0.4));if(rvSz.tool==='erase'){RV.eraseW=ns;liveOpt(eraseS,ns,'消し ')}else{RV.brushW=ns;liveOpt(brushS,ns,'ブラシ ')}drawAnno();rvShowRing()});
   anno.addEventListener('pointerup',()=>{if(rvSz){rvSz=null;szRing.style.display='none'}});
   pF.onclick=()=>{video.pause();seekRTr(dispF()-1)};
   nF.onclick=()=>{video.pause();seekRTr(dispF()+1)};
@@ -1934,22 +1942,24 @@ function openReel(){
       const vids=n.versions.filter(x=>x.type==='video');
       const latest=vids[vids.length-1];
       const card=ce(d,'div','snode');
-      card.appendChild(ce(d,'div','pth',pathStr(n.id)));
+      const th=ce(d,'div','th','🎬');th.title='最新の動画を追加';
+      if(latest.thumb)storage.getURL(latest.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
+      th.onclick=async()=>{await reelAddClip(getNode(n.id),latest)};
+      card.appendChild(th);
+      const bd=ce(d,'div','bd');
+      bd.appendChild(ce(d,'div','pth',pathStr(n.id)));
       const r2=ce(d,'div','nm2');
       const tg=ce(d,'button','addb','▸');tg.title='中の動画（バージョン）を表示';
       r2.appendChild(tg);
-      r2.appendChild(ce(d,'span',null,'🎬 '+n.name));
-      r2.appendChild(ce(d,'span','sp2'));
+      r2.appendChild(ce(d,'span','sp2','🎬 '+n.name));
       r2.appendChild(ce(d,'span','pth',latest.name));
-      const add=ce(d,'button','addb','＋ 追加');add.title='最新の動画を追加';
-      add.onclick=async ev=>{ev.stopPropagation();await reelAddClip(getNode(n.id),latest)};
-      r2.appendChild(add);
-      card.appendChild(r2);
+      bd.appendChild(r2);
+      card.appendChild(bd);
       /* ショットの中の動画（全バージョン）を辿って個別に追加できる */
-      const vl=ce(d,'div');vl.style.cssText='display:none;margin-top:5px;border-top:1px solid #2a2a2f;padding-top:5px;display:none';
+      const vl=ce(d,'div','vl');vl.style.display='none';
       for(const vv of vids){
         const row=ce(d,'div','nm2');
-        row.appendChild(ce(d,'span','pth','▶ '+vv.name+'（'+(vv.uploadedBy||'-')+'）'));
+        row.appendChild(ce(d,'span','pth','▶ '+vv.name));
         row.appendChild(ce(d,'span','sp2'));
         const ab=ce(d,'button','addb','＋');
         ab.onclick=async ev=>{ev.stopPropagation();await reelAddClip(getNode(n.id),vv)};
@@ -1957,7 +1967,7 @@ function openReel(){
         vl.appendChild(row);
       }
       card.appendChild(vl);
-      tg.onclick=ev=>{ev.stopPropagation();const on=vl.style.display==='none';vl.style.display=on?'block':'none';tg.textContent=on?'▾':'▸'};
+      tg.onclick=ev=>{ev.stopPropagation();const on=vl.style.display==='none';vl.style.display=on?'flex':'none';tg.textContent=on?'▾':'▸'};
       rlist.appendChild(card);
     }
   }
