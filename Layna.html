@@ -464,6 +464,21 @@ function stInfo(node){
   return projStatuses(node).find(s=>s.id===id)||{label:'—',color:'#5a5a6a'};
 }
 function reviewToStatus(st){return st}
+/* 「完了」扱いのステータス判定（id か ラベルで判断） */
+function isDoneStatus(root,statusId){
+  if(!statusId||statusId==='empty')return false;
+  if(statusId==='approved')return true;
+  const s=projStatuses(root).find(x=>x.id===statusId);
+  return !!(s&&/完了|承認|上がり|フィックス|ok\b|done|fix|approve|complete/i.test(s.label));
+}
+/* プロジェクト（ルート）が完了か。動画のあるレビューが全て完了ステータスなら完了 */
+function projectDone(root){
+  const reviews=[root,...descendants(root.id)].filter(n=>n.type==='review'&&n.versions&&n.versions.length);
+  if(!reviews.length)return false;
+  return reviews.every(r=>isDoneStatus(root,nodeStatus(r)));
+}
+/* プロジェクトのバッジ（進行中 / 完了） */
+function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
@@ -592,7 +607,7 @@ function renderMainHead(){
   const title=el('h1');
   if(cur){
     title.appendChild(document.createTextNode(cur.name));
-    const st=stInfo(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;title.appendChild(bg);
+    const st=cur.parentId?stInfo(cur):projBadge(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;title.appendChild(bg);
     title.appendChild(elIco('span','type-chip',cur.type==='review'?'film':'folder',cur.type==='review'?'レビュー':'セクション'));
   }else title.textContent='プロジェクト一覧';
   box.appendChild(title);
@@ -769,7 +784,7 @@ function nodeCard(node,isRoot){
     }
   }
   else{const ni=el('div','vcard-noimg');const g=el('div','g');g.appendChild(icoEl(isRev?'film':'section'));ni.appendChild(g);ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
-  const stI=stInfo(node);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
+  const stI=isRoot?projBadge(node):stInfo(node);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
   if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
   else if(kids.length)tw.appendChild(elIco('div','vcard-cnt','folder',' '+kids.length));
   /* このショットのいずれかのバージョンを含む保存済みリール（紐づけを可視化） */
