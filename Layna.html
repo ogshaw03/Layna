@@ -87,6 +87,27 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-chip .ico{margin-right:.4em}
 .ico+*{vertical-align:middle}
 /* プロジェクトのタイムライン・ホーム */
+/* ホーム画面（プロジェクト選択）— シンプルなランチャー風 */
+.home-screen{max-width:1120px;margin:0 auto;padding:30px 10px 50px}
+.home-hd{margin:8px 4px 30px}
+.home-hd .ht{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:.5px}
+.home-hd .hs{color:var(--text3);font-size:13px;margin-top:7px}
+.proj-grid{display:grid;gap:22px;grid-template-columns:repeat(auto-fill,minmax(262px,1fr))}
+.proj-card{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--bg2);cursor:pointer;transition:transform .13s ease,box-shadow .13s ease,border-color .13s ease}
+.proj-card:hover{transform:translateY(-4px);border-color:var(--edge);box-shadow:0 10px 34px rgba(0,0,0,.55),0 0 18px var(--edgeglow)}
+.proj-media{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;position:relative}
+.proj-media img{width:100%;height:100%;object-fit:cover;display:block}
+.proj-media.ph{background:linear-gradient(135deg,#1a2338,#0e131d)}
+.proj-initial{font-family:var(--font-head);font-size:56px;font-weight:800;color:rgba(150,180,255,.34)}
+.proj-body{padding:15px 17px 17px}
+.proj-name{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-meta{display:flex;align-items:center;gap:12px;margin-top:11px;flex-wrap:wrap}
+.proj-badge{font-size:11px;font-weight:700;padding:2px 11px;border-radius:20px;border:1px solid}
+.proj-cnt,.proj-upd{font-size:11px;color:var(--text3)}
+.proj-add{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:216px;border-style:dashed;color:var(--text3);gap:8px;background:transparent}
+.proj-add:hover{color:var(--text);transform:translateY(-4px)}
+.proj-add .p{font-size:36px;font-weight:300;line-height:1}
+.proj-empty{color:var(--text3);padding:60px 10px;text-align:center;grid-column:1/-1}
 .home-flex{display:flex;gap:20px;align-items:flex-start}
 .home-main{flex:1;min-width:0}
 .home-side{width:236px;flex-shrink:0;position:sticky;top:0}
@@ -553,7 +574,15 @@ function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;t
    ナビ / レンダリング
    ============================================================ */
 function go(id){state.currentId=id;state.search='';$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);render()}
-function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();resolveThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
+/* ホーム画面ではプロジェクト系ツールのヘッダーボタンを隠し、シンプルに */
+function updateHeaderForContext(){
+  const home=!state.currentId;
+  const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
+  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#shotListBtn',!home);
+  setD('#progressBtn',!home);setD('#reelBtn',!home);setD('#sizeBtns',!home);
+  setD('#addBtn',!home);setD('#mainHead',!home);setD('#breadcrumb',!home);
+}
+function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
 
 /* サイドバー：ツリー */
 function renderSidebar(){
@@ -729,10 +758,47 @@ function renderProjectHome(s,cur){
   s.appendChild(main);
 }
 
+/* ホーム画面（プロジェクト選択）— シンプルなランチャー */
+function renderHome(s){
+  const roots=childrenOf(null);
+  const wrap=el('div','home-screen');
+  const head=el('div','home-hd');
+  head.appendChild(el('div','ht','プロジェクト'));
+  head.appendChild(el('div','hs','制作中のプロジェクトを選択、または新規作成'));
+  wrap.appendChild(head);
+  const grid=el('div','proj-grid');
+  for(const r of roots){
+    const card=el('div','proj-card');
+    const media=el('div','proj-media');
+    const ev=projectUpdates(r.id)[0];
+    if(ev&&ev.v.thumb){const img=el('img','proj-thumb');img.dataset.ref=ev.v.thumb;media.appendChild(img)}
+    else{media.classList.add('ph');media.appendChild(el('span','proj-initial',(r.name||'?').trim().charAt(0).toUpperCase()))}
+    card.appendChild(media);
+    const body=el('div','proj-body');
+    body.appendChild(el('div','proj-name',r.name));
+    const meta=el('div','proj-meta');
+    const pb=projBadge(r);const bd=el('span','proj-badge',pb.label);bd.style.color=pb.color;bd.style.borderColor=hexA(pb.color,.5);bd.style.background=hexA(pb.color,.12);meta.appendChild(bd);
+    meta.appendChild(el('span','proj-cnt',childrenOf(r.id).length+' 項目'));
+    if(ev)meta.appendChild(el('span','proj-upd','更新 '+fmt(ev.time)));
+    body.appendChild(meta);
+    card.appendChild(body);
+    card.onclick=()=>go(r.id);
+    grid.appendChild(card);
+  }
+  const add=el('div','proj-card proj-add');add.appendChild(el('div','p','＋'));add.appendChild(el('div',null,'新規プロジェクト'));
+  add.onclick=()=>openAddModal(null);
+  grid.appendChild(add);
+  if(!roots.length)wrap.appendChild(el('div','proj-empty','まだプロジェクトがありません。下の「新規プロジェクト」から作成してください。'));
+  wrap.appendChild(grid);
+  s.appendChild(wrap);
+}
+
 /* セクションページ（子項目タイルのみ・動画追加不可） */
 function renderSectionBody(s,cur){
+  /* ホーム（プロジェクト選択）は専用のシンプルUI */
+  if(!cur){renderHome(s);return}
   /* プロジェクト（ルート）を開いたときはタイムライン・ホーム（検索時は通常グリッド） */
-  if(cur&&!cur.parentId&&!state.search.trim()){renderProjectHome(s,cur);return}
+  if(!cur.parentId&&!state.search.trim()){renderProjectHome(s,cur);return}
   const parentId=cur?cur.id:null;
   const q=state.search.trim().toLowerCase();
   let kids=childrenOf(parentId);
