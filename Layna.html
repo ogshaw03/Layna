@@ -910,18 +910,18 @@ function renderProjShots(main,cur){
 }
 /* 進捗タブ用：プロジェクト配下でショット親になり得るノード（孫を持つ） */
 function pmProgressParents(root){const all=[root,...descendants(root.id)];const c=all.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:[root];}
+/* 有効なショット親：プロジェクト設定の指定を優先、なければ自動検出 */
+function shotsParentOf(root){if(root.shotsParentId&&getNode(root.shotsParentId))return root.shotsParentId;return pmProgressParents(root)[0].id;}
 /* 進捗タブ：工程/ステータスの円グラフ＋表（メイン埋め込み版） */
 function renderProjProgress(main,cur){
-  const cands=pmProgressParents(cur);
-  if(!state.pmParentId||!cands.some(c=>c.id===state.pmParentId))state.pmParentId=cands[0].id;
+  state.pmParentId=shotsParentOf(cur);
   if(state.pmTab!=='status')state.pmTab='stage';
-  if(cands.length>1){
-    const sel=el('div','pm-sel');sel.appendChild(el('label',null,'ショット親フォルダ'));
-    const s=el('select');
-    for(const c of cands){const o=el('option',null,pathOf(c.id).map(x=>x.name).join(' / '));o.value=c.id;if(c.id===state.pmParentId)o.selected=true;s.appendChild(o)}
-    s.onchange=()=>{state.pmParentId=s.value;state.pmPick=null;renderBody();resolveThumbs()};
-    sel.appendChild(s);main.appendChild(sel);
-  }
+  /* ショット親フォルダはプロジェクト設定から指定（表示のみ） */
+  const info=el('div','pm-sel');
+  info.appendChild(el('label',null,'ショット親フォルダ： '+pathOf(state.pmParentId).map(x=>x.name).join(' / ')+(cur.shotsParentId?'':'（自動）')));
+  const cfg=el('button','pm-stab');cfg.textContent='⚙ 設定で変更';cfg.style.cssText='padding:4px 10px;font-size:11px';cfg.onclick=()=>openRename(cur);
+  info.appendChild(cfg);
+  main.appendChild(info);
   const tabs=el('div','pm-tabs');
   for(const [id,lab] of [['stage','工程グラフ'],['status','ステータスグラフ']]){
     const b=el('button','pm-stab'+(state.pmTab===id?' on':''),lab);
@@ -1385,8 +1385,8 @@ function openRename(node){
     if(kids||vers)inner.appendChild(el('div','form-label','※ 種別を変えてもデータは消えません（レビューにすると子項目は非表示、セクションにすると動画ログは非表示になります）。現在: 子'+kids+'件 / 動画'+vers+'本'));
     const descRow=frow('説明','textarea');descRow.f.value=node.description||'';
     inner.appendChild(descRow.r);
-    /* プロジェクト（ルート）ならステータスを自由に編集できる */
-    let stArr=null;
+    /* プロジェクト（ルート）ならステータス／進捗のショット親フォルダを編集できる */
+    let stArr=null,spSel=null;
     if(!node.parentId){
       inner.appendChild(el('div','form-label','ステータス定義（このプロジェクト全体で使用）'));
       const stWrap=el('div','step-grid');
@@ -1406,9 +1406,17 @@ function openRename(node){
       const addSt=el('button','btn btn-ghost btn-sm','＋ ステータスを追加');addSt.style.marginBottom='12px';
       addSt.onclick=()=>{stArr.push({id:newId('st'),label:'新ステータス',color:'#60a5ff'});redrawSt()};
       inner.appendChild(addSt);
+      /* 進捗（工程/ステータスグラフ）のショット親フォルダ */
+      inner.appendChild(el('div','form-label','進捗グラフのショット親フォルダ（この直下がショット、その下が工程）'));
+      spSel=el('select','form-input');
+      spSel.appendChild(new Option('（自動検出）',''));
+      const folders=[node,...descendants(node.id).filter(n=>n.type==='section')];
+      for(const f of folders){const label=(f.id===node.id?'（プロジェクト直下）':pathOf(f.id).slice(1).map(x=>x.name).join(' / '));spSel.appendChild(new Option(label,f.id))}
+      spSel.value=(node.shotsParentId&&getNode(node.shotsParentId))?node.shotsParentId:'';
+      inner.appendChild(spSel);
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));await persist();closeModal();render();resolveThumbs()};
+    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}await persist();closeModal();render();resolveThumbs()};
     mFoot(body,[cancel,save]);
   });
 }
