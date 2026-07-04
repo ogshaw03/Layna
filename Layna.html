@@ -1356,15 +1356,50 @@ function openAddModal(parentId){
   openModal(body=>{
     const cur=parentId?getNode(parentId):null;
     const inner=mHead(body,'項目を追加',cur?('親: '+cur.name):'新規プロジェクト');
-    const nameRow=frow(cur?'名前（例: ショット01 / レイアウト / モデリング など自由）':'プロジェクト名','input');
-    const descRow=frow('説明（任意）','textarea');
+    const nameRow=frow(cur?'名前 / ベース名（例: ショット01 / cut）':'プロジェクト名','input');
     inner.appendChild(nameRow.r);
-    // ルート直下(プロジェクト)もセクション/レビューを選べる。既定はセクション
+    const nameLab=nameRow.r.querySelector('label');
     const ts=typeSelector('section');inner.appendChild(ts.row);
-    inner.appendChild(descRow.r);
+    /* 連番で複数作成（同じ工程を含むフォルダを一括作成） */
+    const seqTop=el('label','form-label');seqTop.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px';
+    const seqCb=el('input');seqCb.type='checkbox';seqTop.appendChild(seqCb);seqTop.appendChild(document.createTextNode('連番で複数作成'));
+    const seqFields=el('div');seqFields.style.cssText='display:none;gap:12px;flex-wrap:wrap;margin:6px 0 6px';
+    const mkNum=(lab,val)=>{const box=el('div');box.style.cssText='display:flex;flex-direction:column;gap:3px';const l=el('label','form-label',lab);l.style.margin='0';const i=el('input','form-input');i.type='number';i.value=String(val);i.style.width='84px';box.appendChild(l);box.appendChild(i);seqFields.appendChild(box);return i};
+    const cntI=mkNum('個数',3),startI=mkNum('開始番号',10),stepI=mkNum('増分',10),digI=mkNum('桁数',3);
+    const prev=el('div','form-label');prev.style.color='var(--text3)';
+    const updPrev=()=>{if(!seqCb.checked){prev.textContent='';return}const base=nameRow.f.value.trim()||'name';const cnt=Math.min(4,Math.max(1,parseInt(cntI.value)||1));const start=parseInt(startI.value)||0,step=parseInt(stepI.value)||1,dig=Math.max(0,parseInt(digI.value)||0);const ex=[];for(let i=0;i<cnt;i++)ex.push(base+String(start+i*step).padStart(dig,'0'));prev.textContent='例: '+ex.join(', ')+((parseInt(cntI.value)||1)>4?' …':'')};
+    [cntI,startI,stepI,digI,nameRow.f].forEach(i=>i.addEventListener('input',updPrev));
+    seqCb.onchange=()=>{seqFields.style.display=seqCb.checked?'flex':'none';nameLab.textContent=seqCb.checked?'ベース名（例: cut → cut010, cut020 …）':(cur?'名前 / ベース名（例: ショット01 / cut）':'プロジェクト名');updPrev()};
+    inner.appendChild(seqTop);inner.appendChild(seqFields);inner.appendChild(prev);
+    /* 親の工程テンプレートを各フォルダに作成 */
+    let applyStagesCb=null;
+    const pStages=(cur&&Array.isArray(cur.stages)&&cur.stages.length)?cur.stages:null;
+    if(pStages){
+      const l=el('label','form-label');l.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px';
+      applyStagesCb=el('input');applyStagesCb.type='checkbox';applyStagesCb.checked=true;
+      l.appendChild(applyStagesCb);l.appendChild(document.createTextNode('各フォルダ内に工程を作成（'+pStages.join(' / ')+'）'));
+      inner.appendChild(l);
+    }
+    const descRow=frow('説明（任意）','textarea');inner.appendChild(descRow.r);
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','追加');
-    save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');addNode(parentId,nameRow.f.value.trim(),descRow.f.value.trim(),ts.get());await persist();closeModal();if(parentId)state.expanded.add(parentId);render();resolveThumbs()};
+    save.onclick=async()=>{
+      const base=nameRow.f.value.trim();if(!base)return toast('名前を入力してください');
+      const type=ts.get();
+      let names=[base];
+      if(seqCb.checked){
+        const cnt=Math.max(1,Math.min(200,parseInt(cntI.value)||1));
+        const start=parseInt(startI.value)||0,step=parseInt(stepI.value)||1,dig=Math.max(0,parseInt(digI.value)||0);
+        names=[];for(let i=0;i<cnt;i++)names.push(base+String(start+i*step).padStart(dig,'0'));
+      }
+      const applyStages=type==='section'&&pStages&&applyStagesCb&&applyStagesCb.checked;
+      for(const nm of names){
+        const id=addNode(parentId,nm,names.length===1?descRow.f.value.trim():'',type);
+        if(applyStages)for(const st of pStages)addNode(id,st,'','review');
+      }
+      await persist();closeModal();if(parentId)state.expanded.add(parentId);render();resolveThumbs();
+      if(names.length>1)toast(names.length+'件を作成しました');
+    };
     mFoot(body,[cancel,save]);
   });
 }
@@ -1396,6 +1431,28 @@ function openRename(node){
     if(kids||vers)inner.appendChild(el('div','form-label','※ 種別を変えてもデータは消えません（レビューにすると子項目は非表示、セクションにすると動画ログは非表示になります）。現在: 子'+kids+'件 / 動画'+vers+'本'));
     const descRow=frow('説明','textarea');descRow.f.value=node.description||'';
     inner.appendChild(descRow.r);
+    /* セクションフォルダ：この中で管理する工程（子フォルダに一括作成される工程テンプレート） */
+    let stagesArr=null;
+    if(node.type==='section'){
+      inner.appendChild(el('div','form-label','この中で管理する工程（子フォルダ作成時にテンプレートとして使用）'));
+      const stgWrap=el('div','step-grid');
+      stagesArr=(Array.isArray(node.stages)?node.stages:[]).map(x=>typeof x==='string'?x:(x&&x.name)||'');
+      const redrawStg=()=>{
+        stgWrap.innerHTML='';
+        stagesArr.forEach((nm,i)=>{
+          const row=el('div','step-row');
+          const sc=el('span');sc.style.cssText='width:13px;height:13px;border-radius:3px;flex-shrink:0;align-self:center;background:'+stageColor(nm);
+          const inp=el('input','form-input');inp.value=nm;inp.oninput=()=>{stagesArr[i]=inp.value;sc.style.background=stageColor(inp.value)};
+          const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>{stagesArr.splice(i,1);redrawStg()};
+          row.appendChild(sc);row.appendChild(inp);row.appendChild(del);stgWrap.appendChild(row);
+        });
+      };
+      redrawStg();
+      inner.appendChild(stgWrap);
+      const addStg=el('button','btn btn-ghost btn-sm','＋ 工程を追加');addStg.style.marginBottom='12px';
+      addStg.onclick=()=>{stagesArr.push('新工程');redrawStg()};
+      inner.appendChild(addStg);
+    }
     /* プロジェクト（ルート）ならステータス／進捗のショット親フォルダを編集できる */
     let stArr=null,spSel=null;
     if(!node.parentId){
@@ -1427,7 +1484,7 @@ function openRename(node){
       inner.appendChild(spSel);
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}await persist();closeModal();render();resolveThumbs()};
+    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}await persist();closeModal();render();resolveThumbs()};
     mFoot(body,[cancel,save]);
   });
 }
