@@ -288,6 +288,49 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .fb-edit-ta{width:100%;min-height:56px;resize:vertical;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;line-height:1.5;margin-top:4px}
 
 /* FB画面（シンクスケッチ風） */
+/* サブミットブロック */
+.sub-overlay{position:fixed;inset:0;background:#0d0d0f;z-index:1400;display:flex;flex-direction:column}
+.sub-top{display:flex;align-items:center;gap:12px;padding:11px 16px;background:var(--bg2);border-bottom:1px solid var(--edge);box-shadow:0 1px 10px var(--edgeglow);flex-shrink:0}
+.sub-top .logo{font-family:var(--font-head);font-weight:700;font-size:16px}
+.sub-top .sub{color:var(--text3);font-size:11px}.sub-top .sp{flex:1}
+.sub-body{flex:1;min-height:0;overflow-y:auto;padding:20px 24px}
+.sub-wrap{max-width:1080px;margin:0 auto}
+.subl-item{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);padding:14px 16px;margin-bottom:12px;cursor:pointer}
+.subl-item:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
+.subl-item .nm{font-family:var(--font-head);font-weight:700;font-size:16px}
+.subl-item .mt{color:var(--text3);font-size:12px}
+.subl-item .thumbs{display:flex;gap:5px;margin-left:auto}
+.subl-item .thumbs .th{width:60px;height:34px;border-radius:4px;background:#000 center/cover no-repeat;border:1px solid var(--border)}
+.sub-block{border:1px solid var(--border);border-radius:12px;background:var(--bg2);margin-bottom:16px;overflow:hidden}
+.sub-block .bh{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.sub-block .bh .st{display:inline-block;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;color:#101013}
+.sub-block .bh .sn{font-weight:600}.sub-block .bh .sp2{color:var(--text3);font-size:11px}
+.sub-block .bh .rm{margin-left:auto;background:none;border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:12px}
+.sub-block .bbody{display:flex;gap:16px;padding:14px}
+.sub-drop{width:280px;flex-shrink:0;aspect-ratio:16/9;border:2px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;cursor:pointer;background:#000 center/cover no-repeat;position:relative;overflow:hidden;text-align:center}
+.sub-drop.drag{border-color:var(--edge);color:var(--text);background-color:rgba(96,165,255,.08)}
+.sub-drop.has{border-style:solid;border-color:var(--border)}
+.sub-drop video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sub-drop .rep{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.6);border-radius:6px;padding:2px 8px;font-size:11px;color:#fff}
+.sub-cmt{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
+.sub-cmt label{font-size:11px;color:var(--text3)}
+.sub-cmt textarea{flex:1;min-height:110px;resize:vertical;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px;font-family:inherit}
+.sub-empty{color:var(--text3);text-align:center;padding:60px 10px}
+.sub-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+/* サブミット：ショットピッカー */
+.subpick{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1450;display:flex;flex-direction:column}
+.subpick .pk{background:var(--bg2);margin:auto;width:min(960px,94vw);max-height:88vh;display:flex;flex-direction:column;border:1px solid var(--edge);border-radius:12px;box-shadow:0 12px 50px rgba(0,0,0,.6)}
+.subpick .pkh{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.subpick .pkb{flex:1;min-height:0;overflow-y:auto;padding:16px}
+.subpick .pkf{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)}
+.pk-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.pk-shot{border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--bg)}
+.pk-shot.sel{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
+.pk-shot .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer}
+.pk-shot .nm{padding:7px 9px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-stages{display:flex;flex-wrap:wrap;gap:6px;padding:0 9px 10px}
+.pk-chip{border:1px solid var(--border2);color:var(--text2);border-radius:14px;padding:3px 11px;font-size:12px;cursor:pointer}
+.pk-chip.on{background:rgba(96,165,255,.18);border-color:var(--edge);color:var(--text)}
 .fb-overlay{position:fixed;inset:0;background:#0a0a0c;z-index:1500;display:flex;flex-direction:column}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -442,6 +485,7 @@ textarea.form-input{height:70px;resize:vertical}
   <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
+    <button class="btn btn-ghost" id="submitBtn" title="サブミットブロック — 複数ショットの提出をまとめてレビュー"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="5" rx="1"/><rect x="3" y="11" width="14" height="5" rx="1"/></svg>サブミット</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
     <button class="hd-bell" id="notifBtn" title="通知"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a4 4 0 0 1 8 0c0 4 1.5 5 1.5 5h-11S6 12 6 8z"/><path d="M8.5 16a1.7 1.7 0 0 0 3 0"/></svg><span class="nb-badge hidden" id="notifBadge">0</span></button>
@@ -510,18 +554,31 @@ const storage={
   async _perm(h){const o={mode:'readwrite'};if(await h.queryPermission(o)==='granted')return true;return (await h.requestPermission(o))==='granted'},
   useIdb(){this.mode='idb';try{localStorage.setItem('layna_mode','idb')}catch(_){}},
   folderLabel(){if(this.mode==='folder'&&this.rootHandle)return this.rootHandle.name;if(this.mode==='idb')return 'ブラウザ内保存';return '未接続'},
-  async _subdir(n){return this.rootHandle.getDirectoryHandle(n,{create:true})},
+  async _subdir(n,root,create){let dir=root||this.rootHandle;for(const p of String(n).split('/'))if(p)dir=await dir.getDirectoryHandle(p,{create:create!==false});return dir},
+  /* プロジェクト別フォルダ（設定済みなら directory handle を返す） */
+  projHandles:new Map(),
+  async projRoot(projectId){if(!projectId)return null;if(this.projHandles.has(projectId))return this.projHandles.get(projectId);let h=null;try{h=await idbGet('handles','proj_'+projectId)}catch(_){}if(h){try{if(await h.queryPermission({mode:'readwrite'})!=='granted'){if(await h.requestPermission({mode:'readwrite'})!=='granted')h=null}}catch(_){h=null}}this.projHandles.set(projectId,h);return h;},
+  async setProjRoot(projectId,handle){await idbPut('handles','proj_'+projectId,handle);this.projHandles.set(projectId,handle);},
+  async clearProjRoot(projectId){try{await idbDel('handles','proj_'+projectId)}catch(_){}this.projHandles.set(projectId,null);},
   async loadDb(){if(this.mode==='folder'){try{const fh=await this.rootHandle.getFileHandle('layna_db.json');return JSON.parse(await (await fh.getFile()).text())}catch(e){return null}}return (await idbGet('kv','db'))||null},
   async saveDb(db){if(this.mode==='folder'){const fh=await this.rootHandle.getFileHandle('layna_db.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(db,null,2));await w.close()}else{await idbPut('kv','db',db)}},
-  async putMedia(sub,fn,blob){if(this.mode==='folder'){const dir=await this._subdir(sub);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return sub+'/'+fn}const key='blob_'+newId('b')+'_'+fn;await idbPut('blobs',key,blob);return 'idb:'+key},
-  async delMedia(ref){if(!ref)return;try{if(ref.startsWith('idb:'))await idbDel('blobs',ref.slice(4));else if(this.mode==='folder'){const[sub,fn]=ref.split('/');const dir=await this.rootHandle.getDirectoryHandle(sub);await dir.removeEntry(fn)}}catch(e){}const u=this.urlCache.get(ref);if(u){URL.revokeObjectURL(u);this.urlCache.delete(ref)}},
-  async getURL(ref){if(!ref)return null;if(this.urlCache.has(ref))return this.urlCache.get(ref);let blob=null;try{if(ref.startsWith('idb:'))blob=await idbGet('blobs',ref.slice(4));else{const[sub,fn]=ref.split('/');const dir=await this.rootHandle.getDirectoryHandle(sub);blob=await (await dir.getFileHandle(fn)).getFile()}}catch(e){return null}if(!blob)return null;const url=URL.createObjectURL(blob);this.urlCache.set(ref,url);return url},
+  /* opts.projectId 指定かつ設定済みならプロジェクトフォルダへ保存（ref は p:<id>|<path>） */
+  async putMedia(sub,fn,blob,opts){
+    opts=opts||{};
+    if(opts.projectId){const ph=await this.projRoot(opts.projectId);if(ph){const dir=await this._subdir(sub,ph,true);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return 'p:'+opts.projectId+'|'+sub+'/'+fn}}
+    if(this.mode==='folder'){const dir=await this._subdir(sub);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return sub+'/'+fn}
+    const key='blob_'+newId('b')+'_'+fn;await idbPut('blobs',key,blob);return 'idb:'+key;
+  },
+  _parseRef(ref){if(ref.startsWith('p:')){const i=ref.indexOf('|');return{proj:ref.slice(2,i),path:ref.slice(i+1)}}return{proj:null,path:ref}},
+  async _fileHandle(ref,create){const {proj,path}=this._parseRef(ref);const parts=path.split('/');const fn=parts.pop();let root=this.rootHandle;if(proj){root=await this.projRoot(proj);if(!root)return null}let dir=root;for(const p of parts)if(p)dir=await dir.getDirectoryHandle(p,{create:create===true});return{dir,fn};},
+  async delMedia(ref){if(!ref)return;try{if(ref.startsWith('idb:'))await idbDel('blobs',ref.slice(4));else{const h=await this._fileHandle(ref);if(h)await h.dir.removeEntry(h.fn)}}catch(e){}const u=this.urlCache.get(ref);if(u){URL.revokeObjectURL(u);this.urlCache.delete(ref)}},
+  async getURL(ref){if(!ref)return null;if(this.urlCache.has(ref))return this.urlCache.get(ref);let blob=null;try{if(ref.startsWith('idb:'))blob=await idbGet('blobs',ref.slice(4));else{const h=await this._fileHandle(ref);if(h)blob=await (await h.dir.getFileHandle(h.fn)).getFile()}}catch(e){return null}if(!blob)return null;const url=URL.createObjectURL(blob);this.urlCache.set(ref,url);return url},
 };
 
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
 const state={currentId:null,search:'',expanded:new Set(),frameOrder:false};
-function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[],reels:[],notifications:[]}}
+function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[],reels:[],notifications:[],submits:[]}}
 async function persist(){await storage.saveDb(DB)}
 
 /* v1(projects/shots) → v2(nodes) 移行 */
@@ -636,6 +693,7 @@ async function boot(){
   if(!Array.isArray(DB.nodes))DB.nodes=[];
   if(!Array.isArray(DB.reels))DB.reels=[];
   if(!Array.isArray(DB.notifications))DB.notifications=[];
+  if(!Array.isArray(DB.submits))DB.submits=[];
   if(!Array.isArray(DB.templates)||!DB.templates.length)DB.templates=defaultTemplates();
   // ページ種別の補完（未設定は: 動画があればレビュー、なければセクション）
   for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
@@ -718,6 +776,164 @@ function toggleNotifPanel(){
 function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}document.documentElement.style.setProperty('--cols',cols);[['S',6],['M',4],['L',3]].forEach(([lab,n])=>{const b=el('button','size-btn'+(n===cols?' active':''),lab);b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};wrap.appendChild(b)})}
 
 /* ============================================================
+   サブミットブロック — 複数ショットの提出をまとめてレビュー
+   ============================================================ */
+const subS={};
+function submitStagesOf(shot){const kids=childrenOf(shot.id).filter(n=>n.type==='review');return kids.length?kids:[shot];}
+function subGenName(pid){const d=new Date();const ymd=''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');let seq=1,name;do{name=ymd+'_'+String(seq).padStart(3,'0');seq++}while(DB.submits.some(s=>s.projectId===pid&&s.name===name));return name;}
+function openSubmit(){
+  const cur=state.currentId?getNode(state.currentId):null;
+  const root=cur?rootOf(cur):null;
+  if(!root){toast('プロジェクトを開いてから起動してください');return}
+  const old=$('#submitOverlay');if(old)old.remove();
+  subS.projectId=root.id;subS.blocks=[];
+  const ov=el('div','sub-overlay');ov.id='submitOverlay';
+  const top=el('div','sub-top');
+  top.appendChild(elIco('div','logo','folder','サブミットブロック'));
+  top.appendChild(el('span','sub',root.name));
+  top.appendChild(el('div','sp'));
+  const tr=el('div');tr.style.cssText='display:flex;gap:8px';top.appendChild(tr);
+  const close=el('button','btn btn-ghost btn-sm','✕ 閉じる');close.onclick=()=>ov.remove();top.appendChild(close);
+  const body=el('div','sub-body');const wrap=el('div','sub-wrap');body.appendChild(wrap);
+  const footHost=el('div');
+  ov.appendChild(top);ov.appendChild(body);ov.appendChild(footHost);
+  document.body.appendChild(ov);
+  Object.assign(subS,{ov,tr,wrap,footHost});
+  subShowList();
+}
+function subShowList(){
+  const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
+  const add=el('button','btn btn-primary btn-sm','＋ サブミットブロック作成');add.onclick=()=>subShowCreate();tr.appendChild(add);
+  wrap.appendChild(el('div','section-label','作成されたサブミットブロック'));
+  const list=(DB.submits||[]).filter(s=>s.projectId===subS.projectId).slice().reverse();
+  if(!list.length){wrap.appendChild(el('div','sub-empty','サブミットブロックはまだありません。右上の「＋ サブミットブロック作成」から作成してください。'));return}
+  for(const sb of list){
+    const it=el('div','subl-item');
+    const bd=el('div');bd.appendChild(el('div','nm',sb.name));bd.appendChild(el('div','mt',(sb.items?sb.items.length:0)+' 件・'+fmt(sb.createdAt)));
+    it.appendChild(bd);
+    const ths=el('div','thumbs');
+    for(const item of (sb.items||[]).slice(0,5)){const n=getNode(item.nodeId);const v=n&&n.versions.find(x=>x.id===item.versionId);const th=el('div','th');if(v&&v.thumb)storage.getURL(v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});ths.appendChild(th)}
+    it.appendChild(ths);
+    it.onclick=()=>subShowView(sb);
+    wrap.appendChild(it);
+  }
+}
+function subShowCreate(){
+  const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
+  const back=el('button','btn btn-ghost btn-sm','← 一覧');back.onclick=()=>subShowList();tr.appendChild(back);
+  const addSub=el('button','btn btn-primary btn-sm','＋ サブミットの作成');addSub.onclick=()=>openSubPicker();tr.appendChild(addSub);
+  wrap.appendChild(el('div','section-label','サブミット（提出する動画）'));
+  if(!subS.blocks.length){wrap.appendChild(el('div','sub-empty','右上の「＋ サブミットの作成」からショットと工程を選択してください。'));}
+  else{for(const b of subS.blocks)wrap.appendChild(subBlockEl(b));}
+  const foot=el('div','sub-foot');
+  const create=el('button','btn btn-primary','サブミットブロックを作成');create.onclick=()=>createSubmitBlock();
+  foot.appendChild(create);footHost.appendChild(foot);
+}
+function subBlockEl(block){
+  const bl=el('div','sub-block');
+  const bh=el('div','bh');
+  const shot=block.node.parentId?getNode(block.node.parentId):null;
+  const st=el('span','st',block.node.name);st.style.background=stageColor(block.node.name);bh.appendChild(st);
+  bh.appendChild(el('span','sn',shot&&shot.id!==subS.projectId?shot.name:block.node.name));
+  bh.appendChild(el('span','sp2',pathOf(block.node.id).slice(1,-1).map(x=>x.name).join(' / ')));
+  const rm=el('button','rm','削除');rm.onclick=()=>{const i=subS.blocks.indexOf(block);if(i>=0)subS.blocks.splice(i,1);subShowCreate()};bh.appendChild(rm);
+  bl.appendChild(bh);
+  const bbody=el('div','bbody');
+  const drop=el('div','sub-drop');
+  const setPreview=()=>{drop.innerHTML='';if(block.thumbUrl){drop.classList.add('has');const v=el('video');v.src=block.thumbUrl;v.muted=true;v.playsInline=true;drop.appendChild(v);drop.appendChild(el('div','rep','クリック / DDで差し替え'))}else{drop.classList.remove('has');drop.appendChild(el('div',null,'ここに動画をドロップ'));drop.appendChild(el('div',null,'またはクリックで選択'))}};
+  setPreview();
+  const pickFile=f=>{if(!f||!f.type.startsWith('video/'))return;if(block.thumbUrl){try{URL.revokeObjectURL(block.thumbUrl)}catch(_){}}block.file=f;block.thumbUrl=URL.createObjectURL(f);setPreview()};
+  drop.onclick=()=>{const fi=document.createElement('input');fi.type='file';fi.accept='video/*';fi.onchange=()=>pickFile(fi.files[0]);fi.click()};
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};
+  drop.ondragleave=()=>drop.classList.remove('drag');
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');const fs=[...(e.dataTransfer.files||[])];pickFile(fs.find(x=>x.type.startsWith('video/'))||fs[0])};
+  bbody.appendChild(drop);
+  const cw=el('div','sub-cmt');cw.appendChild(el('label',null,'コメント（このショット工程へのコメント）'));
+  const ta=el('textarea');ta.value=block.comment||'';ta.oninput=()=>block.comment=ta.value;cw.appendChild(ta);
+  bbody.appendChild(cw);
+  bl.appendChild(bbody);
+  return bl;
+}
+function openSubPicker(){
+  const parent=getNode(shotsParentOf(getNode(subS.projectId)));
+  const shots=childrenOf(parent.id);
+  const sel=new Set();
+  const modal=el('div','subpick');
+  const pk=el('div','pk');
+  const pkh=el('div','pkh');pkh.appendChild(el('div',null,'提出するショット・工程を選択'));const hsp=el('div');hsp.style.flex='1';pkh.appendChild(hsp);
+  const pkb=el('div','pkb');const grid=el('div','pk-grid');pkb.appendChild(grid);
+  for(const shot of shots){
+    const card=el('div','pk-shot');
+    const th=el('div','th');const lv=latestVideoVersionUnder(shot.id);if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
+    card.appendChild(th);
+    card.appendChild(el('div','nm',shot.name));
+    const chips=el('div','pk-stages');chips.style.display='none';
+    for(const stg of submitStagesOf(shot)){
+      const chip=el('div','pk-chip',stg.name);
+      chip.onclick=e=>{e.stopPropagation();if(sel.has(stg.id))sel.delete(stg.id);else sel.add(stg.id);chip.classList.toggle('on',sel.has(stg.id));updCount()};
+      chips.appendChild(chip);
+    }
+    card.appendChild(chips);
+    th.onclick=()=>{const show=chips.style.display==='none';chips.style.display=show?'flex':'none';card.classList.toggle('sel',show)};
+    grid.appendChild(card);
+  }
+  if(!shots.length)pkb.appendChild(el('div','sub-empty','ショットがありません。'));
+  const pkf=el('div','pkf');
+  const cnt=el('span','sub',' ');const updCount=()=>cnt.textContent=sel.size+' 件選択';updCount();
+  const cancel=el('button','btn btn-ghost btn-sm','キャンセル');cancel.onclick=()=>modal.remove();
+  const ok=el('button','btn btn-primary btn-sm','ブロックに追加');
+  ok.onclick=()=>{for(const id of sel){if(!subS.blocks.some(b=>b.node.id===id)){const n=getNode(id);if(n)subS.blocks.push({node:n,comment:'',file:null,thumbUrl:null})}}modal.remove();subShowCreate()};
+  const fr=el('div');fr.style.cssText='display:flex;gap:8px';fr.appendChild(cancel);fr.appendChild(ok);
+  pkf.appendChild(cnt);pkf.appendChild(fr);
+  pk.appendChild(pkh);pk.appendChild(pkb);pk.appendChild(pkf);modal.appendChild(pk);
+  modal.onclick=e=>{if(e.target===modal)modal.remove()};
+  subS.ov.appendChild(modal);
+}
+async function createSubmitBlock(){
+  const blocks=subS.blocks.filter(b=>b.file);
+  if(!blocks.length){toast('少なくとも1つのブロックに動画を追加してください');return}
+  const pid=subS.projectId;const name=subGenName(pid);
+  const stub={prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}};
+  const items=[];
+  toast('サブミットブロックを作成中…');
+  for(const b of blocks){
+    const before=b.node.versions.length;
+    await uploadVersion(b.node,b.file,stub,{comment:b.comment,sub:'submitblock/'+name,projectId:pid});
+    const v=b.node.versions[b.node.versions.length-1];
+    if(v&&b.node.versions.length>before)items.push({nodeId:b.node.id,versionId:v.id,comment:b.comment||''});
+  }
+  DB.submits.push({id:newId('sub'),projectId:pid,name,createdAt:nowIso(),items});
+  await persist();
+  for(const b of blocks){if(b.thumbUrl){try{URL.revokeObjectURL(b.thumbUrl)}catch(_){}}}
+  subS.blocks=[];
+  toast('サブミットブロック '+name+' を作成しました（'+items.length+'件）');
+  try{render();resolveThumbs()}catch(_){}
+  subShowList();
+}
+function subShowView(sb){
+  const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
+  const back=el('button','btn btn-ghost btn-sm','← 一覧');back.onclick=()=>subShowList();tr.appendChild(back);
+  wrap.appendChild(el('div','section-label',sb.name+' — タイルをクリックしてレビュー（該当ショットに反映）'));
+  const grid=el('div','pm-grid');
+  for(const item of (sb.items||[])){
+    const n=getNode(item.nodeId);if(!n)continue;const v=n.versions.find(x=>x.id===item.versionId);if(!v)continue;
+    const shot=n.parentId?getNode(n.parentId):null;
+    const tile=el('div','pm-tile');
+    const th=el('div','th');if(v.thumb)storage.getURL(v.thumb).then(u=>{if(u){th.style.backgroundImage='url("'+u+'")'}});else th.appendChild(icoEl('film'));
+    tile.appendChild(th);
+    const bd=el('div','bd');
+    bd.appendChild(el('div','nm',(shot&&shot.id!==sb.projectId?shot.name+' / ':'')+n.name));
+    const mt=el('div','mt');const badge=el('span','pm-badge',n.name);badge.style.background=stageColor(n.name);mt.appendChild(badge);mt.appendChild(el('span','pth',v.name));bd.appendChild(mt);
+    if(item.comment)bd.appendChild(el('div','pth',item.comment));
+    tile.appendChild(bd);
+    tile.onclick=()=>openReview(n.id,v.id);
+    grid.appendChild(tile);
+  }
+  if(!(sb.items&&sb.items.length))wrap.appendChild(el('div','sub-empty','項目がありません。'));
+  else wrap.appendChild(grid);
+}
+
+/* ============================================================
    ナビ / レンダリング
    ============================================================ */
 function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);render()}
@@ -725,7 +941,7 @@ function go(id){state.currentId=id;state.search='';state.projTab='timeline';stat
 function updateHeaderForContext(){
   const home=!state.currentId;
   const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
-  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#sizeBtns',!home);
+  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#submitBtn',!home);setD('#sizeBtns',!home);
   setD('#addBtn',true);setD('#mainHead',!home);setD('#breadcrumb',!home);
 }
 function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline'}))}catch(_){}}
@@ -1516,6 +1732,17 @@ function openRename(node){
       for(const f of folders){const label=(f.id===node.id?'（プロジェクト直下）':pathOf(f.id).slice(1).map(x=>x.name).join(' / '));spSel.appendChild(new Option(label,f.id))}
       spSel.value=(node.shotsParentId&&getNode(node.shotsParentId))?node.shotsParentId:'';
       inner.appendChild(spSel);
+      /* プロジェクト別の保存先フォルダ（ブラウザが使用するフォルダパス。サブミット等を格納） */
+      if(storage.supportsFolder()){
+        inner.appendChild(el('div','form-label','保存先フォルダ（このプロジェクト専用。submitblock 等を格納。未指定なら共通フォルダ）'));
+        const fwrap=el('div');fwrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px';
+        const fcur=el('span','form-label');fcur.style.margin='0';fcur.textContent=node.folderName?('現在: '+node.folderName):'未指定（共通フォルダを使用）';
+        const fpick=el('button','btn btn-ghost btn-sm','フォルダを指定');fpick.type='button';
+        fpick.onclick=async()=>{try{const h=await window.showDirectoryPicker({mode:'readwrite'});await storage.setProjRoot(node.id,h);node.folderName=h.name;fcur.textContent='現在: '+h.name;await persist();toast('保存先フォルダを設定しました')}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました')}};
+        const fclr=el('button','btn btn-ghost btn-sm','解除');fclr.type='button';
+        fclr.onclick=async()=>{await storage.clearProjRoot(node.id);delete node.folderName;fcur.textContent='未指定（共通フォルダを使用）';await persist()};
+        fwrap.appendChild(fpick);fwrap.appendChild(fclr);fwrap.appendChild(fcur);inner.appendChild(fwrap);
+      }
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}await persist();closeModal();render();resolveThumbs()};
@@ -1545,8 +1772,9 @@ async function uploadVersion(node,file,ui,opts){
   try{
     const thumbDataUrl=await genThumb(file);ui.pct.textContent='保存中...';ui.bi.style.width='60%';
     const ext=(file.name.match(/\.[^.]+$/)||[''])[0];const id=newId('media');
-    const mediaRef=await storage.putMedia('media',id+ext,file);
-    let thumbRef=null;if(thumbDataUrl){const blob=await(await fetch(thumbDataUrl)).blob();thumbRef=await storage.putMedia('thumbnails',id+'.jpg',blob)}else if(!isVideo)thumbRef=mediaRef;
+    const sub=opts.sub||'media';const thumbSub=opts.sub?opts.sub+'/thumbnails':'thumbnails';const pm={projectId:opts.projectId};
+    const mediaRef=await storage.putMedia(sub,id+ext,file,pm);
+    let thumbRef=null;if(thumbDataUrl){const blob=await(await fetch(thumbDataUrl)).blob();thumbRef=await storage.putMedia(thumbSub,id+'.jpg',blob,pm)}else if(!isVideo)thumbRef=mediaRef;
     /* 名前：入力があればそれ、空欄なら動画のタイトル（拡張子なしのファイル名） */
     const vname=(opts.name&&opts.name.trim())||file.name.replace(/\.[^.]+$/,'');
     const version={id:newId('ver'),name:vname,type:isVideo?'video':'image',file:mediaRef,thumb:thumbRef,uploadedBy:currentUser(),uploadedAt:nowIso(),review:{status:'pending',notes:[]}};
@@ -2890,6 +3118,7 @@ $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
+$('#submitBtn').onclick=()=>{if(storage.mode)openSubmit()};
 $('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifPanel()};
 /* 工程フィルタ・通知パネルを外側クリックで閉じる */
 document.addEventListener('click',e=>{
