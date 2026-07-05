@@ -366,6 +366,18 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .tl-item.tl-submit{border-left:3px solid var(--edge)}
 .tl-subthumbs{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:96px;height:54px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--bg3)}
 .tl-subthumbs img{width:100%;height:100%;object-fit:cover;background:#000}
+/* 動画・画像タイルは角を四角く（角丸なし） */
+.proj-card,.proj-media,.pm-tile,.pm-tile .th,.vcard,.tl-thumb,.tl-subthumbs,.subl-item .thumbs .th,.pk-shot,.pk-shot .th,.note-shot{border-radius:0}
+.proj-media{overflow:hidden}
+/* プロジェクトサムネイルのトリミング表示（元画像は変えず、位置・拡大で表示） */
+.proj-media img.proj-thumb{position:absolute;max-width:none;object-fit:fill}
+/* トリミング編集ウィジェット */
+.crop-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.crop-box{position:relative;width:100%;aspect-ratio:16/9;max-height:220px;overflow:hidden;background:#000;border:1px solid var(--border);cursor:grab;touch-action:none;user-select:none}
+.crop-box:active{cursor:grabbing}
+.crop-box img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.crop-hint{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;pointer-events:none}
+.crop-slider{width:100%}
 .tl-subbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
 .tl-subbadge svg{width:13px;height:13px}
 .tl-subname{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
@@ -1555,7 +1567,7 @@ function renderHome(s){
     const media=el('div','proj-media');
     const ev=projectUpdates(r.id)[0];
     const thumbRef=r.thumbnail||(ev&&ev.v.thumb);
-    if(thumbRef){const img=el('img','proj-thumb');img.dataset.ref=thumbRef;media.appendChild(img)}
+    if(thumbRef){const img=el('img','proj-thumb');img.dataset.ref=thumbRef;if(r.thumbnail&&thumbRef===r.thumbnail&&r.thumbCrop)img.dataset.crop=JSON.stringify(r.thumbCrop);img.onload=()=>applyThumbCrop(img);media.appendChild(img)}
     else{media.classList.add('ph');media.appendChild(el('span','proj-initial',(r.name||'?').trim().charAt(0).toUpperCase()))}
     card.appendChild(media);
     const body=el('div','proj-body');
@@ -1859,6 +1871,43 @@ async function resolveThumbs(){
   for(const img of document.querySelectorAll('#scroll img[data-ref],#scroll .log-thumb[data-ref]')){const ref=img.dataset.ref;const url=await storage.getURL(ref);if(url){if(img.tagName==='IMG')img.src=url;else img.style.backgroundImage='url("'+url+'")'}}
   for(const v of document.querySelectorAll('#scroll video[data-vref]')){if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}const src=await storage.getURL(v.dataset.vref);if(src&&v.src!==src)v.src=src}
 }
+/* サムネイルのトリミング表示：元画像は変えず、縦横比タイルに合わせて位置・拡大で表示。
+   crop={s:拡大率(>=1), fx/fy:パン位置(-0.5..0.5, 0=中央)} は解像度非依存 */
+function applyThumbCrop(img){
+  const box=img.parentElement;if(!box)return;
+  const iw=img.naturalWidth,ih=img.naturalHeight;if(!iw||!ih)return;
+  let crop={s:1,fx:0,fy:0};if(img.dataset.crop){try{crop=Object.assign(crop,JSON.parse(img.dataset.crop))}catch(_){}}
+  const bw=box.clientWidth,bh=box.clientHeight;if(!bw||!bh)return;
+  const base=Math.max(bw/iw,bh/ih),sc=base*(crop.s||1),dw=iw*sc,dh=ih*sc;
+  img.style.width=dw+'px';img.style.height=dh+'px';
+  img.style.left=((bw-dw)/2+(crop.fx||0)*(dw-bw))+'px';
+  img.style.top=((bh-dh)/2+(crop.fy||0)*(dh-bh))+'px';
+}
+window.addEventListener('resize',()=>{document.querySelectorAll('.proj-media img.proj-thumb').forEach(applyThumbCrop)});
+/* トリミング編集ウィジェット（タイルと同じ縦横比のボックスでドラッグ移動・拡大） */
+function makeCropEditor(opts){
+  opts=opts||{};
+  const wrap=el('div','crop-wrap');
+  const box=el('div','crop-box');
+  const img=el('img');
+  box.appendChild(img);box.appendChild(el('div','crop-hint','ドラッグで移動・スライダーで拡大'));
+  wrap.appendChild(box);
+  const crop=Object.assign({s:1,fx:0,fy:0},opts.crop||{});
+  let iw=0,ih=0;
+  const clamp=()=>{crop.s=Math.max(1,Math.min(6,crop.s));crop.fx=Math.max(-0.5,Math.min(0.5,crop.fx));crop.fy=Math.max(-0.5,Math.min(0.5,crop.fy))};
+  function layout(){if(!iw||!ih)return;const bw=box.clientWidth,bh=box.clientHeight;if(!bw||!bh)return;const base=Math.max(bw/iw,bh/ih),sc=base*crop.s,dw=iw*sc,dh=ih*sc;img.style.width=dw+'px';img.style.height=dh+'px';img.style.left=((bw-dw)/2+crop.fx*(dw-bw))+'px';img.style.top=((bh-dh)/2+crop.fy*(dh-bh))+'px'}
+  img.onload=()=>{iw=img.naturalWidth;ih=img.naturalHeight;clamp();layout()};
+  if(opts.url)img.src=opts.url;
+  let drag=null;
+  box.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY,fx:crop.fx,fy:crop.fy};try{box.setPointerCapture(e.pointerId)}catch(_){}};
+  box.onpointermove=e=>{if(!drag||!iw)return;const bw=box.clientWidth,bh=box.clientHeight,base=Math.max(bw/iw,bh/ih),sc=base*crop.s,ovx=iw*sc-bw,ovy=ih*sc-bh;if(ovx>0)crop.fx=drag.fx+(e.clientX-drag.x)/ovx;if(ovy>0)crop.fy=drag.fy+(e.clientY-drag.y)/ovy;clamp();layout()};
+  box.onpointerup=box.onpointercancel=()=>{drag=null};
+  box.onwheel=e=>{e.preventDefault();crop.s=crop.s*(e.deltaY<0?1.08:0.92);clamp();layout();slider.value=String(Math.round(crop.s*100))};
+  const slider=el('input','crop-slider');slider.type='range';slider.min='100';slider.max='400';slider.value=String(Math.round(crop.s*100));
+  slider.oninput=()=>{crop.s=parseInt(slider.value)/100;clamp();layout()};
+  wrap.appendChild(slider);
+  return {el:wrap,getCrop:()=>({s:+crop.s.toFixed(4),fx:+crop.fx.toFixed(4),fy:+crop.fy.toFixed(4)}),relayout:layout};
+}
 
 /* ============================================================
    モーダル
@@ -1892,18 +1941,27 @@ function openProjectModal(){
   openModal(body=>{
     body.classList.add('proj-modal');
     const inner=mHead(body,'新規プロジェクト','セクション・レビューとは別の、最上位のプロジェクトです');
-    /* サムネイル */
-    inner.appendChild(el('div','form-label','プロジェクトサムネイル（任意・ホームのタイルに表示）'));
-    let thumbFile=null,thumbUrl=null;
-    const thumb=el('div','pc-thumb');
-    const setThumb=()=>{thumb.innerHTML='';if(thumbUrl){thumb.classList.add('has');const img=el('img');img.src=thumbUrl;thumb.appendChild(img);thumb.appendChild(el('div','rep','クリック / ドロップで変更'))}else{thumb.classList.remove('has');thumb.appendChild(icoEl('film'));thumb.appendChild(el('div','ph','画像をドロップ、またはクリックで選択'))}};
-    const pick=f=>{if(!f)return;if(!f.type.startsWith('image/')){toast('画像ファイルを選択してください');return}if(thumbUrl){try{URL.revokeObjectURL(thumbUrl)}catch(_){}}thumbFile=f;thumbUrl=URL.createObjectURL(f);setThumb()};
-    setThumb();
-    thumb.onclick=()=>{const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.onchange=()=>pick(fi.files[0]);fi.click()};
-    thumb.ondragover=e=>{e.preventDefault();thumb.classList.add('drag')};
-    thumb.ondragleave=()=>thumb.classList.remove('drag');
-    thumb.ondrop=e=>{e.preventDefault();thumb.classList.remove('drag');pick([...(e.dataTransfer.files||[])][0])};
-    inner.appendChild(thumb);
+    /* サムネイル（タイルの縦横比に合わせてトリミング可能） */
+    inner.appendChild(el('div','form-label','プロジェクトサムネイル（任意・ドラッグ/拡大でタイル表示範囲を調整）'));
+    let thumbFile=null,thumbUrl=null,cropWidget=null;
+    const thumbHost=el('div');inner.appendChild(thumbHost);
+    function pickFile(){const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.onchange=()=>setImg(fi.files[0]);fi.click()}
+    function setImg(f){if(!f)return;if(!f.type.startsWith('image/')){toast('画像ファイルを選択してください');return}if(thumbUrl){try{URL.revokeObjectURL(thumbUrl)}catch(_){}}thumbFile=f;thumbUrl=URL.createObjectURL(f);renderThumbHost()}
+    function renderThumbHost(){
+      thumbHost.innerHTML='';cropWidget=null;
+      if(!thumbUrl){
+        const p=el('div','pc-thumb');p.appendChild(icoEl('film'));p.appendChild(el('div','ph','画像をドロップ、またはクリックで選択'));
+        p.onclick=pickFile;p.ondragover=e=>{e.preventDefault();p.classList.add('drag')};p.ondragleave=()=>p.classList.remove('drag');
+        p.ondrop=e=>{e.preventDefault();p.classList.remove('drag');setImg([...(e.dataTransfer.files||[])][0])};
+        thumbHost.appendChild(p);
+      }else{
+        cropWidget=makeCropEditor({url:thumbUrl,crop:{s:1,fx:0,fy:0}});
+        thumbHost.appendChild(cropWidget.el);
+        const rep=el('button','btn btn-ghost btn-sm','画像を選び直す');rep.type='button';rep.style.marginBottom='4px';rep.onclick=pickFile;
+        thumbHost.appendChild(rep);
+      }
+    }
+    renderThumbHost();
     /* プロジェクト名 */
     const nameRow=frow('プロジェクト名','input');inner.appendChild(nameRow.r);
     /* 保存先フォルダ */
@@ -1928,10 +1986,11 @@ function openProjectModal(){
       const name=nameRow.f.value.trim();if(!name)return toast('プロジェクト名を入力してください');
       const id=addNode(null,name,descRow.f.value.trim(),'section');
       if(projFolderHandle){await storage.setProjRoot(id,projFolderHandle);getNode(id).folderName=projFolderHandle.name}
-      /* サムネイルはプロジェクトフォルダ直下 thumbnails/ に保存 */
+      /* サムネイルは元画像をそのまま（サイズ変更なし）プロジェクトフォルダ直下 thumbnails/ に保存し、
+         トリミングは crop パラメータ（node.thumbCrop）として別途保持 */
       if(thumbFile){
         if(!projFolderHandle){toast('サムネイルは保存先フォルダ設定時のみ保存されます（プロジェクトは作成しました）');}
-        else{try{const durl=await genThumb(thumbFile);const blob=durl?await(await fetch(durl)).blob():thumbFile;const ref=await storage.putMedia('thumbnails',newId('media')+'.jpg',blob,{projectId:id});if(ref)getNode(id).thumbnail=ref}catch(_){}}
+        else{try{const ext=(thumbFile.name.match(/\.[^.]+$/)||['.jpg'])[0];const ref=await storage.putMedia('thumbnails',newId('media')+ext,thumbFile,{projectId:id});if(ref){getNode(id).thumbnail=ref;getNode(id).thumbCrop=cropWidget?cropWidget.getCrop():{s:1,fx:0,fy:0}}}catch(_){}}
       }
       if(thumbUrl){try{URL.revokeObjectURL(thumbUrl)}catch(_){}}
       await persist();closeModal();go(id);resolveThumbs();
@@ -2055,8 +2114,28 @@ function openRename(node){
       inner.appendChild(addStg);
     }
     /* プロジェクト（ルート）ならステータス／進捗のショット親フォルダを編集できる */
-    let stArr=null,spSel=null;
+    let stArr=null,spSel=null,projThumbFile=null,projThumbUrlTmp=null,projCropWidget=null;
     if(!node.parentId){
+      /* プロジェクトサムネイル（元画像はそのまま・トリミングのみ調整可能） */
+      inner.appendChild(el('div','form-label','プロジェクトサムネイル（ドラッグ/拡大でタイル表示範囲を調整）'));
+      const thHost=el('div');inner.appendChild(thHost);
+      const pickTh=()=>{const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.onchange=()=>setTh(fi.files[0]);fi.click()};
+      const setTh=f=>{if(!f)return;if(!f.type.startsWith('image/')){toast('画像ファイルを選択してください');return}if(projThumbUrlTmp){try{URL.revokeObjectURL(projThumbUrlTmp)}catch(_){}}projThumbFile=f;projThumbUrlTmp=URL.createObjectURL(f);node.thumbCrop={s:1,fx:0,fy:0};renderTh()};
+      async function renderTh(){
+        thHost.innerHTML='';projCropWidget=null;
+        let url=projThumbUrlTmp||(node.thumbnail?await storage.getURL(node.thumbnail):null);
+        if(url){
+          projCropWidget=makeCropEditor({url,crop:node.thumbCrop||{s:1,fx:0,fy:0}});thHost.appendChild(projCropWidget.el);
+          const rep=el('button','btn btn-ghost btn-sm','画像を変更');rep.type='button';rep.style.marginBottom='10px';rep.onclick=pickTh;thHost.appendChild(rep);
+        }else{
+          const p=el('div','pc-thumb');p.appendChild(icoEl('film'));p.appendChild(el('div','ph','画像をドロップ、またはクリックで選択'));
+          p.onclick=pickTh;p.ondragover=e=>{e.preventDefault();p.classList.add('drag')};p.ondragleave=()=>p.classList.remove('drag');
+          p.ondrop=e=>{e.preventDefault();p.classList.remove('drag');setTh([...(e.dataTransfer.files||[])][0])};
+          thHost.appendChild(p);
+          if(!node.folderName)thHost.appendChild(el('div','form-label','（保存先フォルダ設定時のみ保存されます）'));
+        }
+      }
+      renderTh();
       inner.appendChild(el('div','form-label','ステータス定義（このプロジェクト全体で使用）'));
       const stWrap=el('div','step-grid');
       stArr=(node.statuses&&node.statuses.length?node.statuses:DEFAULT_STATUSES).map(x=>({...x}));
@@ -2104,7 +2183,17 @@ function openRename(node){
       inner.appendChild(dcWrap);
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}await persist();closeModal();render();resolveThumbs()};
+    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
+      /* プロジェクトサムネイル：新規画像は元のまま thumbnails/ に保存し、トリミングは crop で保持 */
+      if(!node.parentId){
+        if(projThumbFile){
+          if(!node.folderName){toast('サムネイルは保存先フォルダ設定時のみ保存されます');}
+          else{try{const ext=(projThumbFile.name.match(/\.[^.]+$/)||['.jpg'])[0];const ref=await storage.putMedia('thumbnails',newId('media')+ext,projThumbFile,{projectId:node.id});if(ref)node.thumbnail=ref}catch(_){}}
+        }
+        if(projCropWidget&&node.thumbnail)node.thumbCrop=projCropWidget.getCrop();
+        if(projThumbUrlTmp){try{URL.revokeObjectURL(projThumbUrlTmp)}catch(_){}}
+      }
+      await persist();closeModal();render();resolveThumbs()};
     mFoot(body,[cancel,save]);
   });
 }
@@ -2619,7 +2708,7 @@ function openShotList(){
   +'.btn{background:none;border:1px solid #2a2a2f;color:#9a9aaa;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap}.btn:hover{color:#e8e8ec;border-color:#3a3a42}'
   +'.gridwrap{flex:1;min-height:0;overflow-y:auto;background:#0d0d0f;padding:16px}'
   +'.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}'
-  +'.tile{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;cursor:pointer;background:#1c1c1f}'
+  +'.tile{border:1px solid #2a2a2f;overflow:hidden;cursor:pointer;background:#1c1c1f}'
   +'.tile:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 10px rgba(96,165,255,.22)}'
   +'.tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:22px}'
   +'.tile .bd{padding:7px 9px}.tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
@@ -2801,7 +2890,7 @@ function openProgress(){
   +'.tab.on{background:rgba(96,165,255,.16);border-color:rgba(96,165,255,.6);color:#e8e8ec}'
   +'.ptbl .trow{cursor:pointer}.ptbl .trow:hover td{background:#17171b}.ptbl .trow.pick td{background:rgba(96,165,255,.12)}'
   +'.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}'
-  +'.tile{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;cursor:pointer;background:#1c1c1f}'
+  +'.tile{border:1px solid #2a2a2f;overflow:hidden;cursor:pointer;background:#1c1c1f}'
   +'.tile:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 10px rgba(96,165,255,.22)}'
   +'.tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:22px}'
   +'.tile .bd{padding:7px 9px}.tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
@@ -2984,7 +3073,7 @@ function openReel(){
    +'.rside{width:320px;border-right:1px solid rgba(96,165,255,.5);box-shadow:1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.rside-h{font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:10px 10px 6px;display:flex;justify-content:space-between;align-items:center}'
    +'.rlist{flex:1;overflow-y:auto;padding:0 10px 10px;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));align-content:start}'
-   +'.snode{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;background:#1c1c1f;display:flex;flex-direction:column}'
+   +'.snode{border:1px solid #2a2a2f;overflow:hidden;background:#1c1c1f;display:flex;flex-direction:column}'
    +'.snode:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 8px rgba(96,165,255,.2)}'
    +'.snode .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:20px;cursor:pointer}'
    +'.snode .bd{padding:6px 8px}'
