@@ -42,6 +42,8 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .folder-status:hover{border-color:var(--border2)}
 .folder-status .dot{width:8px;height:8px;border-radius:50%;background:#5a5a6a}
 .folder-status.connected .dot{background:#d8d8dc}
+.folder-status.warn{color:#e0a63a;border-color:rgba(224,166,58,.5)}
+.folder-status.warn .dot{background:#e0a63a}
 .user-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
 .user-field input{width:96px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);font-size:12px}
 .size-btns{display:flex;gap:2px}
@@ -141,6 +143,12 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .home-hd .ht{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:.5px}
 .home-hd .hs{color:var(--text3);font-size:13px;margin-top:7px}
 .home-acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.folder-warn{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 15px;border:1px solid #b98a2e;border-left:3px solid #e0a63a;border-radius:10px;background:rgba(224,166,58,.10)}
+.folder-warn .wi{color:#e0a63a;display:flex;flex-shrink:0}.folder-warn .wi svg{width:20px;height:20px}
+.folder-warn .wtx{flex:1;min-width:0}
+.folder-warn .wt{font-weight:700;font-size:13px;color:#f0c877}
+.folder-warn .ws{font-size:12px;color:var(--text3);margin-top:3px;line-height:1.5}
+.proj-nofolder{color:#e0a63a;border-color:rgba(224,166,58,.5)!important;background:rgba(224,166,58,.12)!important}
 .proj-grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fill,272px);justify-content:center}
 .proj-card{border:1px solid var(--edge);border-radius:16px;overflow:hidden;background:var(--bg);cursor:pointer;box-shadow:0 0 10px var(--edgeglow);transition:box-shadow .2s ease,border-color .2s ease}
 .proj-card:hover{animation:tile-beat 2.6s ease-in-out infinite}
@@ -573,42 +581,47 @@ const storage={
   supportsFolder(){return typeof window.showDirectoryPicker==='function'},
   useIdb(){this.mode='idb';try{localStorage.setItem('layna_mode','idb')}catch(_){}},
   /* ヘッダー表示：プロジェクトを開いていて専用フォルダ指定があればその名前、なければブラウザ内保存 */
-  folderLabel(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root&&root.folderName)return root.folderName;return 'ブラウザ内保存';},
+  folderLabel(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root&&root.folderName)return root.folderName;return '⚠ フォルダ未設定';},
   async _subdir(n,root,create){let dir=root;for(const p of String(n).split('/'))if(p)dir=await dir.getDirectoryHandle(p,{create:create!==false});return dir},
   /* プロジェクト別フォルダ（設定済みなら directory handle を返す） */
   projHandles:new Map(),
   async projRoot(projectId){if(!projectId)return null;if(this.projHandles.has(projectId))return this.projHandles.get(projectId);let h=null;try{h=await idbGet('handles','proj_'+projectId)}catch(_){}if(h){try{if(await h.queryPermission({mode:'readwrite'})!=='granted'){if(await h.requestPermission({mode:'readwrite'})!=='granted')h=null}}catch(_){h=null}}this.projHandles.set(projectId,h);return h;},
   async setProjRoot(projectId,handle){await idbPut('handles','proj_'+projectId,handle);this.projHandles.set(projectId,handle);},
   async clearProjRoot(projectId){try{await idbDel('handles','proj_'+projectId)}catch(_){}this.projHandles.set(projectId,null);},
-  /* ===== プロジェクト単位ストレージ =====
-     ・個人設定/グローバル（templates, notifications, reels）→ kv/local（このブラウザ内）
-     ・接続プロジェクト一覧（registry）→ kv/registry（このブラウザ内・ユーザーごと）
-     ・各プロジェクトのデータ（nodes, submits）→ プロジェクトフォルダ内 layna.project.json、
-       フォルダ未指定なら kv/proj_<id>（このブラウザ内） */
-  async loadLocal(){return (await idbGet('kv','local'))||null},
-  async saveLocal(obj){await idbPut('kv','local',obj)},
-  async loadRegistry(){return (await idbGet('kv','registry'))||null},
-  async saveRegistry(arr){await idbPut('kv','registry',arr)},
+  /* ===== ストレージ方針 =====
+     ・IndexedDB は「フォルダの鍵（handles）」の保持のみに使用（ブラウザ仕様上ここにしか保存できない）
+     ・個人設定/接続一覧/プロジェクトのメタデータ（軽量JSON）→ localStorage
+     ・動画・画像の実体 → プロジェクトフォルダ（フォルダ未設定なら保存不可＝要警告）
+     ・旧IndexedDB(kv/blobs) は移行のため「読み込みのみ」フォールバック */
+  _ls(key){try{const s=localStorage.getItem(key);return s?JSON.parse(s):null}catch(_){return null}},
+  _lsSet(key,obj){try{localStorage.setItem(key,JSON.stringify(obj));return true}catch(e){return false}},
+  async loadLocal(){return this._ls('layna_local')||(await idbGet('kv','local'))||null},
+  async saveLocal(obj){if(!this._lsSet('layna_local',obj))toast('設定の保存に失敗しました（localStorage容量超過の可能性）')},
+  async loadRegistry(){const v=this._ls('layna_registry');if(v)return v;return (await idbGet('kv','registry'))||null},
+  async saveRegistry(arr){this._lsSet('layna_registry',arr)},
   _projFileName:'layna.project.json',
   async loadProject(id){
     const ph=await this.projRoot(id);
     if(ph){try{const fh=await ph.getFileHandle(this._projFileName);const t=await (await fh.getFile()).text();return JSON.parse(t)}catch(e){}}
-    return (await idbGet('kv','proj_'+id))||null;
+    return this._ls('layna_proj_'+id)||(await idbGet('kv','proj_'+id))||null;
   },
   async saveProject(id,data){
     const ph=await this.projRoot(id);
-    if(ph){try{const fh=await ph.getFileHandle(this._projFileName,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(data,null,2));await w.close();return}catch(e){}}
-    await idbPut('kv','proj_'+id,data);
+    if(ph){try{const fh=await ph.getFileHandle(this._projFileName,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(data,null,2));await w.close();
+      /* フォルダに保存できたら localStorage の複製は残さない（データはフォルダ側を正とする） */
+      try{localStorage.removeItem('layna_proj_'+id)}catch(_){}return}catch(e){}}
+    /* フォルダ未設定：メタデータのみ localStorage に保持 */
+    if(!this._lsSet('layna_proj_'+id,data))toast('プロジェクトデータの保存に失敗（フォルダ未設定・容量超過）');
   },
-  async delProject(id){try{await idbDel('kv','proj_'+id)}catch(_){}try{const ph=await this.projRoot(id);if(ph)await ph.removeEntry(this._projFileName)}catch(_){}},
+  async delProject(id){try{localStorage.removeItem('layna_proj_'+id)}catch(_){}try{await idbDel('kv','proj_'+id)}catch(_){}try{const ph=await this.projRoot(id);if(ph)await ph.removeEntry(this._projFileName)}catch(_){}},
   /* 旧: 単一DB（移行用に読むだけ） */
   async loadLegacyDb(){return (await idbGet('kv','db'))||null},
-  /* opts.projectId 指定かつ設定済みならプロジェクトフォルダへ保存（ref は p:<id>|<path>）。
-     未指定・未設定はブラウザ内保存（ref は idb:...）。 */
+  /* 動画・画像はプロジェクトフォルダへ保存（ref は p:<id>|<path>）。
+     フォルダ未設定なら保存できないため null を返す（呼び出し側で警告）。 */
   async putMedia(sub,fn,blob,opts){
     opts=opts||{};
     if(opts.projectId){const ph=await this.projRoot(opts.projectId);if(ph){const dir=await this._subdir(sub,ph,true);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return 'p:'+opts.projectId+'|'+sub+'/'+fn}}
-    const key='blob_'+newId('b')+'_'+fn;await idbPut('blobs',key,blob);return 'idb:'+key;
+    return null;
   },
   _parseRef(ref){if(ref.startsWith('p:')){const i=ref.indexOf('|');return{proj:ref.slice(2,i),path:ref.slice(i+1)}}return{proj:null,path:ref}},
   async _fileHandle(ref,create){const {proj,path}=this._parseRef(ref);const parts=path.split('/');const fn=parts.pop();let root=this.rootHandle;if(proj){root=await this.projRoot(proj);if(!root)return null}if(!root)return null;let dir=root;for(const p of parts)if(p)dir=await dir.getDirectoryHandle(p,{create:create===true});return{dir,fn};},
@@ -630,15 +643,14 @@ function projectData(pid){
   const submits=(DB.submits||[]).filter(s=>s.projectId===pid);
   return{v:3,id:pid,name:root.name,nodes,submits};
 }
-/* registry を最新のルート情報に同期 */
+/* registry を最新のルート情報に同期（追加・更新のみ。
+   除去は削除/接続解除で明示的に行う＝フォルダ一時未接続でも登録は保持） */
 function syncRegistryFromDb(){
   for(const root of childrenOf(null)){
     let e=REG.find(x=>x.id===root.id);
     if(!e){e={id:root.id,name:root.name,folderName:root.folderName||null};REG.push(e)}
     else{e.name=root.name;e.folderName=root.folderName||null}
   }
-  /* DBに無くなったプロジェクトは registry から除去 */
-  REG=REG.filter(e=>getNode(e.id));
 }
 /* 変更検知用キャッシュ（未変更のファイル書き込みを省略） */
 const _saveCache={local:'',reg:'',proj:{}};
@@ -804,7 +816,7 @@ function normalizeNodes(){
   for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
   for(const n of DB.nodes)if(n.type==='review'&&n.status==null&&n.versions&&n.versions.length){const lv=n.versions[n.versions.length-1];n.status=(lv.review&&lv.review.status)||'pending'}
 }
-function updateFolderStatus(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;const hasFolder=!!(root&&root.folderName);$('#folderStatus').classList.toggle('connected',hasFolder);$('#folderName').textContent=storage.folderLabel()}
+function updateFolderStatus(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;const hasFolder=!!(root&&root.folderName);const fs=$('#folderStatus');fs.classList.toggle('connected',hasFolder);fs.classList.toggle('warn',!!root&&!hasFolder);$('#folderName').textContent=storage.folderLabel()}
 
 /* ============================================================
    通知（基盤）— 何を通知するかは後日 notify(...) を呼ぶ側で実装
@@ -999,7 +1011,10 @@ function openSubPicker(){
 async function createSubmitBlock(){
   const blocks=subS.blocks.filter(b=>b.file);
   if(!blocks.length){toast('少なくとも1つのブロックに動画を追加してください');return}
-  const pid=subS.projectId;const name=subGenName(pid);
+  const pid=subS.projectId;
+  const proot=getNode(pid);
+  if(!proot||!proot.folderName){toast('保存先フォルダが未設定のため提出できません。プロジェクト設定でフォルダを指定してください');return}
+  const name=subGenName(pid);
   const subId=newId('sub');
   const blockComment=(subS.blockComment||'').trim();
   const stub={prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}};
@@ -1280,6 +1295,24 @@ function buildProjectTabs(root){
   }
   return nav;
 }
+/* 保存先フォルダ未設定の警告バナー（動画はフォルダにしか保存できないため） */
+function folderWarnBanner(root){
+  if(!root||root.folderName)return null;
+  const b=el('div','folder-warn');
+  b.appendChild(elIco('span','wi','film',''));
+  const tx=el('div','wtx');
+  tx.appendChild(el('div','wt','このプロジェクトには保存先フォルダが設定されていません'));
+  tx.appendChild(el('div','ws',storage.supportsFolder()
+    ?'動画・画像はフォルダにのみ保存されます。設定するまでアップロードできません（ステータスやコメントは一時的にこのブラウザに保存されます）。'
+    :'お使いのブラウザはフォルダ保存に未対応です（Chrome / Edge 推奨）。'));
+  b.appendChild(tx);
+  if(storage.supportsFolder()){
+    const set=el('button','btn btn-primary btn-sm','保存先フォルダを設定');
+    set.onclick=async()=>{try{const h=await window.showDirectoryPicker({mode:'readwrite'});await storage.setProjRoot(root.id,h);root.folderName=h.name;await persist();updateFolderStatus();toast('保存先フォルダを設定しました');render();resolveThumbs()}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました')}};
+    b.appendChild(set);
+  }
+  return b;
+}
 function renderBody(){
   const s=$('#scroll');s.innerHTML='';curUploadUI=null;
   const cur=state.currentId?getNode(state.currentId):null;
@@ -1287,6 +1320,8 @@ function renderBody(){
   const root=rootOf(cur);
   /* プロジェクト内では上部タブを常に表示 */
   s.appendChild(buildProjectTabs(root));
+  /* 保存先フォルダ未設定の警告 */
+  const warn=folderWarnBanner(root);if(warn)s.appendChild(warn);
   if(cur.id===root.id&&!state.search.trim()){
     const main=el('div','home-main');s.appendChild(main);
     if(state.projTab==='progress')renderProjProgress(main,root);
@@ -1514,6 +1549,7 @@ function renderHome(s){
     body.appendChild(el('div','proj-name',r.name));
     const meta=el('div','proj-meta');
     const pb=projBadge(r);const bd=el('span','proj-badge',pb.label);bd.style.color=pb.color;bd.style.borderColor=hexA(pb.color,.5);bd.style.background=hexA(pb.color,.12);meta.appendChild(bd);
+    if(!r.folderName)meta.appendChild(el('span','proj-badge proj-nofolder','⚠ フォルダ未設定'));
     meta.appendChild(el('span','proj-cnt',childrenOf(r.id).length+' 項目'));
     if(ev)meta.appendChild(el('span','proj-upd','更新 '+fmt(ev.time)));
     body.appendChild(meta);
@@ -2055,6 +2091,7 @@ async function uploadVersion(node,file,ui,opts){
     const ext=(file.name.match(/\.[^.]+$/)||[''])[0];const id=newId('media');
     const sub=opts.sub||'media';const thumbSub=opts.sub?opts.sub+'/thumbnails':'thumbnails';const pm={projectId:opts.projectId};
     const mediaRef=await storage.putMedia(sub,id+ext,file,pm);
+    if(!mediaRef){ui.prog.classList.add('hidden');toast('保存先フォルダが未設定のため保存できません。プロジェクト設定でフォルダを指定してください');return}
     let thumbRef=null;if(thumbDataUrl){const blob=await(await fetch(thumbDataUrl)).blob();thumbRef=await storage.putMedia(thumbSub,id+'.jpg',blob,pm)}else if(!isVideo)thumbRef=mediaRef;
     /* 名前：入力があればそれ、空欄なら動画のタイトル（拡張子なしのファイル名） */
     const vname=(opts.name&&opts.name.trim())||file.name.replace(/\.[^.]+$/,'');
