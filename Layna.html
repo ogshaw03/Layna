@@ -143,6 +143,17 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .home-hd .ht{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:.5px}
 .home-hd .hs{color:var(--text3);font-size:13px;margin-top:7px}
 .home-acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+/* 新規プロジェクト作成モーダル（セクション作成と区別） */
+.modal.proj-modal .modal-title{color:var(--text)}
+.modal.proj-modal .modal-title:before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--edge);box-shadow:0 0 8px var(--edgeglow);margin-right:9px;vertical-align:middle}
+.modal.proj-modal .modal-header{border-bottom:1px solid var(--edge);box-shadow:0 1px 10px var(--edgeglow)}
+.pc-thumb{position:relative;width:100%;aspect-ratio:16/9;max-height:200px;border:2px dashed var(--border2);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text3);font-size:13px;cursor:pointer;overflow:hidden;background:#000 center/cover no-repeat;margin-bottom:6px}
+.pc-thumb .ph{font-size:12px}
+.pc-thumb svg{width:26px;height:26px;opacity:.7}
+.pc-thumb.drag{border-color:var(--edge);color:var(--text);background-color:rgba(96,165,255,.08)}
+.pc-thumb.has{border-style:solid;border-color:var(--border)}
+.pc-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pc-thumb .rep{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.6);border-radius:6px;padding:2px 8px;font-size:11px;color:#fff}
 .folder-warn{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 15px;border:1px solid #b98a2e;border-left:3px solid #e0a63a;border-radius:10px;background:rgba(224,166,58,.10)}
 .folder-warn .wi{color:#e0a63a;display:flex;flex-shrink:0}.folder-warn .wi svg{width:20px;height:20px}
 .folder-warn .wtx{flex:1;min-width:0}
@@ -1172,10 +1183,11 @@ function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody
 function renderSidebar(){
   const sb=$('#sidebar');sb.innerHTML='';
   /* ホーム画面（プロジェクト選択）ではサイドバーを表示しない */
-  if(!state.currentId){sb.style.display='none';return}
+  const curNode=state.currentId?getNode(state.currentId):null;
+  if(!curNode){sb.style.display='none';return}
   sb.style.display='';
   /* プロジェクトフォルダ（ルート）は出さず、現在のプロジェクト配下の階層のみ表示 */
-  const root=rootOf(getNode(state.currentId));
+  const root=rootOf(curNode);
   const lab=el('div','sidebar-label');lab.appendChild(el('span',null,'ショット / 工程'));
   const ctrls=el('span','side-ctrls');
   const col=el('span','add','⊟');col.title='現在の階層以外を閉じる';col.onclick=()=>{state.expanded=new Set(pathOf(state.currentId).map(n=>n.id));renderSidebar()};ctrls.appendChild(col);
@@ -1542,7 +1554,8 @@ function renderHome(s){
     const card=el('div','proj-card');
     const media=el('div','proj-media');
     const ev=projectUpdates(r.id)[0];
-    if(ev&&ev.v.thumb){const img=el('img','proj-thumb');img.dataset.ref=ev.v.thumb;media.appendChild(img)}
+    const thumbRef=r.thumbnail||(ev&&ev.v.thumb);
+    if(thumbRef){const img=el('img','proj-thumb');img.dataset.ref=thumbRef;media.appendChild(img)}
     else{media.classList.add('ph');media.appendChild(el('span','proj-initial',(r.name||'?').trim().charAt(0).toUpperCase()))}
     card.appendChild(media);
     const body=el('div','proj-body');
@@ -1871,33 +1884,70 @@ function typeSelector(initial,onChange){
   seg.appendChild(optS);seg.appendChild(optR);row.appendChild(seg);
   return{row,get:()=>sel};
 }
+/* 新規プロジェクト作成（セクション/レビューとは別UI・トップ階層専用）
+   ・ページ種別の選択なし（必ずプロジェクト＝section扱い）
+   ・連番なし（プロジェクトは1つ）
+   ・サムネイル画像を指定可能（プロジェクトフォルダ直下 thumbnails/ に格納） */
+function openProjectModal(){
+  openModal(body=>{
+    body.classList.add('proj-modal');
+    const inner=mHead(body,'新規プロジェクト','セクション・レビューとは別の、最上位のプロジェクトです');
+    /* サムネイル */
+    inner.appendChild(el('div','form-label','プロジェクトサムネイル（任意・ホームのタイルに表示）'));
+    let thumbFile=null,thumbUrl=null;
+    const thumb=el('div','pc-thumb');
+    const setThumb=()=>{thumb.innerHTML='';if(thumbUrl){thumb.classList.add('has');const img=el('img');img.src=thumbUrl;thumb.appendChild(img);thumb.appendChild(el('div','rep','クリック / ドロップで変更'))}else{thumb.classList.remove('has');thumb.appendChild(icoEl('film'));thumb.appendChild(el('div','ph','画像をドロップ、またはクリックで選択'))}};
+    const pick=f=>{if(!f)return;if(!f.type.startsWith('image/')){toast('画像ファイルを選択してください');return}if(thumbUrl){try{URL.revokeObjectURL(thumbUrl)}catch(_){}}thumbFile=f;thumbUrl=URL.createObjectURL(f);setThumb()};
+    setThumb();
+    thumb.onclick=()=>{const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.onchange=()=>pick(fi.files[0]);fi.click()};
+    thumb.ondragover=e=>{e.preventDefault();thumb.classList.add('drag')};
+    thumb.ondragleave=()=>thumb.classList.remove('drag');
+    thumb.ondrop=e=>{e.preventDefault();thumb.classList.remove('drag');pick([...(e.dataTransfer.files||[])][0])};
+    inner.appendChild(thumb);
+    /* プロジェクト名 */
+    const nameRow=frow('プロジェクト名','input');inner.appendChild(nameRow.r);
+    /* 保存先フォルダ */
+    let projFolderHandle=null;
+    inner.appendChild(el('div','form-label','保存先フォルダ（このプロジェクト専用。動画・画像・サムネイルを格納）'));
+    if(storage.supportsFolder()){
+      const fwrap=el('div');fwrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px';
+      const fcur=el('span','form-label');fcur.style.margin='0';fcur.textContent='未指定（フォルダなしでは動画・サムネイルを保存できません）';
+      const fpick=el('button','btn btn-ghost btn-sm','フォルダを指定');fpick.type='button';
+      fpick.onclick=async()=>{try{const h=await window.showDirectoryPicker({mode:'readwrite'});projFolderHandle=h;fcur.textContent='現在: '+h.name}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました')}};
+      const fclr=el('button','btn btn-ghost btn-sm','解除');fclr.type='button';
+      fclr.onclick=()=>{projFolderHandle=null;fcur.textContent='未指定（フォルダなしでは動画・サムネイルを保存できません）'};
+      fwrap.appendChild(fpick);fwrap.appendChild(fclr);fwrap.appendChild(fcur);inner.appendChild(fwrap);
+    }else{
+      inner.appendChild(el('div','form-label','お使いのブラウザはフォルダ保存に未対応です（Chrome / Edge 推奨）。'));
+    }
+    /* 説明 */
+    const descRow=frow('説明（任意）','textarea');inner.appendChild(descRow.r);
+    const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=()=>{if(thumbUrl){try{URL.revokeObjectURL(thumbUrl)}catch(_){}}closeModal()};
+    const save=el('button','btn btn-primary','プロジェクトを作成');
+    save.onclick=async()=>{
+      const name=nameRow.f.value.trim();if(!name)return toast('プロジェクト名を入力してください');
+      const id=addNode(null,name,descRow.f.value.trim(),'section');
+      if(projFolderHandle){await storage.setProjRoot(id,projFolderHandle);getNode(id).folderName=projFolderHandle.name}
+      /* サムネイルはプロジェクトフォルダ直下 thumbnails/ に保存 */
+      if(thumbFile){
+        if(!projFolderHandle){toast('サムネイルは保存先フォルダ設定時のみ保存されます（プロジェクトは作成しました）');}
+        else{try{const durl=await genThumb(thumbFile);const blob=durl?await(await fetch(durl)).blob():thumbFile;const ref=await storage.putMedia('thumbnails',newId('media')+'.jpg',blob,{projectId:id});if(ref)getNode(id).thumbnail=ref}catch(_){}}
+      }
+      if(thumbUrl){try{URL.revokeObjectURL(thumbUrl)}catch(_){}}
+      await persist();closeModal();go(id);resolveThumbs();
+    };
+    mFoot(body,[cancel,save]);
+  });
+}
 function openAddModal(parentId){
   openModal(body=>{
     const cur=parentId?getNode(parentId):null;
-    const inner=mHead(body,'項目を追加',cur?('親: '+cur.name):'新規プロジェクト');
-    const nameRow=frow(cur?'名前 / ベース名（例: ショット01 / cut）':'プロジェクト名','input');
+    const inner=mHead(body,'項目を追加',cur?('親: '+cur.name):'新規項目');
+    const nameRow=frow('名前 / ベース名（例: ショット01 / cut）','input');
     inner.appendChild(nameRow.r);
     const nameLab=nameRow.r.querySelector('label');
     let stgSection=null;
     const ts=typeSelector('section',t=>{if(stgSection)stgSection.style.display=(t==='section')?'':'none'});inner.appendChild(ts.row);
-    /* 新規プロジェクト（トップレベル）作成時は保存先フォルダを指定できる */
-    let projFolderHandle=null;
-    if(!cur){
-      const fsec=el('div');fsec.style.margin='4px 0 2px';
-      fsec.appendChild(el('div','form-label','保存先フォルダ（このプロジェクト専用。動画・画像を格納。未指定ならブラウザ内保存）'));
-      if(storage.supportsFolder()){
-        const fwrap=el('div');fwrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px';
-        const fcur=el('span','form-label');fcur.style.margin='0';fcur.textContent='未指定（ブラウザ内保存を使用）';
-        const fpick=el('button','btn btn-ghost btn-sm','フォルダを指定');fpick.type='button';
-        fpick.onclick=async()=>{try{const h=await window.showDirectoryPicker({mode:'readwrite'});projFolderHandle=h;fcur.textContent='現在: '+h.name}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました')}};
-        const fclr=el('button','btn btn-ghost btn-sm','解除');fclr.type='button';
-        fclr.onclick=()=>{projFolderHandle=null;fcur.textContent='未指定（ブラウザ内保存を使用）'};
-        fwrap.appendChild(fpick);fwrap.appendChild(fclr);fwrap.appendChild(fcur);fsec.appendChild(fwrap);
-      }else{
-        fsec.appendChild(el('div','form-label','お使いのブラウザはフォルダ保存に未対応です（Chrome / Edge 推奨）。ブラウザ内保存で動作します。'));
-      }
-      inner.appendChild(fsec);
-    }
     /* 連番で複数作成（同じ工程を含むフォルダを一括作成） */
     const seqTop=el('label','form-label');seqTop.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px';
     const seqCb=el('input');seqCb.type='checkbox';seqTop.appendChild(seqCb);seqTop.appendChild(document.createTextNode('連番で複数作成'));
@@ -1948,8 +1998,6 @@ function openAddModal(parentId){
         createdIds.push(id);
         if(stages.length){for(const st of stages)addNode(id,st,'','review');getNode(id).stages=stages.slice()}
       }
-      /* 指定された保存先フォルダを各プロジェクトに設定 */
-      if(projFolderHandle&&!cur){for(const id of createdIds){await storage.setProjRoot(id,projFolderHandle);getNode(id).folderName=projFolderHandle.name}}
       await persist();closeModal();if(parentId)state.expanded.add(parentId);render();resolveThumbs();
       if(names.length>1)toast(names.length+'件を作成しました');
     };
@@ -3434,7 +3482,7 @@ async function openReelFromSaved(reelId){
    初期化
    ============================================================ */
 function triggerUpload(node){const fi=document.createElement('input');fi.type='file';fi.accept='image/*,video/*';fi.onchange=()=>{if(fi.files[0])openUploadModal(node,fi.files[0])};fi.click()}
-function headerAdd(){const cur=state.currentId?getNode(state.currentId):null;if(cur&&cur.type==='review')triggerUpload(cur);else openAddModal(state.currentId)}
+function headerAdd(){const cur=state.currentId?getNode(state.currentId):null;if(!cur)openProjectModal();else if(cur.type==='review')triggerUpload(cur);else openAddModal(cur.id)}
 $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 /* 保存先インジケータ：プロジェクトを開いていれば設定（保存先フォルダ指定）を開く */
 $('#folderStatus').onclick=()=>{const cur=state.currentId?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root)openRename(root);else toast('プロジェクトを開くと、プロジェクト設定から保存先フォルダを指定できます')};
