@@ -507,7 +507,7 @@ textarea.form-input{height:70px;resize:vertical}
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
     <button class="btn btn-ghost" id="submitBtn" title="サブミットブロック — 複数ショットの提出をまとめてレビュー"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="5" rx="1"/><rect x="3" y="11" width="14" height="5" rx="1"/></svg>サブミット</button>
     <div class="size-btns" id="sizeBtns"></div>
-    <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
+    <div class="folder-status" id="folderStatus" title="このプロジェクトの保存先 / クリックでプロジェクト設定"><span class="dot"></span><span id="folderName">ブラウザ内保存</span></div>
     <button class="hd-bell" id="notifBtn" title="通知"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a4 4 0 0 1 8 0c0 4 1.5 5 1.5 5h-11S6 12 6 8z"/><path d="M8.5 16a1.7 1.7 0 0 0 3 0"/></svg><span class="nb-badge hidden" id="notifBadge">0</span></button>
     <label class="user-field" id="nameField"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4.5 16.5a5.5 5.5 0 0 1 11 0"/></svg><input id="currentUser" type="text" placeholder="名前" /></label>
     <div class="hd-user hidden" id="authUserBox"></div>
@@ -566,31 +566,30 @@ async function idbDel(s,k){const d=await idbOpen();return new Promise((res,rej)=
 
 /* ---------- ストレージ抽象化（folder / idb） ---------- */
 const storage={
-  mode:null,rootHandle:null,_pending:null,urlCache:new Map(),
+  /* DB（layna_db.json 相当）は常にブラウザ内保存(IndexedDB)。
+     動画・画像はプロジェクトごとに指定したフォルダへ、未指定ならブラウザ内保存へ格納。 */
+  mode:'idb',rootHandle:null,urlCache:new Map(),
   supportsFolder(){return typeof window.showDirectoryPicker==='function'},
-  async pickFolder(){const h=await window.showDirectoryPicker({mode:'readwrite',id:'layna-root'});if(!await this._perm(h))throw new Error('書き込み許可が必要です');this.rootHandle=h;this.mode='folder';await idbPut('handles','root',h);try{localStorage.setItem('layna_mode','folder')}catch(_){}return h.name},
-  async tryReconnect(){if(!this.supportsFolder())return false;const h=await idbGet('handles','root');if(!h)return false;if(await h.queryPermission({mode:'readwrite'})==='granted'){this.rootHandle=h;this.mode='folder';return true}this._pending=h;return false},
-  async resumePending(){if(!this._pending)return false;if(!await this._perm(this._pending))return false;this.rootHandle=this._pending;this.mode='folder';this._pending=null;return true},
-  async _perm(h){const o={mode:'readwrite'};if(await h.queryPermission(o)==='granted')return true;return (await h.requestPermission(o))==='granted'},
   useIdb(){this.mode='idb';try{localStorage.setItem('layna_mode','idb')}catch(_){}},
-  folderLabel(){if(this.mode==='folder'&&this.rootHandle)return this.rootHandle.name;if(this.mode==='idb')return 'ブラウザ内保存';return '未接続'},
-  async _subdir(n,root,create){let dir=root||this.rootHandle;for(const p of String(n).split('/'))if(p)dir=await dir.getDirectoryHandle(p,{create:create!==false});return dir},
+  /* ヘッダー表示：プロジェクトを開いていて専用フォルダ指定があればその名前、なければブラウザ内保存 */
+  folderLabel(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root&&root.folderName)return root.folderName;return 'ブラウザ内保存';},
+  async _subdir(n,root,create){let dir=root;for(const p of String(n).split('/'))if(p)dir=await dir.getDirectoryHandle(p,{create:create!==false});return dir},
   /* プロジェクト別フォルダ（設定済みなら directory handle を返す） */
   projHandles:new Map(),
   async projRoot(projectId){if(!projectId)return null;if(this.projHandles.has(projectId))return this.projHandles.get(projectId);let h=null;try{h=await idbGet('handles','proj_'+projectId)}catch(_){}if(h){try{if(await h.queryPermission({mode:'readwrite'})!=='granted'){if(await h.requestPermission({mode:'readwrite'})!=='granted')h=null}}catch(_){h=null}}this.projHandles.set(projectId,h);return h;},
   async setProjRoot(projectId,handle){await idbPut('handles','proj_'+projectId,handle);this.projHandles.set(projectId,handle);},
   async clearProjRoot(projectId){try{await idbDel('handles','proj_'+projectId)}catch(_){}this.projHandles.set(projectId,null);},
-  async loadDb(){if(this.mode==='folder'){try{const fh=await this.rootHandle.getFileHandle('layna_db.json');return JSON.parse(await (await fh.getFile()).text())}catch(e){return null}}return (await idbGet('kv','db'))||null},
-  async saveDb(db){if(this.mode==='folder'){const fh=await this.rootHandle.getFileHandle('layna_db.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(db,null,2));await w.close()}else{await idbPut('kv','db',db)}},
-  /* opts.projectId 指定かつ設定済みならプロジェクトフォルダへ保存（ref は p:<id>|<path>） */
+  async loadDb(){return (await idbGet('kv','db'))||null},
+  async saveDb(db){await idbPut('kv','db',db)},
+  /* opts.projectId 指定かつ設定済みならプロジェクトフォルダへ保存（ref は p:<id>|<path>）。
+     未指定・未設定はブラウザ内保存（ref は idb:...）。 */
   async putMedia(sub,fn,blob,opts){
     opts=opts||{};
     if(opts.projectId){const ph=await this.projRoot(opts.projectId);if(ph){const dir=await this._subdir(sub,ph,true);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return 'p:'+opts.projectId+'|'+sub+'/'+fn}}
-    if(this.mode==='folder'){const dir=await this._subdir(sub);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return sub+'/'+fn}
     const key='blob_'+newId('b')+'_'+fn;await idbPut('blobs',key,blob);return 'idb:'+key;
   },
   _parseRef(ref){if(ref.startsWith('p:')){const i=ref.indexOf('|');return{proj:ref.slice(2,i),path:ref.slice(i+1)}}return{proj:null,path:ref}},
-  async _fileHandle(ref,create){const {proj,path}=this._parseRef(ref);const parts=path.split('/');const fn=parts.pop();let root=this.rootHandle;if(proj){root=await this.projRoot(proj);if(!root)return null}let dir=root;for(const p of parts)if(p)dir=await dir.getDirectoryHandle(p,{create:create===true});return{dir,fn};},
+  async _fileHandle(ref,create){const {proj,path}=this._parseRef(ref);const parts=path.split('/');const fn=parts.pop();let root=this.rootHandle;if(proj){root=await this.projRoot(proj);if(!root)return null}if(!root)return null;let dir=root;for(const p of parts)if(p)dir=await dir.getDirectoryHandle(p,{create:create===true});return{dir,fn};},
   async delMedia(ref){if(!ref)return;try{if(ref.startsWith('idb:'))await idbDel('blobs',ref.slice(4));else{const h=await this._fileHandle(ref);if(h)await h.dir.removeEntry(h.fn)}}catch(e){}const u=this.urlCache.get(ref);if(u){URL.revokeObjectURL(u);this.urlCache.delete(ref)}},
   async getURL(ref){if(!ref)return null;if(this.urlCache.has(ref))return this.urlCache.get(ref);let blob=null;try{if(ref.startsWith('idb:'))blob=await idbGet('blobs',ref.slice(4));else{const h=await this._fileHandle(ref);if(h)blob=await (await h.dir.getFileHandle(h.fn)).getFile()}}catch(e){return null}if(!blob)return null;const url=URL.createObjectURL(blob);this.urlCache.set(ref,url);return url},
 };
@@ -685,21 +684,6 @@ function fmt(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d))return iso;
    ゲート
    ============================================================ */
 function chrome(on){$('.header').style.display=on?'':'none';$('.app-body').style.display=on?'':'none'}
-function renderGate(){
-  chrome(false);const g0=$('#gateScreen');if(g0)g0.remove();
-  const g=el('div','gate');g.id='gateScreen';const box=el('div','gate-box');
-  box.innerHTML='<div class="gate-logo">La<b>y</b>na</div>';
-  const support=storage.supportsFolder();const sub=el('div','gate-sub');
-  if(storage._pending)sub.innerHTML='前回のフォルダ「<b>'+storage._pending.name+'</b>」に再接続します。';
-  else if(support)sub.innerHTML='このツール専用の<b>保存先フォルダ</b>を選んでください。<br>フォルダ内に <code>layna_db.json</code> と <code>media/</code> を作成します。';
-  else sub.innerHTML='お使いのブラウザはフォルダ保存に未対応です。<br><b>Chrome / Edge</b> 推奨。ブラウザ内保存でも続けられます。';
-  box.appendChild(sub);const acts=el('div','gate-actions');
-  if(storage._pending){const b=el('button','btn btn-primary','フォルダに再接続');b.onclick=async()=>{try{if(await storage.resumePending())await boot();else toast('許可されませんでした')}catch(e){toast('接続失敗: '+e.message)}};acts.appendChild(b);const b2=el('button','btn btn-ghost','別のフォルダ');b2.onclick=connectFlow;acts.appendChild(b2);}
-  else if(support){const b=el('button','btn btn-primary','保存先フォルダを選択');b.onclick=connectFlow;acts.appendChild(b);const b2=el('button','btn btn-ghost','ブラウザ内保存で続ける');b2.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b2);}
-  else{const b=el('button','btn btn-primary','ブラウザ内保存で開始');b.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b);}
-  box.appendChild(acts);g.appendChild(box);document.body.appendChild(g);
-}
-async function connectFlow(){try{await storage.pickFolder();await boot()}catch(e){if(e.name!=='AbortError')toast('フォルダ選択が使えない環境です。「ブラウザ内保存」をご利用ください')}}
 
 /* ============================================================
    起動
@@ -736,7 +720,7 @@ async function boot(){
   }catch(_){}
   if(!restored){state.currentId=null;go(null)}
 }
-function updateFolderStatus(){$('#folderStatus').classList.toggle('connected',!!storage.mode);$('#folderName').textContent=storage.folderLabel()}
+function updateFolderStatus(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;const hasFolder=!!(root&&root.folderName);$('#folderStatus').classList.toggle('connected',hasFolder);$('#folderName').textContent=storage.folderLabel()}
 
 /* ============================================================
    通知（基盤）— 何を通知するかは後日 notify(...) を呼ぶ側で実装
@@ -1005,6 +989,8 @@ function updateHeaderForContext(){
   const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
   setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#submitBtn',!home);setD('#sizeBtns',!home);
   setD('#addBtn',true);setD('#mainHead',!home);setD('#breadcrumb',!home);
+  /* 保存先インジケータはプロジェクト内でのみ表示 */
+  setD('#folderStatus',!home);updateFolderStatus();
 }
 function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline'}))}catch(_){}}
 function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
@@ -1832,14 +1818,16 @@ function openRename(node){
       inner.appendChild(spSel);
       /* プロジェクト別の保存先フォルダ（ブラウザが使用するフォルダパス。サブミット等を格納） */
       if(storage.supportsFolder()){
-        inner.appendChild(el('div','form-label','保存先フォルダ（このプロジェクト専用。submitblock 等を格納。未指定なら共通フォルダ）'));
+        inner.appendChild(el('div','form-label','保存先フォルダ（このプロジェクト専用。動画・画像を格納。未指定ならブラウザ内保存）'));
         const fwrap=el('div');fwrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px';
-        const fcur=el('span','form-label');fcur.style.margin='0';fcur.textContent=node.folderName?('現在: '+node.folderName):'未指定（共通フォルダを使用）';
+        const fcur=el('span','form-label');fcur.style.margin='0';fcur.textContent=node.folderName?('現在: '+node.folderName):'未指定（ブラウザ内保存を使用）';
         const fpick=el('button','btn btn-ghost btn-sm','フォルダを指定');fpick.type='button';
-        fpick.onclick=async()=>{try{const h=await window.showDirectoryPicker({mode:'readwrite'});await storage.setProjRoot(node.id,h);node.folderName=h.name;fcur.textContent='現在: '+h.name;await persist();toast('保存先フォルダを設定しました')}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました')}};
+        fpick.onclick=async()=>{try{const h=await window.showDirectoryPicker({mode:'readwrite'});await storage.setProjRoot(node.id,h);node.folderName=h.name;fcur.textContent='現在: '+h.name;await persist();updateFolderStatus();toast('保存先フォルダを設定しました')}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました')}};
         const fclr=el('button','btn btn-ghost btn-sm','解除');fclr.type='button';
-        fclr.onclick=async()=>{await storage.clearProjRoot(node.id);delete node.folderName;fcur.textContent='未指定（共通フォルダを使用）';await persist()};
+        fclr.onclick=async()=>{await storage.clearProjRoot(node.id);delete node.folderName;fcur.textContent='未指定（ブラウザ内保存を使用）';await persist();updateFolderStatus()};
         fwrap.appendChild(fpick);fwrap.appendChild(fclr);fwrap.appendChild(fcur);inner.appendChild(fwrap);
+      }else{
+        inner.appendChild(el('div','form-label','保存先フォルダ：お使いのブラウザはフォルダ保存に未対応です（Chrome / Edge 推奨）。ブラウザ内保存で動作します。'));
       }
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
@@ -3213,7 +3201,8 @@ async function openReelFromSaved(reelId){
 function triggerUpload(node){const fi=document.createElement('input');fi.type='file';fi.accept='image/*,video/*';fi.onchange=()=>{if(fi.files[0])openUploadModal(node,fi.files[0])};fi.click()}
 function headerAdd(){const cur=state.currentId?getNode(state.currentId):null;if(cur&&cur.type==='review')triggerUpload(cur);else openAddModal(state.currentId)}
 $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
-$('#folderStatus').onclick=connectFlow;
+/* 保存先インジケータ：プロジェクトを開いていれば設定（保存先フォルダ指定）を開く */
+$('#folderStatus').onclick=()=>{const cur=state.currentId?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root)openRename(root);else toast('プロジェクトを開くと、プロジェクト設定から保存先フォルダを指定できます')};
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
 $('#submitBtn').onclick=()=>{if(storage.mode)openSubmit()};
@@ -3244,13 +3233,9 @@ window.addEventListener('drop',async e=>{
 $('#searchInput').oninput=e=>{state.search=e.target.value;renderBody();resolveThumbs()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 async function startAppFlow(){
-  let prev=null;try{prev=localStorage.getItem('layna_mode')}catch(_){}
-  try{
-    if(await storage.tryReconnect()){await boot();return}
-    if(storage._pending){renderGate();return}
-    if(prev==='idb'){storage.useIdb();await boot();return}
-    renderGate();
-  }catch(e){renderGate()}
+  /* 保存先はブラウザ内保存(IndexedDB)に固定。フォルダ管理はプロジェクト単位で行う。 */
+  storage.useIdb();
+  try{await boot()}catch(e){console.error(e);toast('起動に失敗しました: '+e.message)}
 }
 
 /* ===== 認証（Googleログイン + git許可リスト access.json）===== */
