@@ -3285,6 +3285,9 @@ function openReel(){
   const ztrans=ce(d,'div','ztrans');stage.appendChild(ztrans);
   const video=ce(d,'video');video.controls=false;video.playsInline=true;ztrans.appendChild(video);
   const trace=ce(d,'div','rtrace');ztrans.appendChild(trace); // トラッキングペーパー（白レイヤー）
+  /* クリップ切替時の黒フレーム点滅を防ぐ橋渡し用キャンバス（直前フレームを保持） */
+  const bridge=ce(d,'canvas');bridge.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:3;display:none;pointer-events:none';stage.appendChild(bridge);
+  const hideBridge=()=>{bridge.style.display='none'};
   const empty=ce(d,'div','empty');empty.innerHTML='クリップがありません。<br>左のショットリスト、またはメインの REEL ボタンで追加してください。';stage.appendChild(empty);
   maincol.appendChild(stage);
   /* コントロール */
@@ -3618,6 +3621,7 @@ function openReel(){
   const total=()=>cs().reduce((a,c)=>a+(c.dur||0),0);
   function loadCur(auto){
     const c=cs()[reelUI.cur];
+    reelUI.ended=false; /* 新しいクリップを読み込むので終端フラグ解除 */
     /* クリップ切替：未送信アノテはクリップごとに保持（跨いでも消えない） */
     RV.pending=(c&&(c.pending||(c.pending=[])))||[];
     RV.stroke=null;RV.last=-1;RV.layerCount=1;
@@ -3625,12 +3629,16 @@ function openReel(){
     resetRZoom(); /* クリップ切替時はズーム/トラックをリセット */
     const dt=rvData();RV.FPS=(c&&c.fps)||(dt&&dt.v.fps)||24;fpsS.value=String(RV.FPS);
     buildLayerPanel();reelNotes();updUnsent();
-    if(!c){video.removeAttribute('src');video.load();reelRender();return}
+    if(!c){hideBridge();video.removeAttribute('src');video.load();reelRender();return}
+    /* 直前フレームを橋渡しキャンバスに描いて src 差替え中の黒点滅を隠す */
+    if(video.videoWidth>0&&video.readyState>=2&&c.url!==video.currentSrc){
+      try{bridge.width=video.videoWidth;bridge.height=video.videoHeight;bridge.getContext('2d').drawImage(video,0,0);bridge.style.display='block';reelWin.clearTimeout(reelUI.bridgeTO);reelUI.bridgeTO=reelWin.setTimeout(hideBridge,900)}catch(_){hideBridge()}
+    }
     video.src=c.url;if(auto)video.play().catch(()=>{});
     reelRender();
   }
   reelUI.loadCur=loadCur;
-  play.onclick=()=>{if(!cs().length)return;if(video.paused){if(!video.src)loadCur(false);video.play().catch(()=>{})}else video.pause()};
+  play.onclick=()=>{if(!cs().length)return;if(video.paused){if(reelUI.ended){reelUI.ended=false;reelUI.cur=0;loadCur(true);return}if(!video.src)loadCur(false);video.play().catch(()=>{})}else video.pause()};
   prev.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.max(0,reelUI.cur-1);loadCur(true)};
   next.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.min(cs().length-1,reelUI.cur+1);loadCur(true)};
   loopBtn.onclick=()=>{reelUI.loop=!reelUI.loop;loopBtn.classList.toggle('on',reelUI.loop)};
@@ -3700,7 +3708,11 @@ function openReel(){
   video.addEventListener('ended',()=>{
     if(reelUI.cur<cs().length-1){reelUI.cur++;loadCur(true)}
     else if(reelUI.loop&&cs().length){reelUI.cur=0;loadCur(true)}
+    else{reelUI.ended=true} /* リール終端：次の再生で先頭から再生 */
   });
+  /* 新しいクリップの先頭フレームが表示可能になったら橋渡しキャンバスを消す */
+  video.addEventListener('loadeddata',hideBridge);
+  video.addEventListener('playing',hideBridge);
   /* プレイヘッド更新 */
   (function tick(){
     if(!reelAlive())return;
