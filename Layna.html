@@ -123,8 +123,9 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pm-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
 .pm-tile{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg2)}
 .pm-tile:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
-.pm-tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
+.pm-tile .th{position:relative;aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
 .pm-tile .th img{width:100%;height:100%;object-fit:cover}
+.pm-tile .th canvas.tvid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 .pm-tile .bd{padding:7px 9px}.pm-tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm-tile .mt{display:flex;align-items:center;gap:6px;margin-top:5px}.pm-tile .pth{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm-stbl{border-collapse:collapse;width:100%}
@@ -1387,6 +1388,7 @@ function folderWarnBanner(root){
 }
 function renderBody(){renderBodyMain();if(state.drawer&&$('#reviewDrawer'))fillDrawer();}
 function renderBodyMain(){
+  stopShotAutoplay(); /* 再描画のたびに前回のタイル動画を停止・解放 */
   const s=$('#scroll');s.innerHTML='';curUploadUI=null;
   const cur=state.currentId?getNode(state.currentId):null;
   if(!cur){renderHome(s);return}
@@ -1501,7 +1503,11 @@ function renderProjShots(main,cur){
   for(const sh of shots){
     const lv=latestVideoVersionUnder(sh.id);
     const tile=el('div','pm-tile');
-    const th=el('div','th');if(lv&&lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)}else th.appendChild(icoEl('film'));
+    const th=el('div','th');
+    if(lv){
+      if(lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)} /* ポスター（読込前・非表示時のフォールバック） */
+      if(lv.v.file){const cv=el('canvas','tvid');cv.dataset.vref=lv.v.file;th.appendChild(cv)} /* 表示中のみ自動再生（ハーフ解像度） */
+    }else th.appendChild(icoEl('film'));
     tile.appendChild(th);
     const bd=el('div','bd');bd.appendChild(el('div','nm',sh.name));
     const mt=el('div','mt');
@@ -1513,6 +1519,45 @@ function renderProjShots(main,cur){
     grid.appendChild(tile);
   }
   main.appendChild(grid);
+  setupShotAutoplay(); /* タイル動画：表示中のみ自動再生 */
+}
+/* ==== ショットタブのタイル自動再生 ====
+   ・画面に表示中のタイルのみ再生（IntersectionObserver）
+   ・負荷軽減のため、表示サイズの半分の解像度のキャンバスへ ~15fps で描画（ハーフ解像度）
+   ・ミュート／ループ。画面外に出たら停止して動画ソースを解放 */
+let _shotObs=null,_shotCanvases=[];
+function tileStop(cv){
+  const tv=cv._tv;if(tv){if(tv.timer){clearInterval(tv.timer);tv.timer=0}if(tv.video){try{tv.video.pause();tv.video.removeAttribute('src');tv.video.load()}catch(_){}}tv.playing=false}
+  try{const c=cv.getContext('2d');c&&c.clearRect(0,0,cv.width,cv.height)}catch(_){}
+}
+async function tileStart(cv){
+  const vref=cv.dataset.vref;if(!vref)return;
+  let tv=cv._tv;if(!tv)tv=cv._tv={};
+  if(tv.playing)return;tv.playing=true;
+  const r=cv.getBoundingClientRect();
+  cv.width=Math.max(2,Math.round((r.width||160)/2));cv.height=Math.max(2,Math.round((r.height||90)/2)); /* ハーフ解像度 */
+  const url=await storage.getURL(vref);if(!url||!tv.playing)return;
+  let v=tv.video;if(!v){v=tv.video=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('muted','');v.preload='auto';v.disablePictureInPicture=true}
+  v.src=url;try{await v.play()}catch(_){}
+  const ctx=cv.getContext('2d');
+  tv.timer=setInterval(()=>{
+    if(!tv.playing)return;
+    if(!document.contains(cv)){tileStop(cv);return}
+    if(v.readyState<2)return;
+    try{ctx.drawImage(v,0,0,cv.width,cv.height)}catch(_){}
+  },1000/15);
+}
+function stopShotAutoplay(){
+  if(_shotObs){_shotObs.disconnect();_shotObs=null}
+  for(const cv of _shotCanvases)tileStop(cv);
+  _shotCanvases=[];
+}
+function setupShotAutoplay(){
+  stopShotAutoplay();
+  _shotCanvases=[...document.querySelectorAll('#scroll canvas.tvid')];
+  if(!_shotCanvases.length)return;
+  _shotObs=new IntersectionObserver(ents=>{for(const e of ents){if(e.isIntersecting)tileStart(e.target);else tileStop(e.target)}},{root:null,rootMargin:'150px',threshold:0.15});
+  for(const cv of _shotCanvases)_shotObs.observe(cv);
 }
 /* 進捗タブ用：プロジェクト配下でショット親になり得るノード（孫を持つ） */
 function pmProgressParents(root){const all=[root,...descendants(root.id)];const c=all.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:[root];}
