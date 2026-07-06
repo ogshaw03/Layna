@@ -2629,6 +2629,7 @@ function openReview(nodeId,versionId){
   const playBtn=el('button','btn btn-ghost btn-sm','▶');
   const prevBtn=el('button','btn btn-ghost btn-sm','−1F');
   const nextBtn=el('button','btn btn-ghost btn-sm','+1F');
+  const loopBtn=el('button','btn btn-ghost btn-sm tool','🔁');loopBtn.title='ループ再生';
   const frameLab=el('span','fb-frame','F 0 / 0');
   const fpsSel=el('select');[12,24,25,30,60].forEach(n=>fpsSel.appendChild(new Option(n+' fps',n)));fpsSel.value=String(FPS);
   const drawBtn=el('button','btn btn-ghost btn-sm tool','✎ 描画');
@@ -2665,7 +2666,7 @@ function openReview(nodeId,versionId){
   tbTop.appendChild(eyeBtn);tbTop.appendChild(traceBtn);tbTop.appendChild(layBtn);tbTop.appendChild(undoBtn);tbTop.appendChild(clearBtn);
   stage.insertBefore(tbTop,wrap);
   /* 再生・ズーム系は下側 */
-  if(isVideo){ctr.appendChild(playBtn);ctr.appendChild(prevBtn);ctr.appendChild(nextBtn);ctr.appendChild(frameLab);ctr.appendChild(fpsSel)}
+  if(isVideo){ctr.appendChild(playBtn);ctr.appendChild(prevBtn);ctr.appendChild(nextBtn);ctr.appendChild(loopBtn);ctr.appendChild(frameLab);ctr.appendChild(fpsSel)}
   ctr.appendChild(ziBtn);ctr.appendChild(zoBtn);ctr.appendChild(zoomLab);ctr.appendChild(zrBtn);ctr.appendChild(handBtn);
   stage.appendChild(ctr);
   body.appendChild(stage);
@@ -2750,6 +2751,7 @@ function openReview(nodeId,versionId){
     media.addEventListener('loadedmetadata',()=>{setupDuration();fit();sync(true)});
     media.addEventListener('seeked',()=>{clearTimeout(seekGuard);seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}else snapToFrame()});
     playBtn.onclick=()=>{if(media.paused)media.play();else media.pause()};
+    loopBtn.onclick=()=>{media.loop=!media.loop;loopBtn.classList.toggle('active',media.loop)};
     media.addEventListener('play',()=>{playBtn.textContent='⏸'});
     media.addEventListener('pause',()=>{playBtn.textContent='▶';snapToFrame()});
     prevBtn.onclick=()=>seekFrame(dispFrame()-1);
