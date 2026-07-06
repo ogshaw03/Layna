@@ -1325,7 +1325,7 @@ function renderMainHead(){
   if(cur){
     title.appendChild(document.createTextNode(cur.name));
     const st=cur.parentId?stInfo(cur):projBadge(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;title.appendChild(bg);
-    title.appendChild(elIco('span','type-chip',cur.type==='review'?'film':'folder',cur.type==='review'?'レビュー':'セクション'));
+    title.appendChild(elIco('span','type-chip',cur.type==='review'?'film':'folder',cur.type==='review'?'レビュー':'カテゴリ'));
   }else title.textContent='プロジェクト一覧';
   box.appendChild(title);
   if(cur&&cur.description)box.appendChild(el('div','desc',cur.description));
@@ -1932,7 +1932,7 @@ function nodeCard(node,isRoot){
       const img=el('img');img.dataset.ref=node.thumbnail;tw.appendChild(img);
     }
   }
-  else{const ni=el('div','vcard-noimg');const g=el('div','g');g.appendChild(icoEl(isRev?'film':'section'));ni.appendChild(g);ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
+  else{const ni=el('div','vcard-noimg');const g=el('div','g');g.appendChild(icoEl(isRev?'film':'section'));ni.appendChild(g);ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空カテゴリ')));tw.appendChild(ni)}
   const stI=isRoot?projBadge(node):stInfo(node);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
   if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
   else if(kids.length)tw.appendChild(elIco('div','vcard-cnt','folder',' '+kids.length));
@@ -2231,7 +2231,7 @@ function typeSelector(initial,onChange){
   const seg=el('div','seg');
   const svgS='<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">'+ICONS.folder+'</svg>';
   const svgR='<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">'+ICONS.film+'</svg>';
-  const optS=el('button','seg-opt');optS.type='button';optS.innerHTML=svgS+'セクション<small>工程・階層を管理／動画は不可</small>';
+  const optS=el('button','seg-opt');optS.type='button';optS.innerHTML=svgS+'カテゴリ<small>工程・階層を管理／動画は不可</small>';
   const optR=el('button','seg-opt');optR.type='button';optR.innerHTML=svgR+'レビュー<small>動画FBログを縦に残す</small>';
   const apply=()=>{optS.classList.toggle('active',sel==='section');optR.classList.toggle('active',sel==='review');if(onChange)onChange(sel)};
   optS.onclick=()=>{sel='section';apply()};optR.onclick=()=>{sel='review';apply()};apply();
@@ -2245,7 +2245,7 @@ function typeSelector(initial,onChange){
 function openProjectModal(){
   openModal(body=>{
     body.classList.add('proj-modal');
-    const inner=mHead(body,'新規プロジェクト','セクション・レビューとは別の、最上位のプロジェクトです');
+    const inner=mHead(body,'新規プロジェクト','カテゴリ・レビューとは別の、最上位のプロジェクトです');
     /* サムネイル（タイルの縦横比に合わせてトリミング可能） */
     inner.appendChild(el('div','form-label','プロジェクトサムネイル（任意・ドラッグ/拡大でタイル表示範囲を調整）'));
     let thumbFile=null,thumbUrl=null,cropWidget=null;
@@ -2378,7 +2378,7 @@ function openRename(node){
     inner.appendChild(nameRow.r);
     const ts=typeSelector(node.type);inner.appendChild(ts.row);
     const kids=childrenOf(node.id).length,vers=node.versions.length;
-    if(kids||vers)inner.appendChild(el('div','form-label','※ 種別を変えてもデータは消えません（レビューにすると子項目は非表示、セクションにすると動画ログは非表示になります）。現在: 子'+kids+'件 / 動画'+vers+'本'));
+    if(kids||vers)inner.appendChild(el('div','form-label','※ 種別を変えてもデータは消えません（レビューにすると子項目は非表示、カテゴリにすると動画ログは非表示になります）。現在: 子'+kids+'件 / 動画'+vers+'本'));
     const descRow=frow('説明','textarea');descRow.f.value=node.description||'';
     inner.appendChild(descRow.r);
     /* セクションフォルダ：この中で管理する工程（子フォルダに一括作成される工程テンプレート） */
