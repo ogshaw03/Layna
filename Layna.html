@@ -374,7 +374,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .proj-media img.proj-thumb{position:absolute;max-width:none;object-fit:fill}
 /* トリミング編集ウィジェット（実際のタイルと同じ縦横比） */
 .crop-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
-.crop-box{position:relative;width:100%;aspect-ratio:var(--tile-ar);overflow:hidden;background:#000;border:1px solid var(--border);cursor:grab;touch-action:none;user-select:none}
+.crop-box{position:relative;width:100%;overflow:hidden;background:#000;border:1px solid var(--border);cursor:grab;touch-action:none;user-select:none}
+.crop-box::before{content:'';display:block;padding-top:56.25%} /* 16:9を全ブラウザで保証 */
 .crop-box:active{cursor:grabbing}
 .crop-box img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .crop-hint{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;pointer-events:none}
@@ -382,7 +383,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 /* 実際のタイルサイズでのプレビュー */
 .crop-preview{display:flex;flex-direction:column;gap:5px;align-items:flex-start;margin-top:2px}
 .crop-preview .cp-label{font-size:11px;color:var(--text3)}
-.crop-preview .cp-tile{position:relative;width:272px;max-width:100%;aspect-ratio:var(--tile-ar);overflow:hidden;background:#000;border:1px solid var(--edge);box-shadow:0 0 8px var(--edgeglow)}
+.crop-preview .cp-tile{position:relative;width:272px;max-width:100%;overflow:hidden;background:#000;border:1px solid var(--edge);box-shadow:0 0 8px var(--edgeglow)}
+.crop-preview .cp-tile::before{content:'';display:block;padding-top:56.25%} /* 16:9 */
 .crop-preview .cp-tile img{position:absolute;max-width:none;pointer-events:none}
 .tl-subbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
 .tl-subbadge svg{width:13px;height:13px}
