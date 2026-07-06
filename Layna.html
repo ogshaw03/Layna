@@ -1546,8 +1546,15 @@ function renderProjShots(main,cur){
     }else th.appendChild(icoEl('film'));
     tile.appendChild(th);
     const bd=el('div','bd');bd.appendChild(el('div','nm',sh.name));
+    /* 現在の工程バッジ＋現在のステータスバッジ */
+    if(lv){
+      const badges=el('div','mt');
+      const stg=el('span','pm-badge',lv.node.name);stg.style.background=stageColor(lv.node.name);badges.appendChild(stg);
+      const si=stInfo(lv.node);const stB=el('span','pm-badge',si.label);stB.style.background=si.color;badges.appendChild(stB);
+      bd.appendChild(badges);
+    }
     const mt=el('div','mt');
-    mt.appendChild(el('span','pth',lv?('最新: '+(lv.node!==sh?lv.node.name+' / ':'')+lv.v.name):'動画なし'));
+    mt.appendChild(el('span','pth',lv?('最新: '+lv.v.name):'動画なし'));
     bd.appendChild(mt);
     tile.appendChild(bd);
     /* タイルクリックで該当動画（最新）のレビューページへ移動 */
