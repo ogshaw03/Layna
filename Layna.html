@@ -469,11 +469,6 @@ textarea.form-input{height:70px;resize:vertical}
 .note .m{color:var(--text3);font-size:11px;margin-bottom:4px}
 .note-input{display:flex;gap:8px;margin-top:10px}
 .note-input input{flex:1}
-.tmpl-pick{display:flex;flex-direction:column;gap:8px}
-.tmpl-opt{border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer}
-.tmpl-opt:hover{border-color:var(--accent)}
-.tmpl-opt .tn{font-weight:600;font-size:13px}
-.tmpl-opt .ts{font-size:11px;color:var(--text3);margin-top:3px}
 .seg{display:flex;gap:6px}
 .seg-opt{flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:13px;text-align:center;line-height:1.5}
 .seg-opt small{display:block;font-size:10px;color:var(--text3)}
@@ -588,11 +583,6 @@ const STATUS={
   retake:{label:'リテイク',cls:'retake',color:'#d6a95f'},
   rejected:{label:'NG',cls:'rejected',color:'#e06a6a'},
 };
-function defaultTemplates(){return[
-  {id:'tpl_anim',name:'アニメ工程（レイアウト→アニメ→セカンダリ）',steps:[{name:'レイアウト',color:'#7c6fff'},{name:'アニメーション',color:'#5a9bff'},{name:'セカンダリ',color:'#c06fff'}]},
-  {id:'tpl_cg',name:'CG工程（モデリング〜コンポジット）',steps:[{name:'モデリング',color:'#7c6fff'},{name:'アニメーション',color:'#5a9bff'},{name:'ライティング',color:'#ffb85a'},{name:'コンポジット',color:'#5affa0'}]},
-  {id:'tpl_shots',name:'ショット3つ（ショット01〜03）',steps:[{name:'ショット01',color:'#7c6fff'},{name:'ショット02',color:'#7c6fff'},{name:'ショット03',color:'#7c6fff'}]},
-];}
 
 let _c=0;
 function newId(p){_c++;return p+'_'+Date.now().toString(36)+_c.toString(36)}
@@ -645,6 +635,18 @@ const storage={
     if(!this._lsSet('layna_proj_'+id,data))toast('プロジェクトデータの保存に失敗（フォルダ未設定・容量超過）');
   },
   async delProject(id){try{localStorage.removeItem('layna_proj_'+id)}catch(_){}try{await idbDel('kv','proj_'+id)}catch(_){}try{const ph=await this.projRoot(id);if(ph)await ph.removeEntry(this._projFileName)}catch(_){}},
+  /* リール：プロジェクトフォルダ内 reels/reels.json に格納（共有可能）。フォルダ未設定なら localStorage */
+  async loadReels(id){
+    const ph=await this.projRoot(id);
+    if(ph){try{const dir=await ph.getDirectoryHandle('reels');const fh=await dir.getFileHandle('reels.json');return JSON.parse(await (await fh.getFile()).text())}catch(e){}}
+    return this._ls('layna_reels_'+id)||null;
+  },
+  async saveReels(id,reels){
+    const ph=await this.projRoot(id);
+    if(ph){try{const dir=await this._subdir('reels',ph,true);const fh=await dir.getFileHandle('reels.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(reels,null,2));await w.close();
+      try{localStorage.removeItem('layna_reels_'+id)}catch(_){}return}catch(e){}}
+    this._lsSet('layna_reels_'+id,reels);
+  },
   /* 旧: 単一DB（移行用に読むだけ） */
   async loadLegacyDb(){return (await idbGet('kv','db'))||null},
   /* 動画・画像はプロジェクトフォルダへ保存（ref は p:<id>|<path>）。
@@ -664,9 +666,11 @@ const storage={
 let DB=null;let curUploadUI=null;
 let REG=[]; /* 接続プロジェクト一覧（このユーザーが使うプロジェクト）: [{id,name,folderName}] */
 const state={currentId:null,search:'',expanded:new Set(),frameOrder:false};
-function defaultDb(){return{version:3,templates:defaultTemplates(),nodes:[],reels:[],notifications:[],submits:[]}}
+function defaultDb(){return{version:3,nodes:[],reels:[],notifications:[],submits:[]}}
 /* プロジェクト（ルート）ID を求める */
 function projectIdOf(nodeId){const n=getNode(nodeId);return n?rootOf(n).id:null}
+/* リールが属するプロジェクト（最初のクリップのノードのルート） */
+function reelProjectId(r){const c=(r.clips||[])[0];if(!c)return null;const n=getNode(c.nodeId);return n?rootOf(n).id:null}
 /* あるプロジェクトに属する node/submit をまとめてプロジェクトデータ化 */
 function projectData(pid){
   const root=getNode(pid);if(!root)return null;
@@ -684,18 +688,23 @@ function syncRegistryFromDb(){
   }
 }
 /* 変更検知用キャッシュ（未変更のファイル書き込みを省略） */
-const _saveCache={local:'',reg:'',proj:{}};
-/* 保存：グローバル(local)＋registry＋各プロジェクト（変更があったもののみ書き込み） */
+const _saveCache={local:'',reg:'',proj:{},reels:{}};
+/* 保存：グローバル(local=通知のみ)＋registry＋各プロジェクト（データ・リール、変更分のみ） */
 async function persist(){
   if(!DB)return;
   syncRegistryFromDb();
-  const local={templates:DB.templates,notifications:DB.notifications,reels:DB.reels};
+  const local={notifications:DB.notifications};
   const ls=JSON.stringify(local);if(ls!==_saveCache.local){await storage.saveLocal(local);_saveCache.local=ls}
   const rs=JSON.stringify(REG);if(rs!==_saveCache.reg){await storage.saveRegistry(REG);_saveCache.reg=rs}
+  /* リールをプロジェクトごとに集約（フォルダ内 reels/ に格納して共有可能に） */
+  const reelsByProj={};
+  for(const r of (DB.reels||[])){const pid=r.projectId||reelProjectId(r);if(!pid)continue;r.projectId=pid;(reelsByProj[pid]=reelsByProj[pid]||[]).push(r)}
   for(const e of REG){
     const data=projectData(e.id);if(!data)continue;
     const ps=JSON.stringify(data);
     if(_saveCache.proj[e.id]!==ps){await storage.saveProject(e.id,data);_saveCache.proj[e.id]=ps}
+    const rls=reelsByProj[e.id]||[];const rk=JSON.stringify(rls);
+    if(_saveCache.reels[e.id]!==rk){await storage.saveReels(e.id,rls);_saveCache.reels[e.id]=rk}
   }
 }
 
@@ -704,8 +713,7 @@ function migrate(old){
   const nodes=[];
   for(const p of old.projects||[])nodes.push({id:p.id,parentId:null,name:p.name,description:p.description||'',thumbnail:p.thumbnail||null,createdAt:p.createdAt||nowIso(),versions:[]});
   for(const s of old.shots||[])nodes.push({id:s.id,parentId:s.projectId,name:s.name,description:s.description||'',thumbnail:s.thumbnail||null,createdAt:s.createdAt||nowIso(),versions:(s.versions||[]).map(v=>({...v,thumb:v.thumb||v.thumbnail||null}))});
-  const templates=(old.pipelineTemplates&&old.pipelineTemplates.length)?old.pipelineTemplates.map(t=>({id:t.id,name:t.name,steps:(t.steps||[]).map(st=>({name:st.name,color:st.color||'#7c6fff'}))})):defaultTemplates();
-  return{version:2,templates,nodes};
+  return{version:2,nodes};
 }
 
 /* ---------- ツリー操作 ---------- */
@@ -789,10 +797,9 @@ function chrome(on){$('.header').style.display=on?'':'none';$('.app-body').style
    ============================================================ */
 async function boot(){
   const g=$('#gateScreen');if(g)g.remove();chrome(true);
-  /* グローバル(個人設定) */
+  /* グローバル(個人設定＝通知のみ) */
   const local=await storage.loadLocal();
-  DB={version:3,templates:(local&&local.templates&&local.templates.length)?local.templates:defaultTemplates(),
-      nodes:[],reels:(local&&Array.isArray(local.reels))?local.reels:[],
+  DB={version:3,nodes:[],reels:[],
       notifications:(local&&Array.isArray(local.notifications))?local.notifications:[],submits:[]};
   /* 接続プロジェクト一覧 */
   REG=await storage.loadRegistry();
@@ -803,10 +810,9 @@ async function boot(){
     if(legacy){
       const lg=legacy.nodes?legacy:migrate(legacy);
       DB.nodes=Array.isArray(lg.nodes)?lg.nodes:[];
-      DB.reels=Array.isArray(lg.reels)?lg.reels:DB.reels;
+      DB.reels=Array.isArray(lg.reels)?lg.reels:[];
       DB.notifications=Array.isArray(lg.notifications)?lg.notifications:DB.notifications;
       DB.submits=Array.isArray(lg.submits)?lg.submits:[];
-      if(Array.isArray(lg.templates)&&lg.templates.length)DB.templates=lg.templates;
       normalizeNodes();
       syncRegistryFromDb();
       await persist(); /* 新フォーマットで書き出し（kv/db は保険で残す） */
@@ -814,14 +820,18 @@ async function boot(){
       await storage.saveRegistry(REG);
     }
   }else{
-    /* 各プロジェクトのデータを読み込んでマージ */
+    /* 各プロジェクトのデータ・リールを読み込んでマージ */
     for(const e of REG){
       const data=await storage.loadProject(e.id);
       if(data&&Array.isArray(data.nodes)){
         for(const n of data.nodes)if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
         if(Array.isArray(data.submits))for(const s of data.submits)if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
       }
+      const rls=await storage.loadReels(e.id);
+      if(Array.isArray(rls))for(const r of rls)if(!DB.reels.some(x=>x.id===r.id))DB.reels.push(r);
     }
+    /* 旧・localStorageのリール（layna_local.reels）を一度だけ取り込み（次回persistでフォルダへ移行） */
+    if(local&&Array.isArray(local.reels))for(const r of local.reels)if(!DB.reels.some(x=>x.id===r.id))DB.reels.push(r);
     normalizeNodes();
   }
   updateFolderStatus();initSizeBtns();updateNotifBadge();
@@ -1164,8 +1174,12 @@ async function connectProjectFlow(){
   const oldIds=new Set([data.id,...DB.nodes.filter(n=>rootOfId(n)===data.id).map(n=>n.id)]);
   DB.nodes=DB.nodes.filter(n=>!oldIds.has(n.id)&&n.id!==data.id);
   DB.submits=(DB.submits||[]).filter(s=>s.projectId!==data.id);
+  DB.reels=(DB.reels||[]).filter(r=>r.projectId!==data.id);
   for(const n of data.nodes)if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
   if(Array.isArray(data.submits))for(const s of data.submits)if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
+  /* このプロジェクトのリール（フォルダ内 reels/）も取り込み */
+  const rls=await storage.loadReels(data.id);
+  if(Array.isArray(rls))for(const r of rls)if(!DB.reels.some(x=>x.id===r.id))DB.reels.push(r);
   const root=getNode(data.id);if(root)root.folderName=handle.name;
   normalizeNodes();
   if(!REG.some(e=>e.id===data.id))REG.push({id:data.id,name:data.name||(root&&root.name)||'project',folderName:handle.name});
@@ -1179,9 +1193,10 @@ async function disconnectProject(id){
   const root=getNode(id);if(!root)return;
   if(!confirm('プロジェクト「'+root.name+'」の接続を解除しますか？\n（フォルダ内のデータは削除されません。再度「接続」で開けます）'))return;
   const ids=new Set([id,...descendants(id).map(n=>n.id)]);
+  DB.reels=(DB.reels||[]).filter(r=>(r.projectId||reelProjectId(r))!==id); /* ノード削除前に判定 */
   DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
   DB.submits=(DB.submits||[]).filter(s=>s.projectId!==id);
-  REG=REG.filter(e=>e.id!==id);delete _saveCache.proj[id];
+  REG=REG.filter(e=>e.id!==id);delete _saveCache.proj[id];delete _saveCache.reels[id];
   storage.projHandles.delete(id);
   await persist();
   toast('接続を解除しました');
@@ -1604,7 +1619,6 @@ function renderSectionBody(s,cur){
   const secl=el('div','section-label');secl.appendChild(el('span',null,'サブ項目 / 工程'));
   const acts=el('div','acts');
   const addBtn=el('button','btn btn-ghost btn-sm','+ 追加');addBtn.onclick=()=>openAddModal(parentId);acts.appendChild(addBtn);
-  const tb=el('button','btn btn-ghost btn-sm','テンプレートから作成');tb.onclick=()=>openTemplateModal(parentId);acts.appendChild(tb);
   secl.appendChild(acts);
   s.appendChild(secl);
   if(!kids.length){s.appendChild(el('div','empty','まだ項目がありません。「+ 追加」で工程（レビュー）や下位セクションを作成してください。'));return}
@@ -2081,21 +2095,6 @@ function openAddModal(parentId){
 }
 function addNode(parentId,name,description,type){const node={id:newId('nd'),parentId:parentId,name,type:type||'section',description:description||'',thumbnail:null,createdAt:nowIso(),versions:[]};DB.nodes.push(node);return node.id}
 
-/* テンプレートから一括作成 */
-function openTemplateModal(parentId){
-  openModal(body=>{
-    const inner=mHead(body,'テンプレートから作成','選んだ工程を子項目として一括追加します');
-    const ts=typeSelector('review');inner.appendChild(ts.row);
-    inner.appendChild(el('div','form-label','作成する各項目の種別。工程（動画FBを上げる）なら「レビュー」、さらに枝分かれさせるなら「セクション」。'));
-    const pick=el('div','tmpl-pick');
-    for(const t of DB.templates){const o=el('div','tmpl-opt');o.appendChild(el('div','tn',t.name));o.appendChild(el('div','ts',t.steps.map(s=>s.name).join(' ・ ')));o.onclick=async()=>{for(const st of t.steps)addNode(parentId,st.name,'',ts.get());await persist();closeModal();state.expanded.add(parentId);render();resolveThumbs();toast(t.steps.length+'件の項目を追加しました')};pick.appendChild(o)}
-    inner.appendChild(pick);
-    inner.appendChild(el('div','divider'));
-    inner.appendChild(el('div','form-label','独自の工程セットを作りたい場合は、上の「+ 追加」で1件ずつ自由に作成できます。'));
-    mFoot(body,[(()=>{const b=el('button','btn btn-ghost','閉じる');b.onclick=closeModal;return b})()]);
-  });
-}
-
 /* 名称変更 */
 function openRename(node){
   openModal(body=>{
@@ -2222,10 +2221,12 @@ async function deleteNode(node){
   for(const n of all)for(const v of n.versions||[]){await storage.delMedia(v.file);await storage.delMedia(v.thumb)}
   const ids=new Set(all.map(n=>n.id));
   const isProject=!node.parentId;
+  /* 削除対象のクリップを含むリールを除去（プロジェクト削除時はそのプロジェクトのリール全て） */
+  DB.reels=(DB.reels||[]).filter(r=>isProject?(r.projectId||reelProjectId(r))!==node.id:!r.clips.some(c=>ids.has(c.nodeId)));
   DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
   DB.submits=(DB.submits||[]).filter(s=>!ids.has(s.nodeId||s.projectId)&&s.projectId!==node.id);
   if(isProject){/* プロジェクト削除：保存データと接続情報も破棄 */
-    REG=REG.filter(e=>e.id!==node.id);delete _saveCache.proj[node.id];
+    REG=REG.filter(e=>e.id!==node.id);delete _saveCache.proj[node.id];delete _saveCache.reels[node.id];
     try{await storage.delProject(node.id);await storage.clearProjRoot(node.id)}catch(_){}
   }
   await persist();
@@ -3154,6 +3155,7 @@ function openReel(){
     const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
     if(r){r.name=name;r.clips=clips}
     else{r={id:newId('reel'),name,clips,createdAt:nowIso()};DB.reels.push(r);reelUI.reelId=r.id}
+    r.projectId=reelProjectId(r); /* リールの保存先プロジェクト（フォルダ内 reels/ に格納して共有） */
     await persist();
     saveReelBtn.textContent='保存済 ✓';setTimeout(()=>{saveReelBtn.textContent='💾 リール保存'},900);
     try{render();resolveThumbs()}catch(_){}
