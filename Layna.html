@@ -467,6 +467,10 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .fb-side-head{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;padding:12px 14px 8px}
 .fb-notes{flex:1;overflow-y:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
 .fb-input{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px}
+.fb-submit-bar{display:flex;align-items:center;gap:8px;padding:0 12px 12px}
+.fb-unsent-lab{flex:1;font-size:11px;color:var(--amber);font-weight:600}
+.log-note.draft-note{border-color:var(--amber);border-style:dashed;background:rgba(214,169,95,.06)}
+.draft-chip{font-size:10px;font-weight:700;color:#1a1200;background:var(--amber);border-radius:8px;padding:1px 7px;margin-right:6px}
 .fb-input textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;line-height:1.5}
 .fb-input textarea:focus{outline:none;border-color:var(--border2)}
 @media (max-width:900px){.fb-side{width:280px}}
@@ -2573,8 +2577,11 @@ function openReview(nodeId,versionId){
 
   let FPS=v.fps||24,totalFrames=1,lastFrame=-1;
   let tool=null,erasing=false,pending=[],stroke=null,brushW=4,eraseW=16;
+  /* 記入（下書き）：記入ボタンで積む。送信ボタンを押すまでレビューページ(v.review.notes)には反映しない */
+  let drafts=[];
+  const shownNotes=()=>v.review.notes.concat(drafts);
 
-  function close(){document.removeEventListener('keydown',onKey);ov.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  function close(){if(drafts.length&&!confirm('未送信の記入が '+drafts.length+' 件あります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
 
   /* --- トップバー --- */
   const top=el('div','fb-top');
@@ -2702,8 +2709,13 @@ function openReview(nodeId,versionId){
   const list=el('div','fb-notes');side.appendChild(list);
   const iw=el('div','fb-input');
   const ta=el('textarea');ta.placeholder=isVideo?'このフレームにコメント…（Shift+Enterで改行）':'コメント…（Shift+Enterで改行）';
-  const sb=el('button','btn btn-primary btn-sm','送信');
+  const sb=el('button','btn btn-primary btn-sm','記入');sb.title='コメント／アノテーションを記入（送信するまでレビューページには反映されません）';
   iw.appendChild(ta);iw.appendChild(sb);side.appendChild(iw);
+  /* 送信バー：記入した内容をまとめてレビューページに反映 */
+  const submitBar=el('div','fb-submit-bar');
+  const submitLab=el('span','fb-unsent-lab');
+  const submitBtn=el('button','btn btn-primary btn-sm','送信');submitBtn.title='記入した内容をレビューページに反映';
+  submitBar.appendChild(submitLab);submitBar.appendChild(submitBtn);side.appendChild(submitBar);
   body.appendChild(side);
   ov.appendChild(body);
   document.body.appendChild(ov);
@@ -2771,19 +2783,19 @@ function openReview(nodeId,versionId){
     for(let f=0;f<totalFrames;f+=step){const x=Math.round(f*fw)+.5;ctx.moveTo(x,H-18);ctx.lineTo(x,H);ctx.fillText(String(f),x+3,H-20)}
     ctx.stroke();
     /* マーカー：アノテ＝下レイヤー（オレンジのバー）、コメント＝上レイヤー（赤の菱形） */
-    for(const n of v.review.notes){
+    for(const n of shownNotes()){
       if(n.frame==null||!(n.drawing&&n.drawing.length))continue;
-      ctx.fillStyle='#e08a4a';ctx.fillRect(n.frame*fw,2,Math.max(3,fw*(parseInt(n.dur)||1)),7);
+      ctx.fillStyle=n._draft?'rgba(224,138,74,.6)':'#e08a4a';ctx.fillRect(n.frame*fw,2,Math.max(3,fw*(parseInt(n.dur)||1)),7);
     }
     /* 未送信の描画のプレビューマーカー（半透明オレンジ） */
     const pdur=parseInt(durSel.value)||1;
     ctx.fillStyle='rgba(224,138,74,.5)';
     for(const p of pending)if(p.f!=null)ctx.fillRect(p.f*fw,2,Math.max(3,fw*pdur),7);
     /* コメント＝赤の菱形（最前面レイヤー） */
-    for(const n of v.review.notes){
+    for(const n of shownNotes()){
       if(n.frame==null||(n.drawing&&n.drawing.length))continue;
       const cx=n.frame*fw+fw/2;
-      ctx.fillStyle='#ff5a5a';
+      ctx.fillStyle=n._draft?'rgba(255,90,90,.6)':'#ff5a5a';
       ctx.beginPath();ctx.moveTo(cx,2);ctx.lineTo(cx+5,7);ctx.lineTo(cx,12);ctx.lineTo(cx-5,7);ctx.closePath();ctx.fill();
       ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=1;ctx.stroke();
     }
@@ -2858,7 +2870,7 @@ function openReview(nodeId,versionId){
       eye.textContent=layerVis[i-1]?'👁':'—';
       const c=cv.getContext('2d');c.fillStyle='#101013';c.fillRect(0,0,cv.width,cv.height);
       const list=[];
-      for(const n of v.review.notes)if(n.drawing&&n.drawing.length&&visibleAt(n,f))for(const s of n.drawing)if((s.layer||1)===i)list.push(s);
+      for(const n of shownNotes())if(n.drawing&&n.drawing.length&&visibleAt(n,f))for(const s of n.drawing)if((s.layer||1)===i)list.push(s);
       for(const p of pending)if(inWin(p)&&(p.layer||1)===i)list.push(p);
       if(stroke&&inWin(stroke)&&(stroke.layer||1)===i)list.push(stroke);
       paintStrokeList(c,cv.width,cv.height,list,1);
@@ -2873,15 +2885,15 @@ function openReview(nodeId,versionId){
     if(annotVisible){
       /* ゴースト：前後フレームのアノテーションを薄く表示 */
       if(ghostOn&&isVideo){
-        for(const n of v.review.notes){
+        for(const n of shownNotes()){
           if(!n.drawing||!n.drawing.length||n.frame==null)continue;
           if(visibleAt(n,f))continue;
           const d=Math.min(Math.abs(n.frame-f),Math.abs(n.frame+durOf(n)-1-f));
           if(d<=GHOST_RANGE)paintStrokes(ctx,n.drawing.filter(layerOn),0.3-d*0.07);
         }
       }
-      /* 現在フレームのアノテーション */
-      for(const n of v.review.notes)if(n.drawing&&n.drawing.length&&visibleAt(n,f))paintStrokes(ctx,n.drawing.filter(layerOn),1);
+      /* 現在フレームのアノテーション（確定＋記入下書き） */
+      for(const n of shownNotes())if(n.drawing&&n.drawing.length&&visibleAt(n,f))paintStrokes(ctx,n.drawing.filter(layerOn),1);
     }
     /* 未送信の描画（描いたフレームから、選択中の表示F数のあいだ表示） */
     const pdur=parseInt(durSel.value)||1;
@@ -2949,30 +2961,55 @@ function openReview(nodeId,versionId){
   if(isVideo)requestAnimationFrame(()=>sync(true));
 
   /* --- コメント --- */
+  function draftBlock(n){
+    const b=el('div','log-note draft-note');
+    const m=el('div','m');
+    m.appendChild(el('span','draft-chip','未送信'));
+    m.appendChild(el('span',null,(n.author||'-')+'・'+fmt(n.time)));
+    if(n.frame!=null){const fc=el('span','frame-chip'+(isVideo?' link':''),'F'+n.frame);if(isVideo)fc.onclick=()=>seekFrame(n.frame);m.appendChild(fc)}
+    if(n.drawing&&n.drawing.length)m.appendChild(el('span','frame-chip','✎ 描画'));
+    const acts=el('span','note-acts');
+    const del=el('button','na','✕');del.title='この記入を取り消す';del.onclick=()=>{drafts=drafts.filter(x=>x!==n);renderNotes();drawAll();drawTimeline();updSubmit()};
+    acts.appendChild(del);m.appendChild(acts);
+    b.appendChild(m);
+    if(n.text&&n.text!=='（描画のみ）')b.appendChild(el('div','t',n.text));
+    return b;
+  }
+  function updSubmit(){submitLab.textContent=drafts.length?('未送信の記入: '+drafts.length+'件'):'';submitBar.style.display=drafts.length?'':'none';}
   function renderNotes(){
     list.innerHTML='';
-    if(!v.review.notes.length)list.appendChild(el('div','log-empty-note','コメントはまだありません。'));
+    if(!v.review.notes.length&&!drafts.length)list.appendChild(el('div','log-empty-note','コメントはまだありません。'));
     const refresh=async()=>{await persist();renderNotes();drawAll();drawTimeline()};
     for(const n of v.review.notes)list.appendChild(noteBlock(v,n,{refresh,onSeek:isVideo?seekFrame:null}));
+    for(const n of drafts)list.appendChild(draftBlock(n));
     list.scrollTop=list.scrollHeight;
   }
-  renderNotes();
-  const send=async()=>{
+  renderNotes();updSubmit();
+  /* 記入：コメント／アノテーションを下書き(drafts)に積む。まだレビューページには反映しない。
+     ・コメント＋アノテ → テキスト＋描画スクショ／・コメントのみ → テキスト／・アノテのみ → 描画スクショ
+     ・描いて記入を押さなければ pending のまま（クリップに埋め込み表示されるだけで反映されない） */
+  const record=async()=>{
     const txt=ta.value.trim();
     if(!txt&&!pending.length)return;
-    const n={author:currentUser(),text:txt||'（描画のみ）',time:nowIso()};
+    const n={author:currentUser(),text:txt||'（描画のみ）',time:nowIso(),_draft:true};
     if(isVideo)n.frame=dispFrame();
     if(pending.length){
-      /* 描画は「描いたフレーム」に紐づける */
       if(isVideo&&pending[0].f!=null)n.frame=pending[0].f;
       n.drawing=pending.map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}));
       n.dur=parseInt(durSel.value)||1;
     }
-    v.review.notes.push(n);pending=[];stroke=null;
-    await persist();ta.value='';renderNotes();drawAll();drawTimeline();
+    drafts.push(n);pending=[];stroke=null;
+    ta.value='';renderNotes();drawAll();drawTimeline();updSubmit();
   };
-  sb.onclick=send;
-  ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
+  /* 送信：記入した内容をまとめてレビューページ(v.review.notes)へ反映 */
+  async function submit(){
+    if(!drafts.length)return;
+    for(const n of drafts){delete n._draft;v.review.notes.push(n)}
+    drafts=[];
+    await persist();renderNotes();drawAll();drawTimeline();updSubmit();renderBody();resolveThumbs();
+  }
+  sb.onclick=record;submitBtn.onclick=submit;
+  ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();record()}};
 
   /* --- キーボード --- */
   function onKey(e){
@@ -3420,6 +3457,8 @@ function openReel(){
    +'.fb-input{padding:12px;border-top:1px solid #2a2a2f;display:flex;gap:8px}'
    +'.fb-input textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:8px 10px;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;font-size:13px;line-height:1.5;font-family:inherit}'
    +'.log-note{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;padding:9px 12px}'
+   +'.log-note.draft-note{border-color:#e0a63a;border-style:dashed;background:rgba(224,166,58,.06)}'
+   +'.draft-chip{font-size:10px;font-weight:700;color:#1a1200;background:#e0a63a;border-radius:8px;padding:1px 7px;margin-right:6px}'
    +'.log-note .m{font-size:11px;color:#5a5a6a;margin-bottom:4px;display:flex;align-items:center;flex-wrap:wrap;gap:2px}'
    +'.log-note .t{font-size:13px;color:#e8e8ec;white-space:pre-wrap;word-break:break-word;line-height:1.65}'
    +'.log-empty-note{font-size:12px;color:#5a5a6a}'
@@ -3563,7 +3602,7 @@ function openReel(){
   const clist=ce(d,'div','fb-notes');cside.appendChild(clist);
   const ciw=ce(d,'div','fb-input');
   const cta=d.createElement('textarea');cta.placeholder='このフレームにコメント…（Shift+Enterで改行）';
-  const csend=ce(d,'button','btn on','送信');
+  const csend=ce(d,'button','btn on','記入');csend.title='コメント／アノテを記入（送信するまでレビューページには反映されません）';
   ciw.appendChild(cta);ciw.appendChild(csend);cside.appendChild(ciw);
   rowEl.appendChild(cside);
 
@@ -3622,13 +3661,27 @@ function openReel(){
     }
   }
   /* コメントパネル（noteBlock共用。編集/削除/Fジャンプ/スクショはFBと同じ） */
+  function reelDraftBlock(c,n){
+    const b=ce(d,'div','log-note draft-note');
+    const m=ce(d,'div','m');
+    m.appendChild(ce(d,'span','draft-chip','未送信'));
+    m.appendChild(ce(d,'span',null,(n.author||'-')+'・'+fmt(n.time)));
+    if(n.frame!=null){const fc=ce(d,'span','frame-chip','F'+n.frame);m.appendChild(fc)}
+    if(n.drawing&&n.drawing.length)m.appendChild(ce(d,'span','frame-chip','✎ 描画'));
+    const acts=ce(d,'span','note-acts');const del=ce(d,'button','na','✕');del.title='この記入を取り消す';del.onclick=()=>{c.drafts=(c.drafts||[]).filter(x=>x!==n);reelNotes();drawAnno();drawFTL();updUnsent();reelRender()};acts.appendChild(del);m.appendChild(acts);
+    b.appendChild(m);
+    if(n.text&&n.text!=='（描画のみ）')b.appendChild(ce(d,'div','t',n.text));
+    return b;
+  }
   function reelNotes(scrollEnd){
     const dt=rvData();clist.innerHTML='';
     if(!dt){clist.appendChild(ce(d,'div','log-empty-note','クリップ未選択'));return}
-    if(!dt.v.review.notes.length)clist.appendChild(ce(d,'div','log-empty-note','コメントはまだありません。'));
+    const cc=reelUI.clips[reelUI.cur];const cdr=(cc&&cc.drafts)||[];
+    if(!dt.v.review.notes.length&&!cdr.length)clist.appendChild(ce(d,'div','log-empty-note','コメントはまだありません。'));
     const refresh=async()=>{await persist();reelNotes();drawAnno();drawFTL()};
     const shot={fileRef:dt.v.file,fps:dt.v.fps||24,isVideo:true};
     for(const n of dt.v.review.notes)clist.appendChild(noteBlock(dt.v,n,{refresh,onSeek:f=>{video.pause();seekRTr(f)},shot}));
+    for(const n of cdr)clist.appendChild(reelDraftBlock(cc,n));
     if(scrollEnd)clist.scrollTop=clist.scrollHeight;
   }
   function seekRTr(f){
@@ -3660,9 +3713,11 @@ function openReel(){
     const lyOn=s=>RV.layerVis[((s.layer||1)-1)];
     if(dt&&RV.eye){
       /* ゴースト：前後フレームのアノテーションを薄く表示 */
+      const cc=reelUI.clips[reelUI.cur];const cdr=(cc&&cc.drafts)||[];
+      const shownN=dt.v.review.notes.concat(cdr); /* 確定＋記入下書き（このクリップ）を埋め込み表示 */
       if(rGhost){const GR=3,durOf=n=>{const x=parseInt(n.dur);return isNaN(x)?1:x};
-        for(const n of dt.v.review.notes){if(!n.drawing||!n.drawing.length||n.frame==null)continue;if(f>=n.frame&&f<n.frame+durOf(n))continue;const dd=Math.min(Math.abs(n.frame-f),Math.abs(n.frame+durOf(n)-1-f));if(dd<=GR)paintStrokeList(ctx,anno.width,anno.height,n.drawing.filter(lyOn),0.3-dd*0.07)}}
-      for(const n of dt.v.review.notes)if(n.drawing&&n.drawing.length&&n.frame!=null&&f>=n.frame&&f<n.frame+(parseInt(n.dur)||1))paintStrokeList(ctx,anno.width,anno.height,n.drawing.filter(lyOn),1);
+        for(const n of shownN){if(!n.drawing||!n.drawing.length||n.frame==null)continue;if(f>=n.frame&&f<n.frame+durOf(n))continue;const dd=Math.min(Math.abs(n.frame-f),Math.abs(n.frame+durOf(n)-1-f));if(dd<=GR)paintStrokeList(ctx,anno.width,anno.height,n.drawing.filter(lyOn),0.3-dd*0.07)}}
+      for(const n of shownN)if(n.drawing&&n.drawing.length&&n.frame!=null&&f>=n.frame&&f<n.frame+(parseInt(n.dur)||1))paintStrokeList(ctx,anno.width,anno.height,n.drawing.filter(lyOn),1);
     }
     const pdur=parseInt(durS.value)||1;
     const inW=p=>p.f!=null&&f>=p.f&&f<p.f+pdur;
@@ -3779,11 +3834,11 @@ function openReel(){
   eyeB.onclick=()=>{RV.eye=!RV.eye;eyeB.classList.toggle('on',RV.eye);drawAnno()};
   undoB.onclick=()=>{RV.pending.pop();drawAnno();drawFTL();updUnsent()};
   clrB.onclick=()=>{RV.pending.splice(0,RV.pending.length);RV.stroke=null;drawAnno();drawFTL();updUnsent()};
-  /* 記入の確定：描画は「線ごとのフレーム」に分割して保存、コメントは表示中フレームに付与 */
-  function commitPending(c,curFrame){
-    const vv=vOf(c);if(!vv)return 0;
+  /* 記入内容からノート配列を生成（描画は線ごとのフレームに分割）。レビューには push しない */
+  function buildNotes(c,curFrame){
+    const vv=vOf(c);if(!vv)return [];
     const pend=c.pending||[];const txt=(c.commentDraft||'').trim();
-    if(!pend.length&&!txt)return 0;
+    if(!pend.length&&!txt)return [];
     const pdur=parseInt(durS.value)||1;const who=currentUser(),t=nowIso();
     const byFrame={};
     for(const p of pend){const fr=(p.f!=null?p.f:(curFrame!=null?curFrame:0));(byFrame[fr]=byFrame[fr]||[]).push(p)}
@@ -3791,39 +3846,50 @@ function openReel(){
     for(const fr of Object.keys(byFrame).map(Number).sort((a,b)=>a-b))
       notes.push({author:who,text:'（描画のみ）',time:t,frame:fr,dur:pdur,drawing:byFrame[fr].map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
     if(txt){const cf=(curFrame!=null?curFrame:(notes[0]?notes[0].frame:0));const at=notes.find(n=>n.frame===cf);if(at)at.text=txt;else notes.push({author:who,text:txt,time:t,frame:cf})}
-    for(const n of notes)vv.review.notes.push(n);
+    return notes;
+  }
+  /* 記入：現在クリップの pending＋コメントを下書き(c.drafts)へ。まだレビューには反映しない */
+  function reelRecord(c,curFrame){
+    const notes=buildNotes(c,curFrame);if(!notes.length)return 0;
+    (c.drafts=c.drafts||[]).push(...notes);
     if(c.pending)c.pending.length=0;c.commentDraft='';
     return notes.length;
   }
-  function hasUnsent(){return reelUI.clips.some(c=>(c.pending&&c.pending.length)||((c.commentDraft||'').trim()))}
-  const reelSend=async()=>{
+  /* 記入・下書き（drafts）＝未送信。pending/commentDraftは未記入 */
+  function hasUnsent(){return reelUI.clips.some(c=>(c.drafts&&c.drafts.length)||(c.pending&&c.pending.length)||((c.commentDraft||'').trim()))}
+  const reelRecordCur=()=>{
     const c=reelUI.clips[reelUI.cur];if(!c)return;
     c.commentDraft=cta.value;
-    const cnt=commitPending(c,dispF());if(!cnt)return;
+    const cnt=reelRecord(c,dispF());if(!cnt)return;
     RV.stroke=null;cta.value='';
-    await persist();drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
+    drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
   };
-  async function sendAll(){
+  /* 送信：Reelのタイムラインで使用中の全ショット（全クリップ）の下書きをレビューページへ反映 */
+  async function reelSubmit(){
     let total=0;
-    for(let i=0;i<reelUI.clips.length;i++){const c=reelUI.clips[i];if(i===reelUI.cur)c.commentDraft=cta.value;total+=commitPending(c,i===reelUI.cur?dispF():null)}
+    for(const c of reelUI.clips){
+      if(!c.drafts||!c.drafts.length)continue;const vv=vOf(c);if(!vv)continue;
+      for(const n of c.drafts)vv.review.notes.push(n);
+      total+=c.drafts.length;c.drafts=[];
+    }
     if(!total){reelWin.alert('未送信の記入はありません');return}
-    RV.stroke=null;cta.value='';
+    RV.stroke=null;
     await persist();drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
   }
-  csend.onclick=reelSend;
+  csend.onclick=reelRecordCur;
   cta.oninput=()=>{const c=reelUI.clips[reelUI.cur];if(c)c.commentDraft=cta.value;updUnsent()};
-  cta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(cta.value.trim())reelSend()}};
-  /* 未送信バー（全カット送信＋残数表示） */
+  cta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();reelRecordCur()}};
+  /* 送信バー（未送信の記入を全ショットのレビューページへ反映） */
   const unsentBar=ce(d,'div');unsentBar.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #2a2a2f;font-size:11px';
   const unsentLab=ce(d,'span',null,'');unsentLab.style.color='#e0a63a';
   const usp=ce(d,'div');usp.style.flex='1';
-  const sendAllBtn=ce(d,'button','btn btn-sm','全カット送信');sendAllBtn.title='すべてのカットの未送信の記入をまとめて送信';sendAllBtn.onclick=sendAll;
+  const sendAllBtn=ce(d,'button','btn btn-sm on','送信');sendAllBtn.title='記入した内容を、Reelで使用中の全ショットのレビューページに反映';sendAllBtn.onclick=reelSubmit;
   unsentBar.appendChild(unsentLab);unsentBar.appendChild(usp);unsentBar.appendChild(sendAllBtn);
   cside.insertBefore(unsentBar,ciw);
   function updUnsent(){
     let clips=0,items=0;
-    for(const c of reelUI.clips){const n=((c.pending&&c.pending.length)||0)+(((c.commentDraft||'').trim())?1:0);if(n){clips++;items+=n}}
-    unsentLab.textContent=items?('未送信: '+clips+'カット'):'';
+    for(const c of reelUI.clips){const n=(c.drafts&&c.drafts.length)||0;if(n){clips++;items+=n}}
+    unsentLab.textContent=items?('未送信の記入: '+items+'件（'+clips+'カット）'):'';
     sendAllBtn.style.display=items?'':'none';
   }
   reelUI.updUnsent=updUnsent;
@@ -4042,7 +4108,7 @@ function reelRender(){
   /* クリップブロック（幅=尺に比例） */
   [...track.querySelectorAll('.clip')].forEach(n=>n.remove());
   cs.forEach((c,i)=>{
-    const unsent=((c.pending&&c.pending.length)||0)+(((c.commentDraft||'').trim())?1:0);
+    const unsent=((c.drafts&&c.drafts.length)||0)+((c.pending&&c.pending.length)||0)+(((c.commentDraft||'').trim())?1:0);
     const b=ce(d,'div','clip'+(i===reelUI.cur?' cur':'')+(unsent?' unsent':''));
     b.style.width=Math.max(78,(c.dur||2)*reelUI.pxs)+'px';
     if(unsent){const dot=ce(d,'div','unsent-dot',String(unsent));dot.title='未送信の記入 '+unsent+'件';b.appendChild(dot)}
