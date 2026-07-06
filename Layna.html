@@ -123,7 +123,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pm-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
 .pm-tile{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg2)}
 .pm-tile:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
-.pm-tile .th{aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
+.pm-tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
 .pm-tile .th img{width:100%;height:100%;object-fit:cover}
 .pm-tile .bd{padding:7px 9px}.pm-tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm-tile .mt{display:flex;align-items:center;gap:6px;margin-top:5px}.pm-tile .pth{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1639,6 +1639,8 @@ function renderHome(s){
 function renderSectionBody(s,cur){
   const parentId=cur.id;
   const q=state.search.trim().toLowerCase();
+  /* セクション（ショット等）ページ上部にも独立コメント欄を表示（プロジェクト直下の階層から） */
+  if(!q&&cur.parentId)s.appendChild(shotCommentBox(cur));
   let kids=childrenOf(parentId);
   if(q)kids=kids.filter(n=>n.name.toLowerCase().includes(q));
   const secl=el('div','section-label');secl.appendChild(el('span',null,'サブ項目 / 工程'));
@@ -3319,23 +3321,9 @@ function openReel(){
   hd.appendChild(ce(d,'span','sub','シーケンスプレイヤー — メインから動画を送って並べる'));
   hd.appendChild(ce(d,'div','sp'));
   const totalLab=ce(d,'span','sub','計 0:00');hd.appendChild(totalLab);
-  const saveReelBtn=ce(d,'button','btn','💾 リール保存');saveReelBtn.title='この並びを保存（動画タイルから再オープン可能）';hd.appendChild(saveReelBtn);
   const loopBtn=ce(d,'button','btn','ループ');hd.appendChild(loopBtn);
   const clearBtn=ce(d,'button','btn','全クリア');hd.appendChild(clearBtn);
   d.body.appendChild(hd);
-  saveReelBtn.onclick=async()=>{
-    if(!reelUI.clips.length)return;
-    let r=DB.reels.find(x=>x.id===reelUI.reelId);
-    const name=reelWin.prompt('リール名',r?r.name:('Reel '+(DB.reels.length+1)));
-    if(!name)return;
-    const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
-    if(r){r.name=name;r.clips=clips}
-    else{r={id:newId('reel'),name,clips,createdAt:nowIso()};DB.reels.push(r);reelUI.reelId=r.id}
-    r.projectId=reelProjectId(r); /* リールの保存先プロジェクト（フォルダ内 reels/ に格納して共有） */
-    await persist();
-    saveReelBtn.textContent='保存済 ✓';setTimeout(()=>{saveReelBtn.textContent='💾 リール保存'},900);
-    try{render();resolveThumbs()}catch(_){}
-  };
   /* 4カラム: ショットリスト | メイン | レイヤー | コメント */
   const rowEl=ce(d,'div');rowEl.style.cssText='flex:1;display:flex;min-height:0';
   const rside=ce(d,'div','rside');
@@ -3750,17 +3738,6 @@ function openReel(){
   function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
   function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
   function doNew(){if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。新規リールを作ると失われます。続けますか？'))return;reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();try{vNext.removeAttribute('src');vNext.load()}catch(_){}resetView();reelRender();updReelTitle();updUnsent()}
-  async function doSave(forceNew){
-    const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
-    if(!clips.length){reelWin.alert('保存するクリップがありません');return}
-    let r=(!forceNew&&reelUI.reelId)?DB.reels.find(x=>x.id===reelUI.reelId):null;
-    if(r){r.clips=clips}
-    else{const name=reelWin.prompt('リール名',forceNew?'':('Reel '+((DB.reels.length||0)+1)));if(!name)return;r={id:newId('reel'),name:name.trim(),clips,createdAt:nowIso()};DB.reels.push(r);reelUI.reelId=r.id}
-    r.projectId=reelProjectId(r);
-    if(!r.projectId)reelWin.alert('保存先プロジェクトが特定できませんでした（クリップの動画が接続中のプロジェクトに属している必要があります）');
-    await persist();updReelTitle();try{render();resolveThumbs()}catch(_){}
-    saveReelBtn.textContent='保存済 ✓';setTimeout(()=>{saveReelBtn.textContent='💾 リール保存'},900);
-  }
   async function openReelHere(reelId){
     const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
     if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。別のリールを開くと失われます。続けますか？'))return;
@@ -3796,13 +3773,9 @@ function openReel(){
   const mkMenuItem=(label,sc,fn)=>{const it=ce(d,'div','item');it.appendChild(ce(d,'span',null,label));if(sc)it.appendChild(ce(d,'span','sc',sc));it.onclick=e=>{e.stopPropagation();closeMenu();fn()};fileDD.appendChild(it);return it};
   mkMenuItem('新規','Ctrl+N',doNew);
   mkMenuItem('開く…','Ctrl+O',doOpen);
-  fileDD.appendChild(ce(d,'div','sep'));
-  mkMenuItem('保存','Ctrl+S',()=>doSave(false));
-  mkMenuItem('名前を付けて保存…','Ctrl+Shift+S',()=>doSave(true));
   fileMi.onclick=e=>{e.stopPropagation();const willOpen=!fileDD.classList.contains('show');closeMenu();if(willOpen){fileMi.classList.add('open');fileDD.classList.add('show')}};
   d.addEventListener('click',()=>closeMenu());
-  d.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeOpenOv();return}if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='s'){e.preventDefault();doSave(!!e.shiftKey)}else if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}}});
-  saveReelBtn.onclick=()=>doSave(false); /* ヘッダの保存ボタンも File>保存 と同じ挙動 */
+  d.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeOpenOv();return}if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}}});
   reelUI.updTitle=updReelTitle; /* メインウィンドウから開いたときのタイトル更新用 */
   updReelTitle();
   /* 二重バッファの両方にリスナーを付け、アクティブ側のイベントだけ処理する
