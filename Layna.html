@@ -406,11 +406,11 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .drawer-hd .sp{flex:1}
 .drawer-hd .drawer-acts{display:flex;gap:8px;flex-shrink:0}
 .drawer-body{flex:1;min-height:0;overflow-y:auto;padding:16px 18px}
-/* 右側スライド上部：ショット内の全工程をプルダウンで選択 */
-.stage-strip{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;flex-wrap:wrap}
-.stage-strip .ss-lab{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;white-space:nowrap}
-.stage-strip .ss-lab svg{width:13px;height:13px}
-.ss-sel{flex:1;min-width:160px;max-width:360px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;cursor:pointer}
+/* 右側スライドのヘッダ：ショット内の全工程をプルダウンで選択（ページで開くの左） */
+.stage-strip{display:flex;align-items:center;gap:5px;margin:0}
+.stage-strip .ss-lab{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;white-space:nowrap}
+.stage-strip .ss-lab svg{width:12px;height:12px}
+.ss-sel{min-width:110px;max-width:180px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;font-family:inherit;cursor:pointer}
 .ss-sel:focus{outline:none;border-color:var(--border2)}
 /* 実際のタイルサイズでのプレビュー */
 .crop-preview{display:flex;flex-direction:column;gap:5px;align-items:flex-start;margin-top:2px}
@@ -697,7 +697,7 @@ const storage={
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
 let REG=[]; /* 接続プロジェクト一覧（このユーザーが使うプロジェクト）: [{id,name,folderName}] */
-const state={currentId:null,search:'',expanded:new Set(),frameOrder:false};
+const state={currentId:null,search:'',expanded:new Set(),frameOrder:false,tabDrawers:{}};
 function defaultDb(){return{version:3,nodes:[],reels:[],notifications:[],submits:[]}}
 /* プロジェクト（ルート）ID を求める */
 function projectIdOf(nodeId){const n=getNode(nodeId);return n?rootOf(n).id:null}
@@ -1155,7 +1155,7 @@ async function subSendToReel(sb){
 /* ============================================================
    ナビ / レンダリング
    ============================================================ */
-function go(id){closeReviewDrawer();state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
+function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
 /* ============================================================
    URLルーティング（ハッシュ）— 画面ごとに固有URL・作業者間でリンク共有
    #/                     ホーム
@@ -1403,10 +1403,14 @@ function activeTabKey(){
   const root=rootOf(cur);const onRoot=state.currentId===root.id&&!state.search.trim();
   return onRoot?(state.projTab||'timeline'):'browse';
 }
+function removeDrawerDOM(){const dr=$('#reviewDrawer');const ab=$('.app-body');if(ab)ab.classList.remove('drawer-open');if(dr)dr.remove();}
 function renderBody(){
-  /* 右側スライドはタブごとに切り替わる：開いたタブと違うタブになったら閉じる */
-  if(state.drawer&&state.drawer.tab&&state.drawer.tab!==activeTabKey())closeReviewDrawer();
-  renderBodyMain();if(state.drawer&&$('#reviewDrawer'))fillDrawer();
+  /* 右側スライドはタブごとに記憶：現在のタブに紐づくドロワーだけを表示（戻れば再表示） */
+  const key=activeTabKey();
+  state.drawer=(key&&state.tabDrawers&&state.tabDrawers[key])||null;
+  renderBodyMain();
+  if(state.drawer){buildDrawerShell();fillDrawer();}
+  else removeDrawerDOM();
 }
 function renderBodyMain(){
   stopShotAutoplay(); /* 再描画のたびに前回のタイル動画を停止・解放 */
@@ -1827,12 +1831,12 @@ function buildDrawerShell(){
   return dr;
 }
 function fillDrawer(){if(!state.drawer)return;if(state.drawer.kind==='submit')fillSubmitDrawer();else fillReviewDrawer()}
-function closeReviewDrawer(){state.drawer=null;const dr=$('#reviewDrawer');const ab=$('.app-body');if(ab)ab.classList.remove('drawer-open');if(!dr)return;dr.classList.remove('on');setTimeout(()=>{const b=$('#reviewDrawer');if(b&&!b.classList.contains('on'))b.remove()},280)}
+function closeReviewDrawer(){const key=(state.drawer&&state.drawer.tab)||activeTabKey();if(key&&state.tabDrawers)delete state.tabDrawers[key];state.drawer=null;const dr=$('#reviewDrawer');const ab=$('.app-body');if(ab)ab.classList.remove('drawer-open');if(!dr)return;dr.classList.remove('on');setTimeout(()=>{const b=$('#reviewDrawer');if(b&&!b.classList.contains('on'))b.remove()},280)}
 /* レビューページを右側スライドで表示。review以外は配下の最新動画の工程に解決 */
 function openReviewDrawer(nodeId,shotId){
   let node=getNode(nodeId);if(!node)return;
   if(node.type!=='review'){const lv=latestVideoVersionUnder(node.id);if(lv&&lv.node)node=lv.node;}
-  state.drawer={kind:'review',id:node.id,shotId:shotId||null,tab:activeTabKey()};buildDrawerShell();fillReviewDrawer();
+  const key=activeTabKey();const dr={kind:'review',id:node.id,shotId:shotId||null,tab:key};if(key)state.tabDrawers[key]=dr;state.drawer=dr;buildDrawerShell();fillReviewDrawer();
 }
 /* 右側スライド上部：このショット内の全工程（レビュー）をプルダウンで選択・切替 */
 function buildStageStrip(shot,curReviewId){
@@ -1840,7 +1844,7 @@ function buildStageStrip(shot,curReviewId){
   const reviews=descendants(shot.id).filter(n=>n.type==='review');
   if(reviews.length<2)return null; /* 工程が1つだけなら出さない */
   const wrap=el('div','stage-strip');
-  wrap.appendChild(elIco('label','ss-lab','folder',' '+shot.name+' の工程'));
+  wrap.appendChild(elIco('label','ss-lab','folder',' 工程'));
   const sel=el('select','ss-sel');
   for(const r of reviews){
     const o=document.createElement('option');o.value=r.id;
@@ -1859,18 +1863,18 @@ function fillReviewDrawer(){
   back._t.textContent=node.name;
   back._p.textContent=pathOf(node.id).slice(1,-1).map(x=>x.name).join(' / ')||rootOf(node).name;
   back._acts.innerHTML='';
+  /* 工程プルダウン：ヘッダの「ページで開く」ボタンの左（工程テキストの右）に配置 */
+  const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
+  const strip=buildStageStrip(shot,node.id);if(strip)back._acts.appendChild(strip);
   const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.title='このレビューページを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
   back._body.innerHTML='';curUploadUI=null;
-  /* 上部：このショット内の全工程の最新動画タイル（クリックで工程を切替） */
-  const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
-  const strip=buildStageStrip(shot,node.id);if(strip)back._body.appendChild(strip);
   renderReviewBody(back._body,node);
   resolveThumbs();
 }
 /* サブミットブロックを右側スライドで表示 */
 function openSubmitDrawer(submitId){
   const sb=(DB.submits||[]).find(s=>s.id===submitId);if(!sb)return;
-  state.drawer={kind:'submit',id:submitId,tab:activeTabKey()};buildDrawerShell();fillSubmitDrawer();
+  const key=activeTabKey();const dr={kind:'submit',id:submitId,tab:key};if(key)state.tabDrawers[key]=dr;state.drawer=dr;buildDrawerShell();fillSubmitDrawer();
 }
 function fillSubmitDrawer(){
   const back=$('#reviewDrawer');if(!back||!state.drawer||state.drawer.kind!=='submit')return;
