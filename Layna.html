@@ -4049,7 +4049,10 @@ function openReel(){
   (function tick(){
     if(!reelAlive())return;
     const elp=sumPrev(reelUI.cur)+(video.currentTime||0);
-    ph.style.left=(elp*reelUI.pxs)+'px';
+    /* プレイヘッド位置は実際のクリップブロック(最小幅・gap込み)に合わせる（ズレ防止） */
+    const blk=(reelUI._blocks||[])[reelUI.cur];
+    if(blk){const cc=cs()[reelUI.cur];const cd=cc?(cc.dur||0):0;const frac=cd>0?Math.min(1,(video.currentTime||0)/cd):0;ph.style.left=(blk.offsetLeft+frac*blk.offsetWidth)+'px'}
+    else ph.style.left=(elp*reelUI.pxs)+'px';
     time.textContent=fmtSec(elp)+' / '+fmtSec(total());
     const f=dispF();
     if(f!==RV.last){
@@ -4131,14 +4134,24 @@ function reelRender(){
     b.onclick=()=>{reelUI.cur=i;reelUI.loadCur(true)};
     track.appendChild(b);
   });
-  /* ルーラー（秒目盛り） */
+  /* ルーラー：実際のクリップブロック(最小幅・gap込み)の並びに合わせて描画（プレイヘッドとズレないように） */
   const total=cs.reduce((a,c)=>a+(c.dur||0),0);
-  const W=Math.max(track.clientWidth,total*reelUI.pxs+40);
+  const blocks=[...track.querySelectorAll('.clip')];
+  reelUI._blocks=blocks; /* プレイヘッド位置計算に使用 */
+  const W=Math.max(track.clientWidth,track.scrollWidth);
   ruler.width=W;ruler.height=18;
   const ctx=ruler.getContext('2d');ctx.clearRect(0,0,W,18);
-  ctx.strokeStyle='rgba(255,255,255,.3)';ctx.fillStyle='rgba(255,255,255,.5)';ctx.font='9px monospace';ctx.beginPath();
-  for(let s=0;s<=Math.ceil(total)+1;s++){const x=s*reelUI.pxs+.5;ctx.moveTo(x,10);ctx.lineTo(x,18);if(s%5===0)ctx.fillText(fmtSec(s),x+2,8)}
-  ctx.stroke();
+  ctx.font='9px monospace';
+  let acc=0;
+  blocks.forEach((b,i)=>{
+    const x0=b.offsetLeft,bw=b.offsetWidth,dur=cs[i]?(cs[i].dur||0):0;
+    /* クリップ境界（縦線）＋開始時刻ラベル */
+    ctx.strokeStyle='rgba(96,165,255,.5)';ctx.beginPath();ctx.moveTo(Math.round(x0)+.5,2);ctx.lineTo(Math.round(x0)+.5,18);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillText(fmtSec(acc),x0+3,8);
+    /* ブロック内の秒目盛り（ブロック幅にスケール） */
+    if(dur>0){ctx.strokeStyle='rgba(255,255,255,.22)';ctx.beginPath();for(let s=1;s<Math.ceil(dur-1e-6);s++){const x=x0+(s/dur)*bw;ctx.moveTo(Math.round(x)+.5,11);ctx.lineTo(Math.round(x)+.5,18)}ctx.stroke()}
+    acc+=dur;
+  });
   totalLab.textContent='計 '+fmtSec(total)+'・'+cs.length+'クリップ';
   if(reelUI.drawFTL)reelUI.drawFTL();
 }
