@@ -301,7 +301,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .log-note-input textarea{flex:1;min-height:38px;max-height:140px;resize:vertical;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;line-height:1.5}
 .log-note-input textarea:focus{outline:none;border-color:var(--border2)}
 .log-empty-note{font-size:12px;color:var(--text3)}
-/* ショットコメント（動画FBとは独立） */
+/* メッセージ（動画FBとは独立） */
 .shot-comments{max-width:1200px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:6px}
 .shot-comments .section-label{margin:0 0 10px}
 .shot-comments .sc-count{font-weight:600;color:var(--text2);letter-spacing:0}
@@ -1706,7 +1706,7 @@ function renderSectionBody(s,cur){
 function shotCommentItem(cur,c){
   const it=el('div','log-note sc-item');
   const m=el('div','m');
-  m.appendChild(el('span','sc-chip','💬 ショットコメント'));
+  m.appendChild(el('span','sc-chip','💬 メッセージ'));
   m.appendChild(el('span',null,(c.author||'—')+'・'+fmt(c.time)+(c.edited?'（編集済）':'')));
   const t=el('div','t',c.text);
   if((c.author||'')===currentUser()){
@@ -1731,10 +1731,10 @@ function shotCommentItem(cur,c){
 /* 独立コメントの入力フィールド（上部固定・一覧はログに時系列で混在表示） */
 function shotCommentInput(cur){
   const wrap=el('div','shot-comments');
-  const head=el('div','section-label');head.appendChild(el('span',null,'ショットコメント'));
+  const head=el('div','section-label');head.appendChild(el('span',null,'メッセージ'));
   wrap.appendChild(head);
   const inp=el('div','sc-input');
-  const ta=el('textarea');ta.placeholder='このショットへのコメント（動画へのFBとは別に記録され、下のログに動画タイルと時系列で表示されます・Ctrl+Enterで送信）';
+  const ta=el('textarea');ta.placeholder='メッセージ（動画へのFBとは別に記録され、下のログに動画タイルと時系列で表示されます・Ctrl+Enterで送信）';
   const send=el('button','btn btn-primary btn-sm','送信');
   const submit=async()=>{const txt=(ta.value||'').trim();if(!txt)return;(cur.comments=cur.comments||[]).push({id:newId('sc'),author:currentUser(),text:txt,time:nowIso()});ta.value='';await persist();renderBody();resolveThumbs()};
   send.onclick=submit;
