@@ -1643,13 +1643,18 @@ function renderProjProgress(main,cur){
     main.appendChild(grid);
   }else{
     main.appendChild(el('div','pm-h','ショット別 現在の'+(isStage?'工程':'ステータス')));
-    const t=el('table','pm-stbl');const th=el('tr');['ショット',(isStage?'現在の工程':'ステータス'),'工程数'].forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
+    /* 現在の工程セル（工程名バッジ） */
+    const stageCell=ps=>{const td=el('td');if(ps.stageName){const b=el('span','pm-badge',ps.stageName);b.style.background=stageColor(ps.stageName);td.appendChild(b)}else td.appendChild(el('span','pm-pct','未着手'));return td};
+    /* 現在のステータスセル（ステータスバッジ） */
+    const statusCell=ps=>{const td=el('td');const si=stInfo(ps.curNode||ps.shot);if(ps.curNode){const b=el('span','pm-badge',si.label);b.style.background=si.color;td.appendChild(b)}else td.appendChild(el('span','pm-pct','未着手'));return td};
+    const t=el('table','pm-stbl');const th=el('tr');
+    /* 工程グラフ：現在の工程＋現在のステータス／ステータスグラフ：現在のステータス＋現在の工程 */
+    ['ショット',(isStage?'現在の工程':'現在のステータス'),(isStage?'現在のステータス':'現在の工程')].forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
     for(const ps of p.perShot){
       const tr=el('tr');const c1=el('td');c1.appendChild(el('span','sn',ps.shot.name));tr.appendChild(c1);
-      const c2=el('td');
-      if(isStage){if(ps.stageName){const b=el('span','pm-badge',ps.stageName);b.style.background=stageColor(ps.stageName);c2.appendChild(b)}else c2.appendChild(el('span','pm-pct','未着手'))}
-      else{const si=stInfo(ps.curNode||ps.shot);if(ps.curNode){const b=el('span','pm-badge',si.label);b.style.background=si.color;c2.appendChild(b)}else c2.appendChild(el('span','pm-pct','未着手'))}
-      tr.appendChild(c2);tr.appendChild(el('td','pm-num',String(ps.stageCount)));t.appendChild(tr);
+      if(isStage){tr.appendChild(stageCell(ps));tr.appendChild(statusCell(ps))}
+      else{tr.appendChild(statusCell(ps));tr.appendChild(stageCell(ps))}
+      t.appendChild(tr);
     }
     main.appendChild(t);
   }
