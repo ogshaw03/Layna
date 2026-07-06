@@ -3161,6 +3161,8 @@ function openReel(){
    +'.track{display:flex;gap:2px;position:relative;min-height:64px}'
    +'.clip{position:relative;flex-shrink:0;background:#1c1c1f;border:1px solid #3a3a42;border-radius:6px;padding:6px 8px;cursor:pointer;overflow:hidden;min-width:78px}'
    +'.clip.cur{border-color:#e8e8ec;background:#232327}'
+   +'.clip.unsent{border-color:#e0a63a}'
+   +'.clip .unsent-dot{position:absolute;top:3px;right:3px;min-width:14px;height:14px;padding:0 3px;box-sizing:border-box;background:#e0a63a;color:#1a1a1a;font-size:9px;font-weight:700;line-height:14px;text-align:center;border-radius:7px;z-index:2}'
    +'.clip .nm{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}'
    +'.clip .du{font-family:monospace;font-size:10px;color:#5a5a6a}'
    +'.clip .ops{position:absolute;top:3px;right:4px;display:flex;gap:2px;opacity:0}'
@@ -3399,14 +3401,14 @@ function openReel(){
     }
   }
   /* コメントパネル（noteBlock共用。編集/削除/Fジャンプ/スクショはFBと同じ） */
-  function reelNotes(){
+  function reelNotes(scrollEnd){
     const dt=rvData();clist.innerHTML='';
     if(!dt){clist.appendChild(ce(d,'div','log-empty-note','クリップ未選択'));return}
     if(!dt.v.review.notes.length)clist.appendChild(ce(d,'div','log-empty-note','コメントはまだありません。'));
     const refresh=async()=>{await persist();reelNotes();drawAnno();drawFTL()};
     const shot={fileRef:dt.v.file,fps:dt.v.fps||24,isVideo:true};
     for(const n of dt.v.review.notes)clist.appendChild(noteBlock(dt.v,n,{refresh,onSeek:f=>{video.pause();seekRTr(f)},shot}));
-    clist.scrollTop=clist.scrollHeight;
+    if(scrollEnd)clist.scrollTop=clist.scrollHeight;
   }
   function seekRTr(f){
     f=Math.max(0,Math.min(f,RV.total-1));const t=f/RV.FPS+0.0001;
@@ -3428,6 +3430,7 @@ function openReel(){
     drawAnno();drawFTL();
   }
   reelWin.addEventListener('resize',fitAnno);
+  reelWin.addEventListener('beforeunload',e=>{if(hasUnsent()){e.preventDefault();e.returnValue='';return ''}});
   function drawAnno(){
     const ctx=anno.getContext('2d');ctx.clearRect(0,0,anno.width,anno.height);
     const dt=rvData();const f=dispF();
@@ -3533,7 +3536,7 @@ function openReel(){
     else if(RV.tool==='erase'){anno.setPointerCapture(e.pointerId);RV.erasing=true;eraseR(e)}
   };
   anno.onpointermove=e=>{if(RV.stroke){RV.stroke.points.push(ptA(e));drawAnno()}else if(RV.erasing)eraseR(e)};
-  anno.onpointerup=()=>{if(RV.stroke){RV.pending.push(RV.stroke);RV.stroke=null;drawAnno();drawFTL()}RV.erasing=false};
+  anno.onpointerup=()=>{if(RV.stroke){RV.pending.push(RV.stroke);RV.stroke=null;drawAnno();drawFTL();updUnsent()}RV.erasing=false};
   /* Alt+右ドラッグでブラシ/消しゴムサイズ調整（サイズプレビュー円付き） */
   brushS.onchange=()=>{RV.brushW=parseInt(brushS.value)||RV.brushW};
   eraseS.onchange=()=>{RV.eraseW=parseInt(eraseS.value)||RV.eraseW};
@@ -3551,22 +3554,56 @@ function openReel(){
   fpsS.onchange=()=>{RV.FPS=parseInt(fpsS.value)||24;const c=reelUI.clips[reelUI.cur];if(c)c.fps=RV.FPS;RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));RV.last=-1;drawFTL()};
   durS.onchange=()=>{drawAnno();drawFTL()};
   eyeB.onclick=()=>{RV.eye=!RV.eye;eyeB.classList.toggle('on',RV.eye);drawAnno()};
-  undoB.onclick=()=>{RV.pending.pop();drawAnno();drawFTL()};
-  clrB.onclick=()=>{RV.pending.splice(0,RV.pending.length);RV.stroke=null;drawAnno();drawFTL()};
-  /* コメント送信（FBと同じ。各レビューページへ即反映） */
+  undoB.onclick=()=>{RV.pending.pop();drawAnno();drawFTL();updUnsent()};
+  clrB.onclick=()=>{RV.pending.splice(0,RV.pending.length);RV.stroke=null;drawAnno();drawFTL();updUnsent()};
+  /* 記入の確定：描画は「線ごとのフレーム」に分割して保存、コメントは表示中フレームに付与 */
+  function commitPending(c,curFrame){
+    const vv=vOf(c);if(!vv)return 0;
+    const pend=c.pending||[];const txt=(c.commentDraft||'').trim();
+    if(!pend.length&&!txt)return 0;
+    const pdur=parseInt(durS.value)||1;const who=currentUser(),t=nowIso();
+    const byFrame={};
+    for(const p of pend){const fr=(p.f!=null?p.f:(curFrame!=null?curFrame:0));(byFrame[fr]=byFrame[fr]||[]).push(p)}
+    const notes=[];
+    for(const fr of Object.keys(byFrame).map(Number).sort((a,b)=>a-b))
+      notes.push({author:who,text:'（描画のみ）',time:t,frame:fr,dur:pdur,drawing:byFrame[fr].map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
+    if(txt){const cf=(curFrame!=null?curFrame:(notes[0]?notes[0].frame:0));const at=notes.find(n=>n.frame===cf);if(at)at.text=txt;else notes.push({author:who,text:txt,time:t,frame:cf})}
+    for(const n of notes)vv.review.notes.push(n);
+    if(c.pending)c.pending.length=0;c.commentDraft='';
+    return notes.length;
+  }
+  function hasUnsent(){return reelUI.clips.some(c=>(c.pending&&c.pending.length)||((c.commentDraft||'').trim()))}
   const reelSend=async()=>{
-    const dt=rvData();if(!dt)return;
-    const txt=cta.value.trim();
-    if(!txt&&!RV.pending.length)return;
-    const n={author:currentUser(),text:txt||'（描画のみ）',time:nowIso(),frame:RV.pending.length?RV.pending[0].f:dispF()};
-    if(RV.pending.length){n.drawing=RV.pending.map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}));n.dur=parseInt(durS.value)||1}
-    dt.v.review.notes.push(n);RV.pending.splice(0,RV.pending.length);RV.stroke=null;cta.value='';
-    await persist();drawAnno();drawFTL();reelNotes();
-    /* メインウィンドウのレビューページへ反映 */
-    try{render();resolveThumbs()}catch(_){}
+    const c=reelUI.clips[reelUI.cur];if(!c)return;
+    c.commentDraft=cta.value;
+    const cnt=commitPending(c,dispF());if(!cnt)return;
+    RV.stroke=null;cta.value='';
+    await persist();drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
   };
+  async function sendAll(){
+    let total=0;
+    for(let i=0;i<reelUI.clips.length;i++){const c=reelUI.clips[i];if(i===reelUI.cur)c.commentDraft=cta.value;total+=commitPending(c,i===reelUI.cur?dispF():null)}
+    if(!total){reelWin.alert('未送信の記入はありません');return}
+    RV.stroke=null;cta.value='';
+    await persist();drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
+  }
   csend.onclick=reelSend;
-  cta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();reelSend()}};
+  cta.oninput=()=>{const c=reelUI.clips[reelUI.cur];if(c)c.commentDraft=cta.value;updUnsent()};
+  cta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(cta.value.trim())reelSend()}};
+  /* 未送信バー（全カット送信＋残数表示） */
+  const unsentBar=ce(d,'div');unsentBar.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #2a2a2f;font-size:11px';
+  const unsentLab=ce(d,'span',null,'');unsentLab.style.color='#e0a63a';
+  const usp=ce(d,'div');usp.style.flex='1';
+  const sendAllBtn=ce(d,'button','btn btn-sm','全カット送信');sendAllBtn.title='すべてのカットの未送信の記入をまとめて送信';sendAllBtn.onclick=sendAll;
+  unsentBar.appendChild(unsentLab);unsentBar.appendChild(usp);unsentBar.appendChild(sendAllBtn);
+  cside.insertBefore(unsentBar,ciw);
+  function updUnsent(){
+    let clips=0,items=0;
+    for(const c of reelUI.clips){const n=((c.pending&&c.pending.length)||0)+(((c.commentDraft||'').trim())?1:0);if(n){clips++;items+=n}}
+    unsentLab.textContent=items?('未送信: '+clips+'カット'):'';
+    sendAllBtn.style.display=items?'':'none';
+  }
+  reelUI.updUnsent=updUnsent;
 
   /* タイムライン */
   const tlwrap=ce(d,'div','tlwrap');
@@ -3584,9 +3621,10 @@ function openReel(){
     /* クリップ切替：未送信アノテはクリップごとに保持（跨いでも消えない） */
     RV.pending=(c&&(c.pending||(c.pending=[])))||[];
     RV.stroke=null;RV.last=-1;RV.layerCount=1;
+    cta.value=(c&&c.commentDraft)||''; /* コメント下書きはカットごとに保持 */
     resetRZoom(); /* クリップ切替時はズーム/トラックをリセット */
     const dt=rvData();RV.FPS=(c&&c.fps)||(dt&&dt.v.fps)||24;fpsS.value=String(RV.FPS);
-    buildLayerPanel();reelNotes();
+    buildLayerPanel();reelNotes();updUnsent();
     if(!c){video.removeAttribute('src');video.load();reelRender();return}
     video.src=c.url;if(auto)video.play().catch(()=>{});
     reelRender();
@@ -3596,12 +3634,12 @@ function openReel(){
   prev.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.max(0,reelUI.cur-1);loadCur(true)};
   next.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.min(cs().length-1,reelUI.cur+1);loadCur(true)};
   loopBtn.onclick=()=>{reelUI.loop=!reelUI.loop;loopBtn.classList.toggle('on',reelUI.loop)};
-  clearBtn.onclick=()=>{if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();updReelTitle()};
+  clearBtn.onclick=()=>{if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。すべてのクリップを外すと失われます。続けますか？')){return}if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();updReelTitle();updUnsent()};
   /* ==== File メニュー（新規 / 開く / 保存 / 名前を付けて保存）— AE/Maya風 ==== */
   function updReelTitle(){const r=reelUI.reelId?DB.reels.find(x=>x.id===reelUI.reelId):null;reelTitle.textContent=(r?r.name:'未保存のリール')+(reelUI.clips.length?'':'（空）')}
   function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
   function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
-  function doNew(){reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();updReelTitle()}
+  function doNew(){if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。新規リールを作ると失われます。続けますか？'))return;reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();updReelTitle();updUnsent()}
   async function doSave(forceNew){
     const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
     if(!clips.length){reelWin.alert('保存するクリップがありません');return}
@@ -3615,11 +3653,12 @@ function openReel(){
   }
   async function openReelHere(reelId){
     const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
+    if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。別のリールを開くと失われます。続けますか？'))return;
     reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();
     let miss=0;
     for(const ref of (r.clips||[])){const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);if(n&&vv)await reelAddClip(n,vv,true);else miss++}
     if(reelUI.loadCur)reelUI.loadCur(false);
-    reelRender();updReelTitle();
+    reelRender();updReelTitle();updUnsent();
     if(miss)reelWin.alert(miss+' 件のクリップを読み込めませんでした（動画が削除されたか、プロジェクトが未接続の可能性があります）');
   }
   function doOpen(){
@@ -3730,8 +3769,10 @@ function reelRender(){
   /* クリップブロック（幅=尺に比例） */
   [...track.querySelectorAll('.clip')].forEach(n=>n.remove());
   cs.forEach((c,i)=>{
-    const b=ce(d,'div','clip'+(i===reelUI.cur?' cur':''));
+    const unsent=((c.pending&&c.pending.length)||0)+(((c.commentDraft||'').trim())?1:0);
+    const b=ce(d,'div','clip'+(i===reelUI.cur?' cur':'')+(unsent?' unsent':''));
     b.style.width=Math.max(78,(c.dur||2)*reelUI.pxs)+'px';
+    if(unsent){const dot=ce(d,'div','unsent-dot',String(unsent));dot.title='未送信の記入 '+unsent+'件';b.appendChild(dot)}
     b.appendChild(ce(d,'div','nm',(i+1)+'. '+c.name));
     b.appendChild(ce(d,'div','du',fmtSec(c.dur)));
     const ops=ce(d,'div','ops');
