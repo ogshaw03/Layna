@@ -1357,10 +1357,10 @@ function rootOf(node){let n=node;while(n&&n.parentId){const p=getNode(n.parentId
 /* プロジェクトの上部タブ（常に表示）。タブクリックでプロジェクトのトップ＋該当タブへ */
 function buildProjectTabs(root){
   if(!['timeline','progress','shots','browse'].includes(state.projTab))state.projTab='timeline';
-  /* 現在サブページ（root以外）にいるときは「ブラウズ」タブをアクティブ扱いにする */
+  /* 現在サブページ（root以外）にいるときは「ページ」タブをアクティブ扱いにする */
   const onRoot=state.currentId===root.id&&!state.search.trim();
   const nav=el('div','ptab-nav');
-  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['browse','ブラウズ']]){
+  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['browse','ページ']]){
     const active=onRoot?state.projTab===id:(id==='browse');
     const b=el('button','ptab'+(active?' on':''),lab);
     b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
@@ -1405,7 +1405,7 @@ function renderBodyMain(){
     else renderProjTimeline(main,root);
     return;
   }
-  /* サブページ（セクション/レビュー）— 上部タブは「ブラウズ」がアクティブ表示 */
+  /* サブページ（セクション/レビュー）— 上部タブは「ページ」がアクティブ表示 */
   if(cur.type==='review')renderReviewBody(s,cur);
   else renderSectionBody(s,cur);
 }
