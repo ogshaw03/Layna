@@ -17,6 +17,7 @@
   --radius:10px;--radius2:6px;
   --font-head:'Syne',sans-serif;--font-body:'Noto Sans JP',sans-serif;
   --cols:4;
+  --tile-ar:16/9; /* プロジェクトタイルの縦横比（トリミング編集と共通） */
 }
 html,body{height:100%}
 body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;display:flex;flex-direction:column;overflow:hidden}
@@ -167,7 +168,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
   0%,100%{box-shadow:0 0 8px rgba(96,165,255,.14);border-color:rgba(96,165,255,.5)}
   50%{box-shadow:0 0 16px rgba(96,165,255,.4);border-color:rgba(120,180,255,.85)}
 }
-.proj-media{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;position:relative}
+.proj-media{aspect-ratio:var(--tile-ar);background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;position:relative}
 .proj-media img{width:100%;height:100%;object-fit:cover;display:block}
 .proj-media.ph{background:linear-gradient(135deg,#1a2338,#0e131d)}
 .proj-initial{font-family:var(--font-head);font-size:56px;font-weight:800;color:rgba(150,180,255,.34)}
@@ -371,13 +372,18 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .proj-media{overflow:hidden}
 /* プロジェクトサムネイルのトリミング表示（元画像は変えず、位置・拡大で表示） */
 .proj-media img.proj-thumb{position:absolute;max-width:none;object-fit:fill}
-/* トリミング編集ウィジェット */
+/* トリミング編集ウィジェット（実際のタイルと同じ縦横比） */
 .crop-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
-.crop-box{position:relative;width:100%;aspect-ratio:16/9;max-height:220px;overflow:hidden;background:#000;border:1px solid var(--border);cursor:grab;touch-action:none;user-select:none}
+.crop-box{position:relative;width:100%;aspect-ratio:var(--tile-ar);overflow:hidden;background:#000;border:1px solid var(--border);cursor:grab;touch-action:none;user-select:none}
 .crop-box:active{cursor:grabbing}
 .crop-box img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .crop-hint{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;pointer-events:none}
 .crop-slider{width:100%}
+/* 実際のタイルサイズでのプレビュー */
+.crop-preview{display:flex;flex-direction:column;gap:5px;align-items:flex-start;margin-top:2px}
+.crop-preview .cp-label{font-size:11px;color:var(--text3)}
+.crop-preview .cp-tile{position:relative;width:272px;max-width:100%;aspect-ratio:var(--tile-ar);overflow:hidden;background:#000;border:1px solid var(--edge);box-shadow:0 0 8px var(--edgeglow)}
+.crop-preview .cp-tile img{position:absolute;max-width:none;pointer-events:none}
 .tl-subbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
 .tl-subbadge svg{width:13px;height:13px}
 .tl-subname{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
@@ -1884,7 +1890,8 @@ function applyThumbCrop(img){
   img.style.top=((bh-dh)/2+(crop.fy||0)*(dh-bh))+'px';
 }
 window.addEventListener('resize',()=>{document.querySelectorAll('.proj-media img.proj-thumb').forEach(applyThumbCrop)});
-/* トリミング編集ウィジェット（タイルと同じ縦横比のボックスでドラッグ移動・拡大） */
+/* トリミング編集ウィジェット（タイルと同じ縦横比のボックスでドラッグ移動・拡大）
+   ＋実際のタイルサイズのライブプレビューで見え方を確認できる */
 function makeCropEditor(opts){
   opts=opts||{};
   const wrap=el('div','crop-wrap');
@@ -1892,20 +1899,27 @@ function makeCropEditor(opts){
   const img=el('img');
   box.appendChild(img);box.appendChild(el('div','crop-hint','ドラッグで移動・スライダーで拡大'));
   wrap.appendChild(box);
+  const slider=el('input','crop-slider');slider.type='range';slider.min='100';slider.max='400';
+  wrap.appendChild(slider);
+  /* 実際のタイルサイズのプレビュー */
+  const prev=el('div','crop-preview');prev.appendChild(el('div','cp-label','実際のタイルでの見え方'));
+  const ptile=el('div','cp-tile');const pimg=el('img');ptile.appendChild(pimg);prev.appendChild(ptile);
+  wrap.appendChild(prev);
   const crop=Object.assign({s:1,fx:0,fy:0},opts.crop||{});
+  slider.value=String(Math.round(crop.s*100));
   let iw=0,ih=0;
   const clamp=()=>{crop.s=Math.max(1,Math.min(6,crop.s));crop.fx=Math.max(-0.5,Math.min(0.5,crop.fx));crop.fy=Math.max(-0.5,Math.min(0.5,crop.fy))};
-  function layout(){if(!iw||!ih)return;const bw=box.clientWidth,bh=box.clientHeight;if(!bw||!bh)return;const base=Math.max(bw/iw,bh/ih),sc=base*crop.s,dw=iw*sc,dh=ih*sc;img.style.width=dw+'px';img.style.height=dh+'px';img.style.left=((bw-dw)/2+crop.fx*(dw-bw))+'px';img.style.top=((bh-dh)/2+crop.fy*(dh-bh))+'px'}
+  const place=(imgEl,boxEl)=>{const bw=boxEl.clientWidth,bh=boxEl.clientHeight;if(!iw||!ih||!bw||!bh)return;const base=Math.max(bw/iw,bh/ih),sc=base*crop.s,dw=iw*sc,dh=ih*sc;imgEl.style.width=dw+'px';imgEl.style.height=dh+'px';imgEl.style.left=((bw-dw)/2+crop.fx*(dw-bw))+'px';imgEl.style.top=((bh-dh)/2+crop.fy*(dh-bh))+'px'};
+  function layout(){if(!iw||!ih)return;place(img,box);place(pimg,ptile)}
   img.onload=()=>{iw=img.naturalWidth;ih=img.naturalHeight;clamp();layout()};
-  if(opts.url)img.src=opts.url;
+  pimg.onload=layout;
+  if(opts.url){img.src=opts.url;pimg.src=opts.url}
   let drag=null;
   box.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY,fx:crop.fx,fy:crop.fy};try{box.setPointerCapture(e.pointerId)}catch(_){}};
   box.onpointermove=e=>{if(!drag||!iw)return;const bw=box.clientWidth,bh=box.clientHeight,base=Math.max(bw/iw,bh/ih),sc=base*crop.s,ovx=iw*sc-bw,ovy=ih*sc-bh;if(ovx>0)crop.fx=drag.fx+(e.clientX-drag.x)/ovx;if(ovy>0)crop.fy=drag.fy+(e.clientY-drag.y)/ovy;clamp();layout()};
   box.onpointerup=box.onpointercancel=()=>{drag=null};
   box.onwheel=e=>{e.preventDefault();crop.s=crop.s*(e.deltaY<0?1.08:0.92);clamp();layout();slider.value=String(Math.round(crop.s*100))};
-  const slider=el('input','crop-slider');slider.type='range';slider.min='100';slider.max='400';slider.value=String(Math.round(crop.s*100));
   slider.oninput=()=>{crop.s=parseInt(slider.value)/100;clamp();layout()};
-  wrap.appendChild(slider);
   return {el:wrap,getCrop:()=>({s:+crop.s.toFixed(4),fx:+crop.fx.toFixed(4),fy:+crop.fy.toFixed(4)}),relayout:layout};
 }
 
