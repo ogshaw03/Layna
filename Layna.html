@@ -4017,7 +4017,15 @@ function openReel(){
   mkMenuItem('名前を付けて保存…','Ctrl+Shift+S',()=>doSave(true));
   fileMi.onclick=e=>{e.stopPropagation();const willOpen=!fileDD.classList.contains('show');closeMenu();if(willOpen){fileMi.classList.add('open');fileDD.classList.add('show')}};
   d.addEventListener('click',()=>closeMenu());
-  d.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeOpenOv();return}if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='s'){e.preventDefault();doSave(!!e.shiftKey)}else if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}}});
+  d.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){closeMenu();closeOpenOv();return}
+    if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='s'){e.preventDefault();doSave(!!e.shiftKey)}else if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}return}
+    /* 入力中（コメント欄など）はショートカット無効 */
+    const tg=e.target&&e.target.tagName;if(tg==='TEXTAREA'||tg==='INPUT'||tg==='SELECT')return;
+    if(e.key===' '||e.key==='Spacebar'){e.preventDefault();if(cs().length)play.onclick()} /* 再生/停止 */
+    else if(e.key==='ArrowLeft'){e.preventDefault();pF.onclick()} /* 1フレーム戻る */
+    else if(e.key==='ArrowRight'){e.preventDefault();nF.onclick()} /* 1フレーム進む */
+  });
   reelUI.updTitle=updReelTitle; /* メインウィンドウから開いたときのタイトル更新用 */
   updReelTitle();
   /* 二重バッファの両方にリスナーを付け、アクティブ側のイベントだけ処理する
