@@ -3148,7 +3148,7 @@ function openReel(){
    +'.btn{background:none;border:1px solid #2a2a2f;color:#9a9aaa;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}'
    +'.ctr{flex-wrap:wrap}'
    +'.btn:hover{border-color:#3a3a42;color:#e8e8ec}.btn.on{background:#ececf0;color:#16161a;border-color:#ececf0}'
-   +'.stage{flex:1;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;position:relative;overflow:hidden}'
+   +'.stage{flex:1;display:flex;align-items:center;justify-content:center;background:#000;min-height:180px;position:relative;overflow:hidden}'
    +'.stage .ztrans{position:absolute;inset:0;transform-origin:0 0}'
    +'.stage .ztrans video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}'
    +'.rtrace{position:absolute;z-index:4;background:#fff;opacity:0;pointer-events:none}'
@@ -3186,9 +3186,17 @@ function openReel(){
    +'.snode .pth{font-size:9px;color:#5a5a6a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
    +'.snode .nm2{font-size:11px;color:#e8e8ec;display:flex;align-items:center;gap:5px;margin-top:2px}'
    +'.snode .sp2{flex:1}'
-   +'.snode .vl{padding:0 8px 8px;display:flex;flex-direction:column;gap:4px}'
+   +'.snode .th,.snode .bd{cursor:pointer}'
+   +'.snode.open{border-color:rgba(96,165,255,.7)}'
+   +'.snode .vl{padding:2px 8px 8px;display:flex;flex-direction:column;gap:5px;border-top:1px solid #2a2a2f}'
+   +'.snode .vrow{display:flex;align-items:center;gap:7px;padding:4px 5px;border:1px solid #2a2a2f;border-radius:6px;background:#141416;cursor:pointer}'
+   +'.snode .vrow:hover{border-color:rgba(96,165,255,.7);background:#182031}'
+   +'.snode .vth{width:46px;height:26px;flex-shrink:0;background:#000 center/cover no-repeat;border-radius:3px}'
+   +'.snode .vinfo{flex:1;min-width:0}'
+   +'.snode .vnm{font-size:11px;color:#e8e8ec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.snode .vrow .vadd{flex-shrink:0}'
    +'.addb{border:1px solid #2a2a2f;border-radius:5px;background:none;color:#9a9aaa;font-size:11px;padding:2px 8px;cursor:pointer;white-space:nowrap}'
-   +'.addb:hover{color:#16161a;background:#ececf0;border-color:#ececf0}'
+   +'.addb:hover,.snode .vrow:hover .vadd{color:#16161a;background:#ececf0;border-color:#ececf0}'
    /* レイヤーパネル（FBと同じ挙動） */
    +'.fb-layers{width:152px;border-left:1px solid rgba(96,165,255,.5);box-shadow:-1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.fb-layers-head{font-size:10px;font-weight:700;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:10px 10px 6px}'
@@ -3277,7 +3285,7 @@ function openReel(){
   const rref=ce(d,'button','btn','↻');rref.title='リストを更新';rsh.appendChild(rref);
   rside.appendChild(rsh);
   const rlist=ce(d,'div','rlist');rside.appendChild(rlist);
-  const maincol=ce(d,'div');maincol.style.cssText='flex:1;display:flex;flex-direction:column;min-width:0';
+  const maincol=ce(d,'div');maincol.style.cssText='flex:1;display:flex;flex-direction:column;min-width:300px';
   rowEl.appendChild(rside);rowEl.appendChild(maincol);
   d.body.appendChild(rowEl);
   /* プレビュー（ズーム/トラック用ラッパー：動画・トレペ・キャンバスをまとめて変形） */
@@ -3433,7 +3441,11 @@ function openReel(){
     trace.style.left=anno.style.left;trace.style.top=anno.style.top;trace.style.width=cw+'px';trace.style.height=ch+'px';
     drawAnno();drawFTL();
   }
-  reelWin.addEventListener('resize',fitAnno);
+  /* ウィンドウを小さくしすぎると動画やパネルがつぶれるので最小サイズを維持する */
+  const REEL_MINW=940,REEL_MINH=560;
+  function clampReelSize(){try{const w=reelWin.outerWidth,h=reelWin.outerHeight;const nw=Math.max(w,REEL_MINW),nh=Math.max(h,REEL_MINH);if(nw!==w||nh!==h)reelWin.resizeTo(nw,nh)}catch(_){}}
+  reelWin.addEventListener('resize',()=>{clampReelSize();fitAnno()});
+  clampReelSize();
   reelWin.addEventListener('beforeunload',e=>{if(hasUnsent()){e.preventDefault();e.returnValue='';return ''}});
   function drawAnno(){
     const ctx=anno.getContext('2d');ctx.clearRect(0,0,anno.width,anno.height);
@@ -3777,32 +3789,35 @@ function openReel(){
       const vids=n.versions.filter(x=>x.type==='video');
       const latest=vids[vids.length-1];
       const card=ce(d,'div','snode');
-      const th=ce(d,'div','th');th.appendChild(icoEl('film',d));th.title='最新の動画を追加';
+      /* タイルは即読み込みせず、選ぶと中のバージョンへ枝分かれして任意のクリップを選べる */
+      const th=ce(d,'div','th');th.appendChild(icoEl('film',d));th.title='クリックしてバージョンを表示';
       if(latest.thumb)storage.getURL(latest.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
-      th.onclick=async()=>{await reelAddClip(getNode(n.id),latest)};
       card.appendChild(th);
-      const bd=ce(d,'div','bd');
+      const bd=ce(d,'div','bd');bd.title='クリックしてバージョンを表示';
       bd.appendChild(ce(d,'div','pth',pathStr(n.id)));
       const r2=ce(d,'div','nm2');
       const tg=ce(d,'button','addb','▸');tg.title='中の動画（バージョン）を表示';
       r2.appendChild(tg);
       const sp=ce(d,'span','sp2');sp.appendChild(icoEl('film',d));sp.appendChild(d.createTextNode(' '+n.name));r2.appendChild(sp);
-      r2.appendChild(ce(d,'span','pth',latest.name));
+      r2.appendChild(ce(d,'span','pth',vids.length+' バージョン'));
       bd.appendChild(r2);
       card.appendChild(bd);
-      /* ショットの中の動画（全バージョン）を辿って個別に追加できる */
+      /* ショットの中の動画（全バージョン）を新しい順に辿って個別に追加できる */
       const vl=ce(d,'div','vl');vl.style.display='none';
-      for(const vv of vids){
-        const row=ce(d,'div','nm2');
-        row.appendChild(ce(d,'span','pth','▶ '+vv.name));
-        row.appendChild(ce(d,'span','sp2'));
-        const ab=ce(d,'button','addb','＋');
-        ab.onclick=async ev=>{ev.stopPropagation();await reelAddClip(getNode(n.id),vv)};
-        row.appendChild(ab);
+      vids.slice().reverse().forEach((vv,i)=>{
+        const row=ce(d,'div','vrow');row.title='このクリップをリールに追加';
+        const vth=ce(d,'div','vth');if(vv.thumb)storage.getURL(vv.thumb).then(u=>{if(u)vth.style.backgroundImage='url("'+u+'")'});
+        row.appendChild(vth);
+        const vinfo=ce(d,'div','vinfo');
+        vinfo.appendChild(ce(d,'div','vnm',vv.name+(vv===latest?'（最新）':'')));
+        row.appendChild(vinfo);
+        row.appendChild(ce(d,'span','addb vadd','＋'));
+        row.onclick=async ev=>{ev.stopPropagation();await reelAddClip(getNode(n.id),vv)};
         vl.appendChild(row);
-      }
+      });
       card.appendChild(vl);
-      tg.onclick=ev=>{ev.stopPropagation();const on=vl.style.display==='none';vl.style.display=on?'flex':'none';tg.textContent=on?'▾':'▸'};
+      const toggle=ev=>{if(ev)ev.stopPropagation();const on=vl.style.display==='none';vl.style.display=on?'flex':'none';tg.textContent=on?'▾':'▸';card.classList.toggle('open',on)};
+      th.onclick=toggle;bd.onclick=toggle;tg.onclick=toggle;
       rlist.appendChild(card);
     }
   }
