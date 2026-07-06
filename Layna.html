@@ -1397,7 +1397,17 @@ function folderWarnBanner(root){
   }
   return b;
 }
-function renderBody(){renderBodyMain();if(state.drawer&&$('#reviewDrawer'))fillDrawer();}
+/* 現在アクティブなタブの識別子（ルート上はそのタブ、サブページ表示中は 'browse'） */
+function activeTabKey(){
+  const cur=state.currentId?getNode(state.currentId):null;if(!cur)return null;
+  const root=rootOf(cur);const onRoot=state.currentId===root.id&&!state.search.trim();
+  return onRoot?(state.projTab||'timeline'):'browse';
+}
+function renderBody(){
+  /* 右側スライドはタブごとに切り替わる：開いたタブと違うタブになったら閉じる */
+  if(state.drawer&&state.drawer.tab&&state.drawer.tab!==activeTabKey())closeReviewDrawer();
+  renderBodyMain();if(state.drawer&&$('#reviewDrawer'))fillDrawer();
+}
 function renderBodyMain(){
   stopShotAutoplay(); /* 再描画のたびに前回のタイル動画を停止・解放 */
   const s=$('#scroll');s.innerHTML='';curUploadUI=null;
@@ -1822,7 +1832,7 @@ function closeReviewDrawer(){state.drawer=null;const dr=$('#reviewDrawer');const
 function openReviewDrawer(nodeId,shotId){
   let node=getNode(nodeId);if(!node)return;
   if(node.type!=='review'){const lv=latestVideoVersionUnder(node.id);if(lv&&lv.node)node=lv.node;}
-  state.drawer={kind:'review',id:node.id,shotId:shotId||null};buildDrawerShell();fillReviewDrawer();
+  state.drawer={kind:'review',id:node.id,shotId:shotId||null,tab:activeTabKey()};buildDrawerShell();fillReviewDrawer();
 }
 /* 右側スライド上部：このショット内の全工程（レビュー）をプルダウンで選択・切替 */
 function buildStageStrip(shot,curReviewId){
@@ -1860,7 +1870,7 @@ function fillReviewDrawer(){
 /* サブミットブロックを右側スライドで表示 */
 function openSubmitDrawer(submitId){
   const sb=(DB.submits||[]).find(s=>s.id===submitId);if(!sb)return;
-  state.drawer={kind:'submit',id:submitId};buildDrawerShell();fillSubmitDrawer();
+  state.drawer={kind:'submit',id:submitId,tab:activeTabKey()};buildDrawerShell();fillSubmitDrawer();
 }
 function fillSubmitDrawer(){
   const back=$('#reviewDrawer');if(!back||!state.drawer||state.drawer.kind!=='submit')return;
