@@ -343,7 +343,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .fb-edit-ta{width:100%;min-height:56px;resize:vertical;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;line-height:1.5;margin-top:4px}
 
 /* FB画面（シンクスケッチ風） */
-/* サブミットブロック */
+/* サブミット */
 .sub-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1400;display:flex;align-items:center;justify-content:center;padding:24px}
 .sub-modal{background:var(--bg);width:min(1080px,96vw);max-height:90vh;display:flex;flex-direction:column;border:1px solid var(--edge);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden}
 .sub-top{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -389,7 +389,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pk-stages{display:flex;flex-wrap:wrap;gap:6px;padding:0 9px 10px}
 .pk-chip{border:1px solid var(--border2);color:var(--text2);border-radius:14px;padding:3px 11px;font-size:12px;cursor:pointer}
 .pk-chip.on{background:rgba(96,165,255,.18);border-color:var(--edge);color:var(--text)}
-/* サブミットブロック全体コメント */
+/* サブミット全体コメント */
 .sub-blockcmt{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
 .sub-blockcmt label{font-size:11px;color:var(--text3)}
 .sub-blockcmt textarea{min-height:70px;resize:vertical;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);padding:10px;font-size:13px;font-family:inherit;line-height:1.6}
@@ -397,7 +397,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .sub-viewcmt .ttl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-bottom:5px}
 .sub-viewcmt .tx{font-size:13px;line-height:1.65;white-space:pre-wrap}
 .submit-chip{background:rgba(96,165,255,.16)!important;color:var(--text)!important;border:1px solid var(--edge)}
-/* タイムライン：サブミットブロックのまとめ表示 */
+/* タイムライン：サブミットのまとめ表示 */
 .tl-item.tl-submit{border-left:3px solid var(--edge)}
 .tl-subthumbs{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:96px;height:54px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--bg3)}
 .tl-subthumbs img{width:100%;height:100%;object-fit:cover;background:#000}
@@ -452,6 +452,19 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .tl-subname{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .tl-subcount{color:var(--text3);font-size:12px;margin-left:8px}
 .tl-substages{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 2px}
+/* タイムラインのサブミット：1ショット=1タイルで横並び */
+.tl-submit-group{border:1px solid var(--border);border-left:3px solid var(--edge);border-radius:10px;background:var(--bg2);padding:12px 14px;margin-bottom:14px}
+.tl-submit-head{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px}
+.tl-submit-head:hover .tl-subname{color:var(--accent2)}
+.tl-submit-head .tl-submeta{color:var(--text3);font-size:12px;margin-left:auto}
+.tl-submit-tiles{display:flex;gap:10px;flex-wrap:wrap}
+.tl-stile{width:150px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg3);cursor:pointer;transition:border-color .15s}
+.tl-stile:hover{border-color:var(--edge)}
+.tl-stile .th{width:100%;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.tl-stile .th img{width:100%;height:100%;object-fit:cover;display:block}
+.tl-stile .bd{padding:6px 8px;display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.tl-stile .sn{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.subl{max-width:1000px}
 .fb-overlay{position:fixed;inset:0;background:#0a0a0c;z-index:1500;display:flex;flex-direction:column}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -605,7 +618,7 @@ textarea.form-input{height:70px;resize:vertical}
   <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
-    <button class="btn btn-ghost" id="submitBtn" title="サブミットブロック — 複数ショットの提出をまとめてレビュー"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="5" rx="1"/><rect x="3" y="11" width="14" height="5" rx="1"/></svg>サブミット</button>
+    <button class="btn btn-ghost" id="submitBtn" title="サブミット — 複数ショットの提出をまとめてレビュー"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="5" rx="1"/><rect x="3" y="11" width="14" height="5" rx="1"/></svg>サブミット</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="このプロジェクトの保存先 / クリックでプロジェクト設定"><span class="dot"></span><span id="folderName">ブラウザ内保存</span></div>
     <button class="hd-bell" id="notifBtn" title="通知"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a4 4 0 0 1 8 0c0 4 1.5 5 1.5 5h-11S6 12 6 8z"/><path d="M8.5 16a1.7 1.7 0 0 0 3 0"/></svg><span class="nb-badge hidden" id="notifBadge">0</span></button>
@@ -909,7 +922,7 @@ async function boot(){
         if(loc&&loc.lastPageId&&getNode(loc.lastPageId))state.lastPageId=loc.lastPageId;
         if(loc&&loc.id&&getNode(loc.id)){
           state.currentId=loc.id;
-          if(['timeline','progress','shots','browse'].includes(loc.tab))state.projTab=loc.tab;
+          if(['timeline','progress','shots','submit','browse'].includes(loc.tab))state.projTab=loc.tab;
           for(const n of pathOf(loc.id))state.expanded.add(n.id);
           syncHash();render();resolveThumbs();restored=true;
         }
@@ -983,13 +996,15 @@ function toggleNotifPanel(){
 function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}document.documentElement.style.setProperty('--cols',cols);[['S',6],['M',4],['L',3]].forEach(([lab,n])=>{const b=el('button','size-btn'+(n===cols?' active':''),lab);b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};wrap.appendChild(b)})}
 
 /* ============================================================
-   サブミットブロック — 複数ショットの提出をまとめてレビュー
+   サブミット — 複数ショットの提出をまとめてレビュー
    ============================================================ */
 const subS={};
 function submitStagesOf(shot){const kids=childrenOf(shot.id).filter(n=>n.type==='review');return kids.length?kids:[shot];}
 function subGenName(pid){const d=new Date();const ymd=''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');let seq=1,name;do{name=ymd+'_'+String(seq).padStart(3,'0');seq++}while(DB.submits.some(s=>s.projectId===pid&&s.name===name));return name;}
 function openSubmit(){const root=subBuildModal();if(root)subShowList();}
-/* タイムラインのまとめエントリなどからサブミットブロック詳細を直接開く */
+/* サブミットボタン → 作成画面を直接開く（一覧はショット隣の「サブミット」タブへ移動） */
+function openSubmitCreate(){const root=subBuildModal();if(root)subShowCreate();}
+/* タイムラインのまとめエントリなどからサブミット詳細を直接開く */
 function openSubmitView(sb){const root=subBuildModal(sb.projectId);if(root)subShowView(sb);}
 function subBuildModal(forceProjId){
   let root;
@@ -1001,7 +1016,7 @@ function subBuildModal(forceProjId){
   const ov=el('div','sub-overlay');ov.id='submitOverlay';
   const modal=el('div','sub-modal');
   const top=el('div','sub-top');
-  top.appendChild(elIco('div','logo','folder','サブミットブロック'));
+  top.appendChild(elIco('div','logo','folder','サブミット'));
   top.appendChild(el('span','sub',root.name));
   top.appendChild(el('div','sp'));
   const tr=el('div');tr.style.cssText='display:flex;gap:8px';top.appendChild(tr);
@@ -1017,10 +1032,10 @@ function subBuildModal(forceProjId){
 }
 function subShowList(){
   const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
-  const add=el('button','btn btn-primary btn-sm','＋ サブミットブロック作成');add.onclick=()=>subShowCreate();tr.appendChild(add);
-  wrap.appendChild(el('div','section-label','作成されたサブミットブロック'));
+  const add=el('button','btn btn-primary btn-sm','＋ サブミット作成');add.onclick=()=>subShowCreate();tr.appendChild(add);
+  wrap.appendChild(el('div','section-label','作成されたサブミット'));
   const list=(DB.submits||[]).filter(s=>s.projectId===subS.projectId).slice().reverse();
-  if(!list.length){wrap.appendChild(el('div','sub-empty','サブミットブロックはまだありません。右上の「＋ サブミットブロック作成」から作成してください。'));return}
+  if(!list.length){wrap.appendChild(el('div','sub-empty','サブミットはまだありません。右上の「＋ サブミット作成」から作成してください。'));return}
   for(const sb of list){
     const it=el('div','subl-item');
     const bd=el('div');bd.appendChild(el('div','nm',sb.name));bd.appendChild(el('div','mt',(sb.items?sb.items.length:0)+' 件・'+fmt(sb.createdAt)));
@@ -1035,18 +1050,18 @@ function subShowList(){
 function subShowCreate(){
   const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
   const back=el('button','btn btn-ghost btn-sm','← 一覧');back.onclick=()=>subShowList();tr.appendChild(back);
-  const addSub=el('button','btn btn-primary btn-sm','＋ サブミットの作成');addSub.onclick=()=>openSubPicker();tr.appendChild(addSub);
-  /* サブミットブロック全体へのコメント（各ショットのコメントとは別・提出メッセージ） */
+  const addSub=el('button','btn btn-primary btn-sm','＋ ショットを追加');addSub.onclick=()=>openSubPicker();tr.appendChild(addSub);
+  /* サブミット全体へのコメント（各ショットのコメントとは別・提出メッセージ） */
   const bc=el('div','sub-blockcmt');
-  bc.appendChild(el('label',null,'サブミットブロックへのコメント（提出メッセージ・各ショットのコメントとは別）'));
+  bc.appendChild(el('label',null,'サブミットへのコメント（提出メッセージ・各ショットのコメントとは別）'));
   const bcta=el('textarea');bcta.placeholder='例）sh001とsh002を修正いたしましたのでご確認のほどよろしくお願いいたします。';
   bcta.value=subS.blockComment||'';bcta.oninput=()=>subS.blockComment=bcta.value;bc.appendChild(bcta);
   wrap.appendChild(bc);
-  wrap.appendChild(el('div','section-label','サブミット（提出する動画）'));
-  if(!subS.blocks.length){wrap.appendChild(el('div','sub-empty','右上の「＋ サブミットの作成」からショットと工程を選択してください。'));}
+  wrap.appendChild(el('div','section-label','提出物（提出する動画）'));
+  if(!subS.blocks.length){wrap.appendChild(el('div','sub-empty','右上の「＋ ショットを追加」からショットと工程を選択してください。'));}
   else{for(const b of subS.blocks)wrap.appendChild(subBlockEl(b));}
   const foot=el('div','sub-foot');
-  const create=el('button','btn btn-primary','サブミットブロックを作成');create.onclick=()=>createSubmitBlock();
+  const create=el('button','btn btn-primary','サブミットを作成');create.onclick=()=>createSubmitBlock();
   foot.appendChild(create);footHost.appendChild(foot);
 }
 function subBlockEl(block){
@@ -1126,14 +1141,14 @@ async function createSubmitBlock(){
   const blockComment=(subS.blockComment||'').trim();
   const stub={prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}};
   const items=[];
-  toast('サブミットブロックを作成中…');
+  toast('サブミットを作成中…');
   for(const b of blocks){
     const before=b.node.versions.length;
     await uploadVersion(b.node,b.file,stub,{comment:b.comment,sub:'submitblock/'+name,projectId:pid});
     const v=b.node.versions[b.node.versions.length-1];
     if(v&&b.node.versions.length>before){
       v.submitId=subId;v.submitName=name; /* タイムラインでまとめて表示するため */
-      /* サブミットブロックのコメントは各ショットの「メッセージ」（node.comments）として反映 */
+      /* サブミットのコメントは各ショットの「メッセージ」（node.comments）として反映 */
       if(blockComment)(b.node.comments=b.node.comments||[]).push({id:newId('sc'),author:currentUser(),text:blockComment,time:nowIso(),kind:'submit',submitName:name});
       items.push({nodeId:b.node.id,versionId:v.id,comment:b.comment||''});
       /* このショット工程のステータスを反映 */
@@ -1144,19 +1159,19 @@ async function createSubmitBlock(){
   await persist();
   for(const b of blocks){if(b.thumbUrl){try{URL.revokeObjectURL(b.thumbUrl)}catch(_){}}}
   subS.blocks=[];subS.blockComment='';
-  toast('サブミットブロック '+name+' を作成しました（'+items.length+'件）');
+  toast('サブミット '+name+' を作成しました（'+items.length+'件）');
   try{render();resolveThumbs()}catch(_){}
   subShowList();
 }
 function subShowView(sb){
   const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
   const back=el('button','btn btn-ghost btn-sm','← 一覧');back.onclick=()=>subShowList();tr.appendChild(back);
-  /* このサブミットブロックの動画をまとめて REEL に送る */
+  /* このサブミットの動画をまとめて REEL に送る */
   const toReel=el('button','btn btn-primary btn-sm','▶ まとめて REEL に送る');
   toReel.onclick=()=>subSendToReel(sb);tr.appendChild(toReel);
   wrap.appendChild(el('div','section-label',sb.name+' — タイルをクリックしてレビュー（該当ショットに反映）'));
-  /* サブミットブロックへのコメント（提出メッセージ） */
-  if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットブロックへのコメント'));bc.appendChild(el('div','tx',sb.comment));wrap.appendChild(bc);}
+  /* サブミットへのコメント（提出メッセージ） */
+  if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットへのコメント'));bc.appendChild(el('div','tx',sb.comment));wrap.appendChild(bc);}
   const grid=el('div','pm-grid');
   for(const item of (sb.items||[])){
     const n=getNode(item.nodeId);if(!n)continue;const v=n.versions.find(x=>x.id===item.versionId);if(!v)continue;
@@ -1169,13 +1184,13 @@ function subShowView(sb){
     const mt=el('div','mt');const badge=el('span','pm-badge',n.name);badge.style.background=stageColor(n.name);mt.appendChild(badge);mt.appendChild(el('span','pth',v.name));bd.appendChild(mt);
     if(item.comment)bd.appendChild(el('div','pth',item.comment));
     tile.appendChild(bd);
-    tile.onclick=()=>openReview(n.id,v.id);
+    tile.onclick=()=>{if(subS.ov)subS.ov.remove();go(n.id)}; /* タスクページへ */
     grid.appendChild(tile);
   }
   if(!(sb.items&&sb.items.length))wrap.appendChild(el('div','sub-empty','項目がありません。'));
   else wrap.appendChild(grid);
 }
-/* サブミットブロック内の全動画をまとめて REEL に送る */
+/* サブミット内の全動画をまとめて REEL に送る */
 async function subSendToReel(sb){
   const list=[];
   for(const item of (sb.items||[])){const n=getNode(item.nodeId);const v=n&&n.versions.find(x=>x.id===item.versionId);if(n&&v&&v.type==='video')list.push({n,v})}
@@ -1195,7 +1210,7 @@ function go(id){state.currentId=id;state.search='';state.projTab='timeline';stat
    #/n/<nodeId>/<tab>     プロジェクト/セクション/レビューページ（tab: timeline|progress|shots|browse）
    #/r/<nodeId>/<verId>   レビュー（動画FB）画面
    ============================================================ */
-const VALID_TABS=['timeline','progress','shots','browse'];
+const VALID_TABS=['timeline','progress','shots','submit','browse'];
 function hashOf(){
   if(state.reviewOpen&&getNode(state.reviewOpen.nodeId))return '#/r/'+state.reviewOpen.nodeId+'/'+state.reviewOpen.versionId;
   if(!state.currentId)return '#/';
@@ -1405,10 +1420,10 @@ function shotOf(node){if(!node||!node.parentId)return '';const p=getNode(node.pa
 /* プロジェクトの上部タブ（常に表示）。タブクリックでプロジェクトのトップ＋該当タブへ */
 /* ヘッダ内のプロジェクトタブ（タイムライン / 進捗 / ショット） */
 function buildProjectTabsHead(root){
-  if(!['timeline','progress','shots','browse'].includes(state.projTab))state.projTab='timeline';
+  if(!['timeline','progress','shots','submit','browse'].includes(state.projTab))state.projTab='timeline';
   const onRoot=state.currentId===root.id&&!state.search.trim();
   const nav=el('div','head-tabs');
-  [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']].forEach(([id,lab],i)=>{
+  [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['submit','サブミット']].forEach(([id,lab],i)=>{
     if(i)nav.appendChild(el('span','vdiv')); /* タブ間の縦区切り線 */
     const active=onRoot&&state.projTab===id;
     const b=el('button','ptab'+(active?' on':''),lab);
@@ -1494,6 +1509,7 @@ function renderBodyMain(){
     const main=el('div','home-main');s.appendChild(main);
     if(state.projTab==='progress')renderProjProgress(main,root);
     else if(state.projTab==='shots')renderProjShots(main,root);
+    else if(state.projTab==='submit')renderProjSubmits(main,root);
     else if(state.projTab==='browse'){state.lastPageId=root.id;renderSectionBody(main,root)}
     else renderProjTimeline(main,root);
     return;
@@ -1514,9 +1530,9 @@ function projectUpdates(rootId){
     const upNote=notes.find(x=>x.kind==='upload');
     const item={type:'upload',node:n,v,time:v.uploadedAt||'',stage:n.name,comment:upNote?upNote.text:null};
     if(v.submitId){
-      /* サブミットブロックの提出はまとめて1つのタイムラインエントリに */
+      /* サブミットの提出はまとめて1つのタイムラインエントリに */
       let g=groups[v.submitId];
-      if(!g){g={type:'submit',submitId:v.submitId,name:v.submitName||'サブミットブロック',items:[],time:''};groups[v.submitId]=g;evs.push(g)}
+      if(!g){g={type:'submit',submitId:v.submitId,name:v.submitName||'サブミット',items:[],time:''};groups[v.submitId]=g;evs.push(g)}
       g.items.push(item);
       if(item.time>g.time)g.time=item.time;
       continue;
@@ -1565,26 +1581,51 @@ function renderProjTimeline(main,cur){
   }
   main.appendChild(tl);
 }
-/* タイムライン：サブミットブロックのまとめエントリ（クリックでサブミットブロックを開く） */
+/* タイムライン：サブミットのまとめエントリ。1ショット=1タイルで横並び表示（クリックで右側に表示） */
 function tlSubmitItem(e,cur){
   const sb=(DB.submits||[]).find(s=>s.id===e.submitId);
-  const it=el('div','tl-item tl-submit');it.title='クリックでサブミットブロックを右側に表示';
-  it.onclick=()=>{if(sb)openSubmitDrawer(sb.id)};
-  const ths=el('div','tl-subthumbs');
-  for(const item of e.items.slice(0,4)){const th=el('img');if(item.v.thumb)th.dataset.ref=item.v.thumb;ths.appendChild(th)}
-  it.appendChild(ths);
-  const bd=el('div','tl-body');
-  const top=el('div','tl-path');top.appendChild(elIco('span','tl-subbadge','folder','サブミットブロック'));bd.appendChild(top);
-  const t=el('div','tl-title');
-  t.appendChild(el('span','tl-subname',e.name));
-  t.appendChild(el('span','tl-subcount',e.items.length+' 件の提出'));
-  bd.appendChild(t);
-  const stg=el('div','tl-substages');
-  for(const s of (e.stages||[])){const chip=el('span','tl-stage',s);chip.style.background=stageColor(s);stg.appendChild(chip)}
-  bd.appendChild(stg);
-  bd.appendChild(el('div','tl-meta',fmt(e.time)+' に提出'));
-  it.appendChild(bd);
-  return it;
+  const open=()=>{if(sb)openSubmitDrawer(sb.id)};
+  const grp=el('div','tl-submit-group');
+  const head=el('div','tl-submit-head');head.title='クリックでサブミットを右側に表示';head.onclick=open;
+  head.appendChild(elIco('span','tl-subbadge','folder','サブミット'));
+  head.appendChild(el('span','tl-subname',e.name));
+  head.appendChild(el('span','tl-subcount',e.items.length+' ショット'));
+  head.appendChild(el('span','tl-submeta',fmt(e.time)+' に提出'));
+  grp.appendChild(head);
+  const row=el('div','tl-submit-tiles');
+  for(const item of e.items){
+    const n=item.node,v=item.v;const shot=n.parentId?getNode(n.parentId):null;
+    const tile=el('div','tl-stile');tile.onclick=open;tile.title=(shot?shot.name+' / ':'')+n.name;
+    const th=el('div','th');const img=el('img');if(v.thumb)img.dataset.ref=v.thumb;th.appendChild(img);tile.appendChild(th);
+    const bd=el('div','bd');
+    bd.appendChild(el('div','sn',shot?shot.name:n.name)); /* ショット名 */
+    const badge=el('span','tl-stage',n.name);badge.style.background=stageColor(n.name);bd.appendChild(badge); /* 工程 */
+    tile.appendChild(bd);
+    row.appendChild(tile);
+  }
+  grp.appendChild(row);
+  return grp;
+}
+/* サブミットタブ：作成済みサブミットの一覧（クリックで右側スライドに表示） */
+function renderProjSubmits(main,root){
+  const lab=el('div','section-label');lab.appendChild(el('span',null,'サブミット'));
+  const acts=el('div','acts');
+  const add=el('button','btn btn-ghost btn-sm','＋ サブミット作成');add.onclick=()=>openSubmitCreate();acts.appendChild(add);
+  lab.appendChild(acts);main.appendChild(lab);
+  const list=(DB.submits||[]).filter(s=>s.projectId===root.id).slice().reverse();
+  if(!list.length){main.appendChild(el('div','empty','サブミットはまだありません。右上の「サブミット」ボタン、または「＋ サブミット作成」から作成してください。'));return}
+  const w=el('div','subl');
+  for(const sb of list){
+    const it=el('div','subl-item');
+    const bd=el('div');bd.appendChild(el('div','nm',sb.name));bd.appendChild(el('div','mt',((sb.items&&sb.items.length)||0)+' 件・'+fmt(sb.createdAt)));
+    it.appendChild(bd);
+    const ths=el('div','thumbs');
+    for(const item of (sb.items||[]).slice(0,5)){const n=getNode(item.nodeId);const v=n&&n.versions.find(x=>x.id===item.versionId);const th=el('div','th');if(v&&v.thumb)storage.getURL(v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});ths.appendChild(th)}
+    it.appendChild(ths);
+    it.onclick=()=>openSubmitDrawer(sb.id);
+    w.appendChild(it);
+  }
+  main.appendChild(w);
 }
 /* ショットタブ：ショット親フォルダ直下の「ショット」ごとに最新動画をグリッド表示
    （ショットの中身＝工程ではなく、ショット単位で表示） */
@@ -1974,7 +2015,7 @@ function fillReviewDrawer(){
   renderReviewBody(back._body,node);
   resolveThumbs();
 }
-/* サブミットブロックを右側スライドで表示 */
+/* サブミットを右側スライドで表示 */
 function openSubmitDrawer(submitId){
   const sb=(DB.submits||[]).find(s=>s.id===submitId);if(!sb)return;
   const key=activeTabKey();const dr={kind:'submit',id:submitId,tab:key};if(key)state.tabDrawers[key]=dr;state.drawer=dr;buildDrawerShell();fillSubmitDrawer();
@@ -1983,12 +2024,12 @@ function fillSubmitDrawer(){
   const back=$('#reviewDrawer');if(!back||!state.drawer||state.drawer.kind!=='submit')return;
   const sb=(DB.submits||[]).find(s=>s.id===state.drawer.id);if(!sb){closeReviewDrawer();return}
   back._t.textContent=sb.name;
-  back._p.textContent='サブミットブロック — '+((sb.items&&sb.items.length)||0)+' 件の提出';
+  back._p.textContent='サブミット — '+((sb.items&&sb.items.length)||0)+' 件の提出';
   back._acts.innerHTML='';
   const toReel=el('button','btn btn-primary btn-sm','▶ まとめて REEL に送る');toReel.onclick=()=>subSendToReel(sb);back._acts.appendChild(toReel);
   const body=back._body;body.innerHTML='';curUploadUI=null;
-  if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットブロックへのコメント'));bc.appendChild(el('div','tx',sb.comment));body.appendChild(bc);}
-  body.appendChild(el('div','section-label','提出物（タイルをクリックしてレビュー）'));
+  if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットへのコメント'));bc.appendChild(el('div','tx',sb.comment));body.appendChild(bc);}
+  body.appendChild(el('div','section-label','提出物（タイルをクリックしてタスクページへ）'));
   const grid=el('div','pm-grid');
   for(const item of (sb.items||[])){
     const n=getNode(item.nodeId);if(!n)continue;const v=n.versions.find(x=>x.id===item.versionId);if(!v)continue;
@@ -2000,7 +2041,7 @@ function fillSubmitDrawer(){
     const mt=el('div','mt');const badge=el('span','pm-badge',n.name);badge.style.background=stageColor(n.name);mt.appendChild(badge);mt.appendChild(el('span','pth',v.name));bd.appendChild(mt);
     if(item.comment)bd.appendChild(el('div','pth',item.comment));
     tile.appendChild(bd);
-    tile.onclick=()=>openReview(n.id,v.id);
+    tile.onclick=()=>{closeReviewDrawer();go(n.id)}; /* 右側スライドのタイル → タスクページへ */
     grid.appendChild(tile);
   }
   if(!(sb.items&&sb.items.length))body.appendChild(el('div','sub-empty','項目がありません。'));
@@ -2186,7 +2227,7 @@ function noteBlock(v,n,opts){
     m.appendChild(fc);
   }
   if(n.drawing&&n.drawing.length)m.appendChild(el('span','frame-chip','✎ 描画'));
-  if(n.kind==='submit')m.appendChild(el('span','frame-chip submit-chip','⧉ '+(n.submitName||'サブミットブロック')));
+  if(n.kind==='submit')m.appendChild(el('span','frame-chip submit-chip','⧉ '+(n.submitName||'サブミット')));
   const acts=el('span','note-acts');
   const ed=el('button','na','✎ 編集');
   const del=el('button','na','✕');del.title='削除';
@@ -4452,7 +4493,7 @@ $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 $('#folderStatus').onclick=()=>{const cur=state.currentId?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root)openRename(root);else toast('プロジェクトを開くと、プロジェクト設定から保存先フォルダを指定できます')};
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
-$('#submitBtn').onclick=()=>{if(storage.mode)openSubmit()};
+$('#submitBtn').onclick=()=>{if(storage.mode)openSubmitCreate()};
 $('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifPanel()};
 /* 工程フィルタ・通知パネルを外側クリックで閉じる */
 document.addEventListener('click',e=>{
