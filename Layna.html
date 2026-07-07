@@ -1021,7 +1021,7 @@ function renderNotifPanel(){
 function toggleNotifPanel(){
   const p=$('#notifPanel');if(!p)return;
   const willOpen=p.classList.contains('hidden');
-  if(willOpen){renderNotifPanel();p.classList.remove('hidden')}else p.classList.add('hidden');
+  if(willOpen){try{scanMentionsForMe()}catch(_){}renderNotifPanel();p.classList.remove('hidden')}else p.classList.add('hidden');
 }
 /* ============================================================
    メンション（@名前＝個人 / @ロール）
@@ -1095,26 +1095,44 @@ function attachMention(ta,root){
   ta.addEventListener('blur',()=>setTimeout(close,150));
   ta.addEventListener('scroll',position);
 }
-/* ==== 自分宛メンションの通知（読込時に走査。localStorage で既知キーを管理） ==== */
-function myMember(root){if(!root)return null;if(authUser&&authUser.email){const m=memberById(root,authUser.email);if(m)return m}const nm=currentUser();return projectMembers(root).find(m=>(m.name||'')===nm)||null}
+/* ==== 自分宛メンションの通知（読込時＋通知パネル表示時に走査。localStorage で既知キーを管理） ==== */
+/* 自分の識別：ログインメール(id) と 表示名/入力名 の両方で照合（メンバー未登録でも id 一致すれば拾う） */
+function myIdentity(root){
+  const email=((authUser&&authUser.email)||'').toLowerCase();
+  let name=(currentUser()||'').trim();if(name==='anonymous')name='';
+  let me=null;
+  if(email)me=memberById(root,email);
+  if(!me&&name)me=projectMembers(root).find(m=>(m.name||'').trim()===name);
+  const ids=new Set();if(email)ids.add(email);if(me)ids.add(String(me.id).toLowerCase());
+  const roles=new Set(me?(me.roles||[]).map(r=>String(r)):[]);
+  return {ids,roles,name};
+}
 function _seenMentions(){try{return new Set(JSON.parse(localStorage.getItem('layna.seenMentions')||'[]'))}catch(_){return new Set()}}
 function _saveSeenMentions(set){try{localStorage.setItem('layna.seenMentions',JSON.stringify([...set].slice(-3000)))}catch(_){}}
 function scanMentionsForMe(){
-  if(!DB)return;const baseline=!localStorage.getItem('layna.seenMentions');const seen=_seenMentions();const pending=[];
+  if(!DB)return;const seen=_seenMentions();const pending=[];
   for(const root of childrenOf(null)){
-    const me=myMember(root);if(!me)continue;
-    const myId=String(me.id).toLowerCase();const myRoles=new Set((me.roles||[]).map(r=>String(r)));
-    const hit=ms=>Array.isArray(ms)&&ms.some(x=>(x.type==='user'&&String(x.id).toLowerCase()===myId)||(x.type==='role'&&myRoles.has(String(x.id))));
-    const consider=(obj,author,text,nodeId)=>{if(!obj||!hit(obj.mentions))return;if((author||'')===currentUser())return;
+    const me=myIdentity(root);
+    if(!me.ids.size&&!me.name)continue; /* 誰か特定できないときはスキップ */
+    const hit=ms=>Array.isArray(ms)&&ms.some(x=>x.type==='user'
+        ?(me.ids.has(String(x.id).toLowerCase())||(me.name&&x.name&&String(x.name).trim()===me.name))
+        :(x.type==='role'&&me.roles.has(String(x.id))));
+    const consider=(obj,author,text,nodeId)=>{if(!obj||!obj.mentions||!obj.mentions.length||!hit(obj.mentions))return;
+      if((author||'')===currentUser())return; /* 自分の発言は通知しない */
       const key='mn:'+(obj.id||'')+':'+(obj.time||'')+':'+nodeId;if(seen.has(key))return;seen.add(key);
-      if(!baseline)pending.push({title:'メンションされました',text:(author||'誰か')+'：'+String(text||'').replace(/\s+/g,' ').slice(0,80),nodeId})};
+      pending.push({title:'メンションされました',text:(author||'誰か')+'：'+String(text||'').replace(/\s+/g,' ').slice(0,80),nodeId})};
     for(const n of descendants(root.id)){
       for(const c of (n.comments||[]))consider(c,c.author,c.text,n.id);
       if(n.type==='review')for(const v of (n.versions||[]))for(const note of ((v.review&&v.review.notes)||[]))consider(note,note.author,note.text,n.id);
     }
   }
-  if(pending.length){if(!Array.isArray(DB.notifications))DB.notifications=[];for(const p of pending.reverse())DB.notifications.unshift({id:newId('ntf'),title:p.title,text:p.text,time:nowIso(),read:false,nodeId:p.nodeId||null});if(DB.notifications.length>300)DB.notifications.length=300;updateNotifBadge()}
   _saveSeenMentions(seen);
+  if(pending.length){if(!Array.isArray(DB.notifications))DB.notifications=[];
+    for(const p of pending.reverse())DB.notifications.unshift({id:newId('ntf'),title:p.title,text:p.text,time:nowIso(),read:false,nodeId:p.nodeId||null});
+    if(DB.notifications.length>300)DB.notifications.length=300;
+    updateNotifBadge();persist(); /* 通知を localStorage に保存（次回読込でも保持） */
+    const pn=$('#notifPanel');if(pn&&!pn.classList.contains('hidden'))renderNotifPanel();
+  }
 }
 function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}document.documentElement.style.setProperty('--cols',cols);[['S',6],['M',4],['L',3]].forEach(([lab,n])=>{const b=el('button','size-btn'+(n===cols?' active':''),lab);b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};wrap.appendChild(b)})}
 
