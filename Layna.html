@@ -114,6 +114,15 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .pl-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);padding:9px 11px;font-size:13px;font-family:inherit}
 .pl-input:focus{outline:none;border-color:var(--border2)}
 .pl-err{color:var(--red);font-size:12px}
+/* メンション チップ & 候補ドロップダウン */
+.mention{color:var(--accent2);background:var(--bg4);border-radius:4px;padding:0 3px;font-weight:600}
+.mention-role{color:var(--amber)}
+.mention-pop{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 26px rgba(0,0,0,.55);overflow:hidden;max-height:260px;overflow-y:auto}
+.mention-opt{display:flex;align-items:baseline;gap:8px;padding:7px 11px;cursor:pointer;font-size:13px}
+.mention-opt.on,.mention-opt:hover{background:var(--bg3)}
+.mention-opt .mo-nm{font-weight:600;color:var(--text);white-space:nowrap}
+.mention-opt.is-role .mo-nm{color:var(--amber)}
+.mention-opt .mo-sub{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .scroll{flex:1;overflow-y:auto;padding:0 20px 28px}
 .home-main{padding-top:14px}
 /* 単色ラインアイコン */
@@ -933,6 +942,7 @@ async function boot(){
     normalizeNodes();
   }
   updateFolderStatus();initSizeBtns();updateNotifBadge();
+  try{scanMentionsForMe()}catch(_){} /* 自分宛メンションを走査して通知（読込時） */
   /* URL（ハッシュ）優先で画面を復元。無ければ localStorage、どちらも無ければホーム */
   if(!applyHash(true)){
     let restored=false;
@@ -1012,6 +1022,99 @@ function toggleNotifPanel(){
   const p=$('#notifPanel');if(!p)return;
   const willOpen=p.classList.contains('hidden');
   if(willOpen){renderNotifPanel();p.classList.remove('hidden')}else p.classList.add('hidden');
+}
+/* ============================================================
+   メンション（@名前＝個人 / @ロール）
+   ・表示は @名前 / @ロール。内部参照は個人=メール(id)、ロール=ロール名。
+   ・保存：コメント/ノートに mentions:[{type:'user'|'role',id,name}]（通知用）
+   ・入力：@ でメンバー/ロール候補のドロップダウン（ownerDocument 対応でポップアップ内でも動作）
+   ・通知：他ユーザーの通知は共有できない（localStorage）ため、読込時に自分宛メンションを走査して通知
+   ============================================================ */
+function curRoot(){const c=state&&state.currentId?getNode(state.currentId):null;return c?rootOf(c):null}
+function projectRoles(root){return [...new Set(projectMembers(root).flatMap(m=>(m.roles||[])))].filter(Boolean)}
+function mentionCandidates(root){
+  root=root||curRoot();const out=[];if(!root)return out;
+  for(const m of projectMembers(root)){if(m.active===false)continue;out.push({type:'user',id:m.id,name:m.name||m.id,sub:(m.roles||[]).join(', ')||m.id,color:m.color})}
+  for(const r of projectRoles(root))out.push({type:'role',id:r,name:r,sub:'ロール',color:null});
+  return out;
+}
+/* テキストから @メンションを走査（候補名の最長一致） */
+function scanMentions(text,root){
+  root=root||curRoot();const cands=mentionCandidates(root).slice().sort((a,b)=>(b.name||'').length-(a.name||'').length);
+  const res=[];const t=String(text||'');let i=0;
+  while(i<t.length){
+    if(t[i]==='@'){let m=null;for(const c of cands){if(c.name&&t.startsWith(c.name,i+1)){m=c;break}}
+      if(m){res.push({type:m.type,id:m.id,name:m.name,start:i,end:i+1+m.name.length,color:m.color});i=i+1+m.name.length;continue}}
+    i++;
+  }
+  return res;
+}
+/* 保存用メンション配列。tracked（ピッカーで実際に選んだ候補）で同名個人の id を優先 */
+function extractMentions(text,root,tracked){
+  root=root||curRoot();const scan=scanMentions(text,root);const seen=new Set();const out=[];
+  for(const s of scan){let id=s.id;
+    if(s.type==='user'&&tracked){const tk=tracked.find(x=>x.type==='user'&&x.name===s.name);if(tk)id=tk.id}
+    const key=s.type+':'+String(id).toLowerCase();if(seen.has(key))continue;seen.add(key);
+    out.push({type:s.type,id,name:s.name});
+  }
+  return out;
+}
+/* テキストを @メンションをチップ化して container に描画（ownerDocument 対応） */
+function renderMentionText(container,text,root){
+  const d=container.ownerDocument||document;const t=String(text||'');const parts=scanMentions(t,root);
+  let pos=0;const push=s=>{if(s)container.appendChild(d.createTextNode(s))};
+  for(const p of parts){push(t.slice(pos,p.start));const chip=d.createElement('span');chip.className='mention mention-'+p.type;chip.textContent='@'+p.name;if(p.type==='user'&&p.color)chip.style.color=p.color;container.appendChild(chip);pos=p.end}
+  push(t.slice(pos));return container;
+}
+/* textarea に @ オートコンプリートを付与（重複付与ガード付き・ownerDocument 対応） */
+function attachMention(ta,root){
+  if(!ta||ta._mentionOn)return;ta._mentionOn=true;ta._mentions=ta._mentions||[];
+  const d=ta.ownerDocument||document;let box=null,items=[],sel=0,anchor=-1;
+  const close=()=>{if(box){box.remove();box=null}items=[];anchor=-1};
+  const curToken=()=>{const c=ta.selectionStart;const s=ta.value.slice(0,c);const m=s.match(/(^|\s)@([^\s@]*)$/);if(!m)return null;return {q:m[2],start:c-m[2].length-1,end:c}};
+  const hi=()=>{if(box)[...box.children].forEach((e,i)=>e.classList.toggle('on',i===sel))};
+  const position=()=>{if(!box)return;const r=ta.getBoundingClientRect();box.style.position='fixed';box.style.left=Math.round(r.left)+'px';box.style.top=Math.round(r.bottom+4)+'px';box.style.minWidth=Math.min(260,Math.max(160,r.width))+'px';box.style.zIndex=99999};
+  const choose=idx=>{const c=items[idx];if(!c)return;const tok=curToken()||{start:anchor,end:ta.selectionStart};
+    const before=ta.value.slice(0,tok.start),after=ta.value.slice(tok.end),ins='@'+c.name+' ';
+    ta.value=before+ins+after;const caret=(before+ins).length;try{ta.setSelectionRange(caret,caret)}catch(_){}
+    if(!ta._mentions.some(m=>m.type===c.type&&String(m.id).toLowerCase()===String(c.id).toLowerCase()))ta._mentions.push({type:c.type,id:c.id,name:c.name});
+    close();ta.focus();};
+  const open=tok=>{const q=(tok.q||'').toLowerCase();const cands=mentionCandidates(root).filter(c=>!q||c.name.toLowerCase().includes(q)).slice(0,8);
+    if(!cands.length){close();return}items=cands;sel=0;anchor=tok.start;
+    if(!box){box=d.createElement('div');box.className='mention-pop';(d.body||d.documentElement).appendChild(box)}
+    box.innerHTML='';cands.forEach((c,idx)=>{const it=d.createElement('div');it.className='mention-opt'+(idx===sel?' on':'')+(c.type==='role'?' is-role':'');
+      const nm=d.createElement('span');nm.className='mo-nm';nm.textContent='@'+c.name;const sb=d.createElement('span');sb.className='mo-sub';sb.textContent=(c.type==='role'?'ロール':c.sub);
+      it.appendChild(nm);it.appendChild(sb);it.onmousedown=e=>{e.preventDefault();choose(idx)};box.appendChild(it)});
+    position();};
+  ta.addEventListener('input',()=>{const tok=curToken();if(tok)open(tok);else close()});
+  ta.addEventListener('keydown',e=>{if(!box)return;
+    if(e.key==='ArrowDown'){e.preventDefault();sel=(sel+1)%items.length;hi()}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=(sel-1+items.length)%items.length;hi()}
+    else if((e.key==='Enter'&&!e.ctrlKey&&!e.metaKey)||e.key==='Tab'){e.preventDefault();choose(sel)}
+    else if(e.key==='Escape'){e.preventDefault();close()}},true);
+  ta.addEventListener('blur',()=>setTimeout(close,150));
+  ta.addEventListener('scroll',position);
+}
+/* ==== 自分宛メンションの通知（読込時に走査。localStorage で既知キーを管理） ==== */
+function myMember(root){if(!root)return null;if(authUser&&authUser.email){const m=memberById(root,authUser.email);if(m)return m}const nm=currentUser();return projectMembers(root).find(m=>(m.name||'')===nm)||null}
+function _seenMentions(){try{return new Set(JSON.parse(localStorage.getItem('layna.seenMentions')||'[]'))}catch(_){return new Set()}}
+function _saveSeenMentions(set){try{localStorage.setItem('layna.seenMentions',JSON.stringify([...set].slice(-3000)))}catch(_){}}
+function scanMentionsForMe(){
+  if(!DB)return;const baseline=!localStorage.getItem('layna.seenMentions');const seen=_seenMentions();const pending=[];
+  for(const root of childrenOf(null)){
+    const me=myMember(root);if(!me)continue;
+    const myId=String(me.id).toLowerCase();const myRoles=new Set((me.roles||[]).map(r=>String(r)));
+    const hit=ms=>Array.isArray(ms)&&ms.some(x=>(x.type==='user'&&String(x.id).toLowerCase()===myId)||(x.type==='role'&&myRoles.has(String(x.id))));
+    const consider=(obj,author,text,nodeId)=>{if(!obj||!hit(obj.mentions))return;if((author||'')===currentUser())return;
+      const key='mn:'+(obj.id||'')+':'+(obj.time||'')+':'+nodeId;if(seen.has(key))return;seen.add(key);
+      if(!baseline)pending.push({title:'メンションされました',text:(author||'誰か')+'：'+String(text||'').replace(/\s+/g,' ').slice(0,80),nodeId})};
+    for(const n of descendants(root.id)){
+      for(const c of (n.comments||[]))consider(c,c.author,c.text,n.id);
+      if(n.type==='review')for(const v of (n.versions||[]))for(const note of ((v.review&&v.review.notes)||[]))consider(note,note.author,note.text,n.id);
+    }
+  }
+  if(pending.length){if(!Array.isArray(DB.notifications))DB.notifications=[];for(const p of pending.reverse())DB.notifications.unshift({id:newId('ntf'),title:p.title,text:p.text,time:nowIso(),read:false,nodeId:p.nodeId||null});if(DB.notifications.length>300)DB.notifications.length=300;updateNotifBadge()}
+  _saveSeenMentions(seen);
 }
 function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}document.documentElement.style.setProperty('--cols',cols);[['S',6],['M',4],['L',3]].forEach(([lab,n])=>{const b=el('button','size-btn'+(n===cols?' active':''),lab);b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};wrap.appendChild(b)})}
 
@@ -1916,7 +2019,7 @@ function shotCommentItem(cur,c){
   const m=el('div','m');
   m.appendChild(el('span','sc-chip','💬 メッセージ'));
   m.appendChild(el('span',null,(c.author||'—')+'・'+fmt(c.time)+(c.edited?'（編集済）':'')));
-  const t=el('div','t',c.text);
+  const t=el('div','t');renderMentionText(t,c.text,rootOf(cur)); /* @メンションをチップ表示 */
   if((c.author||'')===currentUser()){
     const acts=el('span','note-acts');
     const ed=el('button','na','✎ 編集');const del=el('button','na','✕');del.title='削除';
@@ -1928,9 +2031,9 @@ function shotCommentItem(cur,c){
       const row=el('div','edit-row');
       const save=el('button','btn btn-primary btn-sm','保存');const cancel=el('button','btn btn-ghost btn-sm','取消');
       row.appendChild(save);row.appendChild(cancel);
-      t.style.display='none';it.appendChild(ta);it.appendChild(row);ta.focus();
+      t.style.display='none';it.appendChild(ta);it.appendChild(row);attachMention(ta,rootOf(cur));ta.focus();
       cancel.onclick=()=>{ta.remove();row.remove();t.style.display=''};
-      save.onclick=async()=>{const nv=(ta.value||'').trim();if(!nv)return;c.text=nv;c.edited=true;await persist();renderBody()};
+      save.onclick=async()=>{const nv=(ta.value||'').trim();if(!nv)return;c.text=nv;c.edited=true;c.mentions=extractMentions(nv,rootOf(cur),ta._mentions);await persist();renderBody()};
     };
   }
   it.appendChild(m);it.appendChild(t);
@@ -1942,11 +2045,12 @@ function shotCommentInput(cur){
   const head=el('div','section-label');head.appendChild(el('span',null,'メッセージ'));
   wrap.appendChild(head);
   const inp=el('div','sc-input');
-  const ta=el('textarea');ta.placeholder='メッセージ（動画へのFBとは別に記録され、下のログに動画タイルと時系列で表示されます・Ctrl+Enterで送信）';
+  const ta=el('textarea');ta.placeholder='メッセージ（@でメンション。動画へのFBとは別に記録され、下のログに動画タイルと時系列で表示されます・Ctrl+Enterで送信）';
   const send=el('button','btn btn-primary btn-sm','送信');
-  const submit=async()=>{const txt=(ta.value||'').trim();if(!txt)return;(cur.comments=cur.comments||[]).push({id:newId('sc'),author:currentUser(),text:txt,time:nowIso()});ta.value='';await persist();renderBody();resolveThumbs()};
+  const submit=async()=>{const txt=(ta.value||'').trim();if(!txt)return;const mn=extractMentions(txt,rootOf(cur),ta._mentions);(cur.comments=cur.comments||[]).push({id:newId('sc'),author:currentUser(),text:txt,time:nowIso(),mentions:mn});ta.value='';ta._mentions=[];await persist();renderBody();resolveThumbs()};
   send.onclick=submit;
   ta.onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();submit()}};
+  attachMention(ta,rootOf(cur));
   inp.appendChild(ta);inp.appendChild(send);
   wrap.appendChild(inp);
   return wrap;
@@ -2236,11 +2340,12 @@ function buildFrameNotes(pending,opts){
     }
   }
   if(txt){
-    if(!isVideo){if(notes[0])notes[0].text=txt;else notes.push({author:who,text:txt,time:t})}
+    const mns=extractMentions(txt,opts.root,opts.mentions);
+    if(!isVideo){if(notes[0]){notes[0].text=txt;if(mns.length)notes[0].mentions=mns}else notes.push({author:who,text:txt,time:t,mentions:mns})}
     else{
       const cf=(opts.curFrame!=null?opts.curFrame:(notes[0]&&notes[0].frame!=null?notes[0].frame:0));
       const at=notes.find(n=>n.frame===cf);
-      if(at)at.text=txt;else notes.push({author:who,text:txt,time:t,frame:cf});
+      if(at){at.text=txt;if(mns.length)at.mentions=mns}else notes.push({author:who,text:txt,time:t,frame:cf,mentions:mns});
     }
   }
   return notes;
@@ -2263,7 +2368,7 @@ function noteBlock(v,n,opts){
   const ed=el('button','na','✎ 編集');
   const del=el('button','na','✕');del.title='削除';
   acts.appendChild(ed);acts.appendChild(del);m.appendChild(acts);
-  const t=el('div','t',n.text==='（描画のみ）'?'':n.text); /* 旧データの「（描画のみ）」は表示しない */
+  const t=el('div','t');renderMentionText(t,n.text==='（描画のみ）'?'':n.text,opts.root); /* @メンションをチップ表示（旧「（描画のみ）」は非表示） */
   note.appendChild(m);note.appendChild(t);
   /* アノテーション付きフレームのスクショをコメントに表示（noShot＝記入せず送信した描画のみは省略） */
   if(opts.shot&&opts.shot.isVideo&&n.drawing&&n.drawing.length&&!n.noShot){
@@ -2278,11 +2383,11 @@ function noteBlock(v,n,opts){
     const row=el('div','edit-row');
     const save=el('button','btn btn-primary btn-sm','保存');
     const cancel=el('button','btn btn-ghost btn-sm','キャンセル');
-    save.onclick=async()=>{const txt=ta.value.trim();if(!txt)return;n.text=txt;n.edited=true;if(opts.refresh)await opts.refresh()};
+    save.onclick=async()=>{const txt=ta.value.trim();if(!txt)return;n.text=txt;n.edited=true;n.mentions=extractMentions(txt,opts.root,ta._mentions);if(opts.refresh)await opts.refresh()};
     cancel.onclick=()=>{ta.remove();row.remove();t.style.display=''};
     t.style.display='none';
     note.appendChild(ta);note.appendChild(row);row.appendChild(save);row.appendChild(cancel);
-    ta.focus();
+    attachMention(ta,opts.root);ta.focus();
   };
   del.onclick=async()=>{if(!confirm('コメントを削除しますか？'))return;v.review.notes=v.review.notes.filter(x=>x!==n);if(opts.refresh)await opts.refresh()};
   return note;
@@ -3069,9 +3174,9 @@ function openReview(nodeId,versionId){
   side.appendChild(el('div','fb-side-head','コメント / FB'));
   const list=el('div','fb-notes');side.appendChild(list);
   const iw=el('div','fb-input');
-  const ta=el('textarea');ta.placeholder=isVideo?'このフレームにコメント…（Shift+Enterで改行）':'コメント…（Shift+Enterで改行）';
+  const ta=el('textarea');ta.placeholder=isVideo?'このフレームにコメント…（@でメンション・Shift+Enterで改行）':'コメント…（@でメンション・Shift+Enterで改行）';
   const sb=el('button','btn btn-primary btn-sm','記入');sb.title='コメント／アノテーションを記入（送信するまでタスクページには反映されません）';
-  iw.appendChild(ta);iw.appendChild(sb);side.appendChild(iw);
+  iw.appendChild(ta);iw.appendChild(sb);side.appendChild(iw);attachMention(ta,rootOf(node));
   /* 送信バー：記入した内容をまとめてレビューページに反映 */
   const submitBar=el('div','fb-submit-bar');
   const submitLab=el('span','fb-unsent-lab');
@@ -3337,7 +3442,7 @@ function openReview(nodeId,versionId){
     const del=el('button','na','✕');del.title='この記入を取り消す';del.onclick=()=>{drafts=drafts.filter(x=>x!==n);renderNotes();drawAll();drawTimeline();updSubmit()};
     acts.appendChild(del);m.appendChild(acts);
     b.appendChild(m);
-    if(n.text&&n.text!=='（描画のみ）')b.appendChild(el('div','t',n.text));
+    if(n.text&&n.text!=='（描画のみ）'){const tt=el('div','t');renderMentionText(tt,n.text,rootOf(node));b.appendChild(tt)}
     return b;
   }
   /* 未送信＝記入済み下書き(drafts)＋未記入の pending アノテ＋入力中コメント。
@@ -3359,11 +3464,11 @@ function openReview(nodeId,versionId){
   const record=async()=>{
     /* 各線は描いたフレームごとに別ノートへ（複数フレームにまたがってもズレない）。
        コメントは現在フレームのノートに付ける。リールと同じ buildFrameNotes を使用。 */
-    const notes=buildFrameNotes(pending,{text:ta.value,curFrame:isVideo?dispFrame():null,dur:parseInt(durSel.value)||1,isVideo});
+    const notes=buildFrameNotes(pending,{text:ta.value,curFrame:isVideo?dispFrame():null,dur:parseInt(durSel.value)||1,isVideo,mentions:ta._mentions,root:rootOf(node)});
     if(!notes.length)return;
     for(const n of notes)n._draft=true;
     drafts.push(...notes);pending=[];stroke=null;
-    ta.value='';renderNotes();drawAll();drawTimeline();updSubmit();
+    ta.value='';ta._mentions=[];renderNotes();drawAll();drawTimeline();updSubmit();
   };
   /* 送信：記入した内容をまとめてレビューページ(v.review.notes)へ反映。
      未記入の pending アノテ・入力中コメントも自動で記入してから送信（リールと統一）。 */
@@ -3824,6 +3929,10 @@ function openReel(){
    +'.fb-notes{flex:1;overflow-y:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}'
    +'.fb-input{padding:12px;border-top:1px solid #2a2a2f;display:flex;gap:8px}'
    +'.fb-input textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:8px 10px;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;font-size:13px;line-height:1.5;font-family:inherit}'
+   +'.mention{color:#e8e8ec;background:#232327;border-radius:4px;padding:0 3px;font-weight:600}.mention-role{color:#d6a95f}'
+   +'.mention-pop{background:#141416;border:1px solid #3a3a42;border-radius:8px;box-shadow:0 8px 26px rgba(0,0,0,.55);overflow:hidden;max-height:260px;overflow-y:auto;font-family:inherit}'
+   +'.mention-opt{display:flex;align-items:baseline;gap:8px;padding:7px 11px;cursor:pointer;font-size:13px}.mention-opt.on{background:#1c1c1f}'
+   +'.mention-opt .mo-nm{font-weight:600;color:#e8e8ec;white-space:nowrap}.mention-opt.is-role .mo-nm{color:#d6a95f}.mention-opt .mo-sub{font-size:11px;color:#5a5a6a;white-space:nowrap}'
    +'.log-note{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;padding:9px 12px}'
    +'.log-note.draft-note{border-color:#e0a63a;border-style:dashed;background:rgba(224,166,58,.06)}'
    +'.draft-chip{font-size:10px;font-weight:700;color:#1a1200;background:#e0a63a;border-radius:8px;padding:1px 7px;margin-right:6px}'
@@ -3974,9 +4083,9 @@ function openReel(){
   reelUI.updStatus=updReelStatus;
   const clist=ce(d,'div','fb-notes');cside.appendChild(clist);
   const ciw=ce(d,'div','fb-input');
-  const cta=d.createElement('textarea');cta.placeholder='このフレームにコメント…（Shift+Enterで改行）';
+  const cta=d.createElement('textarea');cta.placeholder='このフレームにコメント…（@でメンション・Shift+Enterで改行）';
   const csend=ce(d,'button','btn on','記入');csend.title='コメント／アノテを記入（送信するまでタスクページには反映されません）';
-  ciw.appendChild(cta);ciw.appendChild(csend);cside.appendChild(ciw);
+  ciw.appendChild(cta);ciw.appendChild(csend);cside.appendChild(ciw);attachMention(cta,curRoot());
   rowEl.appendChild(cside);
 
   const rvData=()=>{const c=reelUI.clips[reelUI.cur];if(!c||!c.nodeId)return null;const n=getNode(c.nodeId);const vv=n&&n.versions.find(x=>x.id===c.vId);return vv?{node:n,v:vv}:null};
@@ -4044,7 +4153,7 @@ function openReel(){
     if(n.drawing&&n.drawing.length)m.appendChild(ce(d,'span','frame-chip','✎ 描画'));
     const acts=ce(d,'span','note-acts');const del=ce(d,'button','na','✕');del.title='この記入を取り消す';del.onclick=()=>{c.drafts=(c.drafts||[]).filter(x=>x!==n);reelNotes();drawAnno();drawFTL();updUnsent();reelRender()};acts.appendChild(del);m.appendChild(acts);
     b.appendChild(m);
-    if(n.text&&n.text!=='（描画のみ）')b.appendChild(ce(d,'div','t',n.text));
+    if(n.text&&n.text!=='（描画のみ）'){const tt=ce(d,'div','t');renderMentionText(tt,n.text,curRoot());b.appendChild(tt)}
     return b;
   }
   function reelNotes(scrollEnd){
@@ -4226,7 +4335,8 @@ function openReel(){
      レビューページ(record)と共通の buildFrameNotes を使用（ロジック分岐・フレームズレを防ぐ）。 */
   function buildNotes(c,curFrame){
     const vv=vOf(c);if(!vv)return [];
-    return buildFrameNotes(c.pending||[],{text:c.commentDraft||'',curFrame,dur:parseInt(durS.value)||1,isVideo:true});
+    const nd=c&&c.nodeId?getNode(c.nodeId):null;
+    return buildFrameNotes(c.pending||[],{text:c.commentDraft||'',curFrame,dur:parseInt(durS.value)||1,isVideo:true,root:nd?rootOf(nd):curRoot()});
   }
   /* 記入：現在クリップの pending＋コメントを下書き(c.drafts)へ。まだレビューには反映しない */
   function reelRecord(c,curFrame,noShot){
