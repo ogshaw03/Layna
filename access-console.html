@@ -5,15 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title>Layna アクセス管理コンソール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet" />
 <style>
+  /* Layna 本体と同じモノクロ基調のパレット・タイポグラフィ */
   :root{
-    --bg:#0d0f14;--bg2:#151821;--bg3:#1c2030;--bg4:#252a3a;
-    --border:#262b3a;--border2:#333a4d;
-    --text:#e8eaf0;--text2:#aab0c0;--text3:#6b7180;
-    --accent:#7c6fff;--green:#5affa0;--amber:#ffb85a;--red:#ff5a5a;--blue:#5a8fff;
-    --radius:10px;--radius2:8px;
-    --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
-    --font-head:"Segoe UI",system-ui,sans-serif;
+    --bg:#0d0d0f;--bg2:#141416;--bg3:#1c1c1f;--bg4:#232327;
+    --border:#2a2a2f;--border2:#3a3a42;
+    --text:#e8e8ec;--text2:#9a9aaa;--text3:#5a5a6a;
+    --accent:#c7c7cf;--accent2:#e8e8ec;--green:#7fbf9a;--amber:#d6a95f;--red:#e06a6a;
+    --radius:10px;--radius2:6px;
+    --font:'Noto Sans JP',system-ui,-apple-system,"Segoe UI",sans-serif;
+    --font-head:'Syne',system-ui,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;font-size:14px}
@@ -21,10 +24,10 @@
   button{font-family:inherit;cursor:pointer}
   .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);padding:8px 14px;border-radius:var(--radius2);font-size:13px;transition:.15s}
   .btn:hover{background:var(--bg4)}
-  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  .btn-primary:hover{filter:brightness(1.1)}
-  .btn-danger{background:rgba(255,90,90,.15);border-color:rgba(255,90,90,.4);color:#ff7a7a}
-  .btn-danger:hover{background:rgba(255,90,90,.25)}
+  .btn-primary{background:#ececf0;border-color:#ececf0;color:#16161a;font-weight:600}
+  .btn-primary:hover{background:#fff}
+  .btn-danger{background:transparent;border-color:var(--red);color:var(--red)}
+  .btn-danger:hover{background:rgba(224,106,106,.12)}
   .btn-sm{padding:4px 9px;font-size:12px}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   input,textarea,select{font-family:inherit;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 11px;border-radius:var(--radius2);font-size:13px;width:100%}
@@ -49,8 +52,8 @@
   .card-desc b{color:var(--text2)}
 
   .mstatus{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius);margin-bottom:14px;font-size:14px;font-weight:600}
-  .mstatus.on{background:rgba(90,255,160,.1);border:1px solid rgba(90,255,160,.3);color:var(--green)}
-  .mstatus.off{background:rgba(255,184,90,.12);border:1px solid rgba(255,184,90,.4);color:var(--amber)}
+  .mstatus.on{background:rgba(127,191,154,.1);border:1px solid rgba(127,191,154,.3);color:var(--green)}
+  .mstatus.off{background:rgba(214,169,95,.12);border:1px solid rgba(214,169,95,.4);color:var(--amber)}
   .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
   .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
   .dot.off{background:var(--amber)}
@@ -72,10 +75,10 @@
   .u-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3)}
   .u-email{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
   .role{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px}
-  .role.op{background:rgba(255,184,90,.18);color:#ffcf8a;border:1px solid rgba(255,184,90,.4)}
-  .role.admin{background:rgba(124,111,255,.2);color:#a79dff;border:1px solid rgba(124,111,255,.4)}
-  .role.member{background:rgba(90,255,160,.13);color:#7fe6ad;border:1px solid rgba(90,255,160,.3)}
-  .role.dom{background:rgba(90,143,255,.15);color:#9cc0ff;border:1px solid rgba(90,143,255,.35)}
+  .role.op{background:rgba(214,169,95,.16);color:#d6a95f;border:1px solid rgba(214,169,95,.4)}
+  .role.admin{background:rgba(199,199,207,.14);color:#c7c7cf;border:1px solid rgba(199,199,207,.32)}
+  .role.member{background:rgba(127,191,154,.14);color:#7fbf9a;border:1px solid rgba(127,191,154,.34)}
+  .role.dom{background:rgba(154,154,170,.12);color:#9a9aaa;border:1px solid rgba(154,154,170,.3)}
   .empty{font-size:12px;color:var(--text3);padding:6px 2px}
 
   .notification{position:fixed;bottom:24px;right:24px;background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:11px 16px;font-size:13px;z-index:2000;display:none;max-width:340px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
