@@ -59,8 +59,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* Layna 本体と同じ Firebase プロジェクト（animref-ef532）を使用 */
-const firebaseConfig={apiKey:"AIzaSyASqL2Qp8sGrkzHz7J_HhE6QXntAZOO7RE",authDomain:"animref-ef532.firebaseapp.com",projectId:"animref-ef532",storageBucket:"animref-ef532.firebasestorage.app",messagingSenderId:"1029274074603",appId:"1:1029274074603:web:f0ddc3eb69e35a47276dae"};
+/* Layna 専用 Firebase プロジェクト（layna-6d687）。Layna 本体と同じ config を使用 */
+const firebaseConfig={apiKey:"AIzaSyAWWgykhkakM-OrAs1MFu5CEeLg0poIhSk",authDomain:"layna-6d687.firebaseapp.com",projectId:"layna-6d687",storageBucket:"layna-6d687.firebasestorage.app",messagingSenderId:"104594371405",appId:"1:104594371405:web:d789a911be89321ce7bd04"};
 const CFG_PATH=['laynaAccess','config']; /* Firestore ドキュメント（Layna 本体が読むのと同じパス） */
 
 const app=initializeApp(firebaseConfig);

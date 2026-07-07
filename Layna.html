@@ -4485,10 +4485,10 @@ async function initApp(){
 initApp();
 </script>
 <script type="module">
-  // Googleログイン用（OGREF と同じ Firebase Auth を流用。ドメイン ogshaw03.github.io は承認済み）
+  // Googleログイン用（Layna 専用 Firebase プロジェクト layna-6d687。承認済みドメインに ogshaw03.github.io を追加すること）
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  const firebaseConfig={apiKey:"AIzaSyASqL2Qp8sGrkzHz7J_HhE6QXntAZOO7RE",authDomain:"animref-ef532.firebaseapp.com",projectId:"animref-ef532",storageBucket:"animref-ef532.firebasestorage.app",messagingSenderId:"1029274074603",appId:"1:1029274074603:web:f0ddc3eb69e35a47276dae"};
+  const firebaseConfig={apiKey:"AIzaSyAWWgykhkakM-OrAs1MFu5CEeLg0poIhSk",authDomain:"layna-6d687.firebaseapp.com",projectId:"layna-6d687",storageBucket:"layna-6d687.firebasestorage.app",messagingSenderId:"104594371405",appId:"1:104594371405:web:d789a911be89321ce7bd04"};
   window.__laynaFBUser=undefined;
   try{
     const app=initializeApp(firebaseConfig);const auth=getAuth(app);const provider=new GoogleAuthProvider();
