@@ -81,6 +81,7 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .mh-row1{display:flex;align-items:center;gap:12px;min-height:42px}
+.vdiv{width:1px;height:20px;background:var(--border2);flex-shrink:0;align-self:center;margin:0 2px}
 /* タスクページ/カテゴリページ左上の固定バー（スクロール追従） */
 .task-topbar{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 -20px 16px;padding:12px 20px;background:var(--bg);border-bottom:1px solid var(--border)}
 .task-topbar .tt-head{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
@@ -1359,6 +1360,7 @@ function renderMainHead(){
   box.appendChild(title);
   if(root.description)box.appendChild(el('div','desc',root.description));
   row1.appendChild(box);
+  row1.appendChild(el('span','vdiv')); /* プロジェクト名とタブの区切り線 */
   row1.appendChild(buildProjectTabsHead(root)); /* プロジェクトタブ（タイムライン/進捗/ショット） */
   row1.appendChild(el('div','spacer'));
   /* プロジェクトのタイムライン用・工程フィルタ（タイムラインタブのみ） */
@@ -1406,12 +1408,13 @@ function buildProjectTabsHead(root){
   if(!['timeline','progress','shots','browse'].includes(state.projTab))state.projTab='timeline';
   const onRoot=state.currentId===root.id&&!state.search.trim();
   const nav=el('div','head-tabs');
-  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']]){
+  [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']].forEach(([id,lab],i)=>{
+    if(i)nav.appendChild(el('span','vdiv')); /* タブ間の縦区切り線 */
     const active=onRoot&&state.projTab===id;
     const b=el('button','ptab'+(active?' on':''),lab);
     b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
     nav.appendChild(b);
-  }
+  });
   return nav;
 }
 /* 下段：左サイドバー／ショットから開いたタスク（タスクページ）をタブとして複数並べる（ブラウザのタブ風） */
@@ -1427,9 +1430,7 @@ function buildTaskTabs(root){
     const n=getNode(id);if(!n)continue;
     const active=state.currentId===id;
     const tab=el('div','task-tab'+(active?' on':''));
-    const sh=shotOf(n);
-    if(sh)tab.appendChild(el('span','tt-shot',sh)); /* ショット番号（カット）を表示 */
-    tab.appendChild(el('span','tt-name',n.name));
+    tab.appendChild(el('span','tt-name',shotOf(n)||n.name)); /* タブはショット名のみ（工程はタスクページ側で表示） */
     tab.onclick=()=>{state.currentId=id;state.projTab='browse';state.pmPick=null;state.search='';$('#searchInput').value='';for(const x of pathOf(id))state.expanded.add(x.id);syncHash();render()};
     const x=el('button','tt-close','✕');x.title='タブを閉じる';
     x.onclick=e=>{e.stopPropagation();
@@ -1811,12 +1812,10 @@ function renderSectionBody(s,cur){
   /* 非ルートのカテゴリは自分の固定バー（名前＋設定・削除）を持つ。ルート(プロジェクト)はヘッダ側で管理 */
   if(cur.parentId){
     const topbar=el('div','task-topbar');
-    const tt=el('div','tt-head');
-    const sh=shotOf(cur);if(sh)tt.appendChild(el('span','tt-shot',sh));
     const h1=el('h2','tt-proc');h1.appendChild(document.createTextNode(cur.name));
     const st=stInfo(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;h1.appendChild(bg);
     h1.appendChild(elIco('span','type-chip','folder','カテゴリ'));
-    tt.appendChild(h1);topbar.appendChild(tt);topbar.appendChild(el('div','spacer'));
+    topbar.appendChild(h1);
     const rn=el('button','btn btn-ghost btn-sm','設定');rn.onclick=()=>openRename(cur);topbar.appendChild(rn);
     const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>deleteNode(cur);topbar.appendChild(del);
     s.appendChild(topbar);
@@ -1883,14 +1882,10 @@ function shotCommentInput(cur){
 function renderReviewBody(s,cur){
   /* タスクページ左上の固定バー：ショット番号／工程／ステータス＋ステータス切替・設定・削除（スクロール追従） */
   const topbar=el('div','task-topbar');
-  const tt=el('div','tt-head');
-  const sh=shotOf(cur);if(sh)tt.appendChild(el('span','tt-shot',sh));
-  const h1=el('h2','tt-proc');h1.appendChild(document.createTextNode(cur.name));
+  const h1=el('h2','tt-proc');h1.appendChild(document.createTextNode(cur.name)); /* 工程（タスク名） */
   const tst=stInfo(cur);const tbg=el('span','badge',tst.label);tbg.style.background=hexA(tst.color,.18);tbg.style.color=tst.color;h1.appendChild(tbg);
   h1.appendChild(elIco('span','type-chip','film','タスク'));
-  tt.appendChild(h1);
-  topbar.appendChild(tt);
-  topbar.appendChild(el('div','spacer'));
+  topbar.appendChild(h1);
   if(cur.versions.length)topbar.appendChild(buildStatusSelect(cur)); /* ステータス切替プルダウン */
   const trn=el('button','btn btn-ghost btn-sm','設定');trn.onclick=()=>openRename(cur);topbar.appendChild(trn);
   const tdel=el('button','btn btn-danger btn-sm','削除');tdel.onclick=()=>deleteNode(cur);topbar.appendChild(tdel);
