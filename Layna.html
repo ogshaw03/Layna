@@ -104,6 +104,16 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .mp-badge .mp-bl{color:var(--text3);font-size:9px;letter-spacing:.02em}
 .mp-badge .mp-bn{color:var(--text);font-weight:600}
 .mp-filter{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 14px;padding:9px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2)}
+/* プロジェクト パスワード解錠画面 */
+.proj-lock{display:flex;justify-content:center;align-items:flex-start;padding:60px 20px}
+.pl-box{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:30px 26px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.pl-ic{font-size:34px;line-height:1}
+.pl-title{font-family:var(--font-head);font-size:19px;font-weight:700}
+.pl-sub{color:var(--text2);font-size:12px}
+.pl-row{display:flex;gap:8px;width:100%;margin-top:6px}
+.pl-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);padding:9px 11px;font-size:13px;font-family:inherit}
+.pl-input:focus{outline:none;border-color:var(--border2)}
+.pl-err{color:var(--red);font-size:12px}
 .scroll{flex:1;overflow-y:auto;padding:0 20px 28px}
 .home-main{padding-top:14px}
 /* 単色ラインアイコン */
@@ -1513,6 +1523,8 @@ function renderBodyMain(){
   const cur=state.currentId?getNode(state.currentId):null;
   if(!cur){renderHome(s);return}
   const root=rootOf(cur);
+  /* パスワード保護：未解錠なら解錠画面のみ表示（配下すべてを保護） */
+  if(projectLocked(root)){renderProjectLock(s,root);return}
   /* 保存先フォルダ未設定の警告 */
   const warn=folderWarnBanner(root);if(warn)s.appendChild(warn);
   if(cur.id===root.id&&!state.search.trim()){
@@ -1833,6 +1845,7 @@ function renderHome(s){
     body.appendChild(el('div','proj-name',r.name));
     const meta=el('div','proj-meta');
     const pb=projBadge(r);const bd=el('span','proj-badge',pb.label);bd.style.color=pb.color;bd.style.borderColor=hexA(pb.color,.5);bd.style.background=hexA(pb.color,.12);meta.appendChild(bd);
+    if(r.passHash)meta.appendChild(el('span','proj-badge','🔒 保護'));
     if(!r.folderName)meta.appendChild(el('span','proj-badge proj-nofolder','⚠ フォルダ未設定'));
     meta.appendChild(el('span','proj-cnt',childrenOf(r.id).length+' 項目'));
     if(ev)meta.appendChild(el('span','proj-upd','更新 '+fmt(ev.time)));
@@ -2580,6 +2593,7 @@ function openRename(node){
     }
     /* プロジェクト（ルート）ならステータス／進捗のショット親フォルダを編集できる */
     let stArr=null,spSel=null,projThumbFile=null,projThumbUrlTmp=null,projCropWidget=null;
+    let pwNew=null,pwConf=null,pwRemove=null;
     if(!node.parentId){
       /* プロジェクトサムネイル（元画像はそのまま・トリミングのみ調整可能） */
       inner.appendChild(el('div','form-label','プロジェクトサムネイル（ドラッグ/拡大でタイル表示範囲を調整）'));
@@ -2647,6 +2661,13 @@ function openRename(node){
       const memBtn=el('button','btn btn-ghost btn-sm','👥 メンバー管理…');memBtn.type='button';memBtn.onclick=()=>openMembersWindow(node);
       memWrap.appendChild(memBtn);
       inner.appendChild(memWrap);
+      /* プロジェクトのパスワード保護（画面上のアクセス制限） */
+      inner.appendChild(el('div','divider'));
+      inner.appendChild(el('div','form-label','パスワード保護（'+(node.passHash?'設定済み':'未設定')+'）— このプロジェクトを開くときにパスワードを要求します'));
+      pwNew=frow(node.passHash?'新しいパスワード':'パスワード','input');pwNew.f.type='password';pwNew.f.placeholder=node.passHash?'変更する場合のみ入力':'パスワードを設定';inner.appendChild(pwNew.r);
+      pwConf=frow('確認（再入力）','input');pwConf.f.type='password';inner.appendChild(pwConf.r);
+      if(node.passHash){const rr=el('label','form-check');rr.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0';pwRemove=el('input');pwRemove.type='checkbox';rr.appendChild(pwRemove);rr.appendChild(el('span','form-label','パスワード保護を解除する（誰でも開けるようになります）'));rr.querySelector('.form-label').style.margin='0';inner.appendChild(rr)}
+      inner.appendChild(el('div','form-label','※ パスワードは画面上のアクセスを制限するものです。データ自体は共有フォルダに保存されるため、フォルダへ直接アクセスできる人には有効ではありません。厳密な権限管理は今後のアクセス権付与方式で対応予定です。'));
       /* このユーザーの接続を解除（データは消さない） */
       inner.appendChild(el('div','divider'));
       const dcWrap=el('div');dcWrap.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap';
@@ -2658,6 +2679,11 @@ function openRename(node){
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
       if(asgSel){if(asgSel.value)node.assignee=asgSel.value;else delete node.assignee}
       if(revSel){if(revSel.value)node.reviewer=revSel.value;else delete node.reviewer}
+      /* プロジェクトのパスワード保護：新規入力があれば設定/変更、解除チェックで削除 */
+      if(!node.parentId){
+        if(pwRemove&&pwRemove.checked){delete node.passHash;delete node.passSalt;unlockedSet().delete(node.id)}
+        else if(pwNew&&pwNew.f.value){if(pwNew.f.value!==(pwConf?pwConf.f.value:'')){toast('パスワードが一致しません');return}await setProjectPassword(node,pwNew.f.value);markUnlocked(node.id)}
+      }
       /* プロジェクトサムネイル：新規画像は元のまま thumbnails/ に保存し、トリミングは crop で保持 */
       if(!node.parentId){
         if(projThumbFile){
@@ -2718,6 +2744,45 @@ function assignFilterBar(root){
   mk('filterAssignee','作業担当');mk('filterReviewer','チェック担当');
   if(state.filterAssignee||state.filterReviewer){const clr=el('button','btn btn-ghost btn-sm','フィルタ解除');clr.onclick=()=>{state.filterAssignee=null;state.filterReviewer=null;renderBody();resolveThumbs()};bar.appendChild(clr)}
   return bar;
+}
+/* ============================================================
+   プロジェクトのパスワード保護（UIレベルのアクセス制限）
+   ・root.passHash（SHA-256 の16進）と root.passSalt を layna.project.json に保存
+   ・パスワード平文は保存しない。解錠状態はタブ内（sessionStorage）のみ保持
+   ・注意：データ本体は共有フォルダにあるため、フォルダ直アクセスには無力（画面上の制限）
+   ・将来のアクセス権付与方式（Firebase）への布石 */
+function _hex(buf){return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+function genSalt(){const a=new Uint8Array(16);(self.crypto||window.crypto).getRandomValues(a);return _hex(a.buffer)}
+async function hashPass(salt,pw){
+  const data=new TextEncoder().encode(String(salt)+':'+String(pw));
+  try{if(self.crypto&&self.crypto.subtle){const h=await self.crypto.subtle.digest('SHA-256',data);return _hex(h)}}catch(_){}
+  /* フォールバック（subtle 不可環境）：FNV-1a を複数ラウンド */
+  let out='';let h=0x811c9dc5;const bytes=new Uint8Array(data);
+  for(let round=0;round<4;round++){for(let i=0;i<bytes.length;i++){h^=bytes[i];h=(h*0x01000193)>>>0}out+=('0000000'+h.toString(16)).slice(-8)}
+  return out;
+}
+async function setProjectPassword(root,pw){root.passSalt=genSalt();root.passHash=await hashPass(root.passSalt,pw)}
+async function verifyPass(root,pw){if(!root||!root.passHash)return true;return (await hashPass(root.passSalt||'',pw))===root.passHash}
+function unlockedSet(){if(!state._unlocked){state._unlocked=new Set();try{const a=JSON.parse(sessionStorage.getItem('layna.unlocked')||'[]');if(Array.isArray(a))a.forEach(x=>state._unlocked.add(x))}catch(_){}}return state._unlocked}
+function markUnlocked(id){unlockedSet().add(id);try{sessionStorage.setItem('layna.unlocked',JSON.stringify([...state._unlocked]))}catch(_){}}
+function projectLocked(root){return !!(root&&root.passHash&&!unlockedSet().has(root.id))}
+/* パスワード解錠画面（プロジェクトを開こうとしたとき） */
+function renderProjectLock(s,root){
+  const g=el('div','proj-lock');const box=el('div','pl-box');
+  box.appendChild(el('div','pl-ic','🔒'));
+  box.appendChild(el('div','pl-title',root.name));
+  box.appendChild(el('div','pl-sub','このプロジェクトはパスワードで保護されています。'));
+  const row=el('div','pl-row');
+  const inp=el('input','pl-input');inp.type='password';inp.placeholder='パスワードを入力';
+  const btn=el('button','btn btn-primary','解除して開く');
+  const err=el('div','pl-err');err.textContent='パスワードが違います';err.style.visibility='hidden';
+  const submit=async()=>{if(await verifyPass(root,inp.value)){markUnlocked(root.id);render();resolveThumbs()}else{err.style.visibility='visible';inp.select()}};
+  btn.onclick=submit;inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();submit()}};
+  row.appendChild(inp);row.appendChild(btn);
+  box.appendChild(row);box.appendChild(err);
+  const back=el('button','btn btn-ghost btn-sm','← ホームに戻る');back.onclick=()=>go(null);box.appendChild(back);
+  g.appendChild(box);s.appendChild(g);
+  setTimeout(()=>{try{inp.focus()}catch(_){}},0);
 }
 /* プロジェクト設定から別ウィンドウで開くメンバー管理UI */
 function openMembersWindow(root){
