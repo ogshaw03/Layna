@@ -226,7 +226,7 @@ const lc=s=>String(s||'').toLowerCase();
 function escH(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function notify(msg){const n=$('notification');if(!n)return;n.textContent=msg;n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',3500);}
 
-let me=null, cfg=null, unsub=null, unsubLU=null, query='', luUsers={}, nameByEmail={};
+let me=null, cfg=null, unsub=null, unsubLU=null, query='', luUsers={}, nameByEmail={}, luErr=null;
 $('rulesPre')&&($('rulesPre').textContent=RULES);
 $('rulesPre2')&&($('rulesPre2').textContent=RULES);
 
@@ -255,8 +255,16 @@ onAuthStateChanged(auth, user=>{
   $('loginScreen').classList.add('hidden');
   $('console').classList.remove('hidden');
   $('userChip').innerHTML=`<img src="${escH(user.photoURL||'')}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${escH(user.email||'')}</span>`;
+  recordMe(); /* コンソールを開いた人も loggedUsers に記録（ドメイン許可アカウントの可視化を確実に） */
   subscribe();
 });
+/* 現在のログインユーザーを loggedUsers に記録（本体と同じ仕組み） */
+async function recordMe(){
+  try{ if(!me||!me.email)return;
+    const key=lc(me.email).replace(/[.@#$/\[\]]/g,'_');
+    await setDoc(doc(db,'laynaAccess','loggedUsers'),{users:{[key]:{email:me.email,displayName:me.name||me.email,photoURL:me.photoURL||'',lastSeen:new Date().toISOString()}}},{merge:true});
+  }catch(e){}
+}
 
 function subscribe(){
   unsub=onSnapshot(doc(db,...CFG_PATH),
@@ -264,9 +272,10 @@ function subscribe(){
     err=>{ showError(err&&err.message); }
   );
   /* ログイン記録（laynaAccess/loggedUsers）を監視して名前・ドメインログイン者を表示 */
+  luErr=null;
   unsubLU=onSnapshot(doc(db,'laynaAccess','loggedUsers'),
-    snap=>{ luUsers=snap.exists()?(snap.data().users||{}):{}; rebuildNames(); if(cfg&&isEditor())paint(); },
-    err=>{}
+    snap=>{ luErr=null; luUsers=snap.exists()?(snap.data().users||{}):{}; rebuildNames(); if(cfg&&isEditor())paint(); },
+    err=>{ luErr=err&&err.message; if(cfg&&isEditor())paint(); }
   );
 }
 
@@ -355,7 +364,14 @@ function paint(){
       const b=document.createElement('button');b.className='btn btn-sm';b.textContent='→メンバーに固定';b.disabled=!editor;b.onclick=()=>setRole(u.email,'member');row.appendChild(b);
       dul.appendChild(row);
     });
-    if(!dusers.length)dul.innerHTML='<div class="empty">'+(q?'該当なし':(domains.length?'ドメイン許可でログインしたアカウントはまだありません':'許可ドメインが未設定です'))+'</div>';
+    if(!dusers.length){
+      let msg;
+      if(luErr)msg='loggedUsers を読み込めません（'+escH(luErr)+'）。Firestore ルールに laynaAccess/loggedUsers の read/write 許可を追加してください（下部「セットアップ」参照）。';
+      else if(q)msg='該当なし';
+      else if(!domains.length)msg='許可ドメインが未設定です。上の「許可ドメイン」で追加してください。';
+      else msg='ドメイン許可のアカウントは、その人が Layna にログインすると表示されます（ログイン時に自動記録）。まだ誰もログインしていないか、ルール未設定の可能性があります。';
+      dul.innerHTML='<div class="empty">'+msg+'</div>';
+    }
   }
 }
 
