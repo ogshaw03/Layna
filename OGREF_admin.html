@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>OGREF 運営コンソール</title>
+<style>
+  :root{
+    --bg:#0d0f14;--bg2:#151821;--bg3:#1c2030;--bg4:#252a3a;
+    --border:#262b3a;--border2:#333a4d;
+    --text:#e8eaf0;--text2:#aab0c0;--text3:#6b7180;
+    --accent:#7c6fff;--green:#5affa0;--amber:#ffb85a;--red:#ff5a5a;--blue:#5a8fff;
+    --radius:10px;--radius2:8px;
+    --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --font-head:"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;font-size:14px}
+  .hidden{display:none!important}
+  button{font-family:inherit;cursor:pointer}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);padding:8px 14px;border-radius:var(--radius2);font-size:13px;transition:.15s}
+  .btn:hover{background:var(--bg4)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{filter:brightness(1.1)}
+  .btn-danger{background:rgba(255,90,90,.15);border-color:rgba(255,90,90,.4);color:#ff7a7a}
+  .btn-danger:hover{background:rgba(255,90,90,.25)}
+  .btn-sm{padding:4px 9px;font-size:12px}
+  input,textarea,select{font-family:inherit;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 11px;border-radius:var(--radius2);font-size:13px;width:100%}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+  .role.admin{background:rgba(124,111,255,.2);color:#a79dff;border:1px solid rgba(124,111,255,.4)}
+
+  .overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:1000;padding:24px;text-align:center}
+  .title-big{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:1px}
+  .title-big .sub{color:var(--accent)}
+  .muted{color:var(--text3);font-size:13px;line-height:1.7;max-width:440px}
+
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .brand{font-family:var(--font-head);font-weight:800;font-size:16px;letter-spacing:.5px}
+  .brand .sub{color:var(--accent)}
+  .spacer{flex:1}
+  .env-switch{display:flex;border:1px solid var(--border2);border-radius:999px;overflow:hidden}
+  .env-switch button{background:transparent;border:none;color:var(--text3);padding:6px 14px;font-size:12px;font-weight:700;letter-spacing:.5px}
+  .env-switch button.active[data-env="dev"]{background:var(--blue);color:#fff}
+  .env-switch button.active[data-env="prod"]{background:var(--red);color:#fff}
+  .user-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+  .user-chip img{width:28px;height:28px;border-radius:50%;background:var(--bg4)}
+
+  .wrap{max-width:860px;margin:0 auto;padding:22px 20px 60px}
+  .env-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius);margin-bottom:18px;font-size:13px;font-weight:600}
+  .env-banner.dev{background:rgba(90,143,255,.12);border:1px solid rgba(90,143,255,.35);color:#9cc0ff}
+  .env-banner.prod{background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.4);color:#ff9a9a}
+
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px}
+  .card-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card-desc{font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.6}
+
+  .mstatus{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius);margin-bottom:14px;font-size:14px;font-weight:600}
+  .mstatus.on{background:rgba(255,184,90,.12);border:1px solid rgba(255,184,90,.4);color:var(--amber)}
+  .mstatus.off{background:rgba(90,255,160,.1);border:1px solid rgba(90,255,160,.3);color:var(--green)}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .dot.on{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .dot.off{background:var(--green)}
+  .mmeta{font-size:11px;color:var(--text3);font-weight:400;margin-left:auto;text-align:right;line-height:1.4}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .field-label{font-size:12px;color:var(--text2);margin-bottom:6px;display:block}
+  .sub-label{font-size:12px;color:var(--text2);font-weight:700;margin:14px 0 6px}
+
+  .u-list{display:flex;flex-direction:column;gap:8px}
+  .u-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3)}
+  .u-email{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+  .role{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px}
+  .role.op{background:rgba(255,184,90,.18);color:#ffcf8a;border:1px solid rgba(255,184,90,.4)}
+  .role.member{background:rgba(90,255,160,.13);color:#7fe6ad;border:1px solid rgba(90,255,160,.3)}
+  .empty{font-size:12px;color:var(--text3);padding:6px 2px}
+  .req-badge{font-size:11px;font-weight:700;color:#fff;background:var(--amber);border-radius:999px;padding:2px 9px;margin-left:4px}
+  .req-item{border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3);padding:12px 13px;margin-bottom:10px}
+  .req-head{display:flex;align-items:center;gap:10px}
+  .req-av{width:30px;height:30px;border-radius:50%;background:var(--bg4);flex-shrink:0}
+  .req-id{display:flex;flex-direction:column;min-width:0;flex:1}
+  .req-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .req-email{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .req-time{font-size:11px;color:var(--text3);flex-shrink:0}
+  .req-reason{font-size:12px;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius2);padding:8px 10px;margin:9px 0;white-space:pre-wrap;line-height:1.6}
+  .req-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .add-row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .add-row input{flex:1;min-width:160px}
+  .chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);white-space:nowrap;cursor:pointer}
+
+  .notification{position:fixed;bottom:24px;right:24px;background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:11px 16px;font-size:13px;z-index:2000;display:none;max-width:340px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+
+  /* 意見一覧 */
+  .fb-counts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .fb-count{display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2)}
+  .fb-count .n{font-weight:800;color:var(--text)}
+  .fb-count .swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .fb-a-item{border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3);padding:12px 14px;margin-bottom:10px}
+  .fb-a-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .fb-a-name{font-weight:700;font-size:13px}
+  .fb-a-meta{font-size:11px;color:var(--text3)}
+  .fb-a-pill{margin-left:auto;font-size:10px;padding:2px 9px;border-radius:10px;font-weight:700}
+  .fb-a-body{font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--bg);border-radius:var(--radius2);padding:9px 11px;margin-bottom:10px}
+  .fb-a-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .fb-a-status{width:auto;flex:0 0 auto;font-weight:700}
+  .fb-a-comment{flex:1;min-width:200px}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="loadingOverlay"><div class="muted">読み込み中...</div></div>
+
+<div class="overlay hidden" id="loginScreen">
+  <div class="title-big">OGREF <span class="sub">運営コンソール</span></div>
+  <div class="muted">運営ユーザー専用です。運営アカウントでログインしてください。</div>
+  <button class="btn btn-primary" id="loginBtn">Googleでログイン</button>
+</div>
+
+<div id="console" class="hidden">
+  <div class="topbar">
+    <div class="brand">OGREF <span class="sub">運営</span></div>
+    <div class="spacer"></div>
+    <div class="env-switch" id="envSwitch">
+      <button data-env="dev" class="active">DEV</button>
+      <button data-env="prod">本番</button>
+    </div>
+    <div class="user-chip" id="userChip"></div>
+    <button class="btn btn-sm" id="logoutBtn">ログアウト</button>
+  </div>
+
+  <div class="wrap">
+    <div class="env-banner dev" id="envBanner"></div>
+
+    <div class="card hidden" id="notOpCard">
+      <div class="card-title">⚠ この環境の運営ユーザーではありません</div>
+      <div class="card-desc" id="notOpDesc"></div>
+    </div>
+
+    <div id="opArea">
+      <!-- Maintenance -->
+      <div class="card">
+        <div class="card-title">🛠 メンテナンス制御</div>
+        <div class="card-desc">開始するとアクセス中の全メンバーがメンテナンス画面になります。<b>解除すると全メンバーのページが自動的に再読み込み</b>されます。</div>
+        <div class="mstatus off" id="mStatus">
+          <span class="dot off" id="mDot"></span>
+          <span id="mStatusText">状態を取得中...</span>
+          <span class="mmeta" id="mMeta"></span>
+        </div>
+        <label class="field-label">メンテナンス画面に表示するメッセージ</label>
+        <textarea id="mMessage" rows="2" placeholder="ただいまメンテナンス中です。しばらくお待ちください。"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary" id="mStartBtn">🛠 メンテナンス開始</button>
+          <button class="btn" id="mEndBtn">✓ 解除（全員を再読み込み）</button>
+        </div>
+      </div>
+
+      <!-- Broadcast message -->
+      <div class="card">
+        <div class="card-title">📢 全メンバーへのお知らせ</div>
+        <div class="card-desc">メンテナンス予告などのメッセージを全メンバーに表示します。各メンバーは確認後に自分で消せます。</div>
+        <div class="mstatus off" id="bStatus">
+          <span class="dot off" id="bDot"></span>
+          <span id="bStatusText">お知らせはありません</span>
+          <span class="mmeta" id="bMeta"></span>
+        </div>
+        <label class="field-label">お知らせ本文</label>
+        <textarea id="bMessage" rows="3" placeholder="例: 本日22:00よりメンテナンスを実施します。"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary" id="bSendBtn">📢 送信 / 更新</button>
+          <button class="btn" id="bClearBtn">お知らせを取り下げる</button>
+        </div>
+      </div>
+
+      <!-- Access management -->
+      <div class="card">
+        <div class="card-title">🔐 アクセス管理 / 権限付与</div>
+        <div class="card-desc">3区分でアクセスを管理します。<b>運営</b>=権限付与/メンテ制御/コンソール可、<b>管理者</b>=権限付与のみ可（OGREF内のアクセス管理画面）、<b>メンバー</b>=利用のみ。許可したメールアドレスのGoogleアカウントがOGREFを利用できます。</div>
+
+        <div class="row" style="margin-top:4px">
+          <button class="btn btn-primary" id="openAccessBtn">🔐 アクセス権管理を別ウィンドウで開く</button>
+        </div>
+        <div class="card-desc" style="margin:10px 0 0">別ウィンドウで一覧の<b>検索</b>・ユーザー追加・権限変更（運営/管理者/メンバー）ができます。ウィンドウは開いたまま操作内容が即時反映されます。</div>
+      </div>
+
+      <!-- Access requests (アクセス権の申請) -->
+      <div class="card">
+        <div class="card-title">🙋 アクセス権の申請 <span id="reqBadge" class="req-badge" style="display:none"></span></div>
+        <div class="card-desc">OGREF（Beta等）の利用希望者が拒否画面から送った申請です。<b>承認</b>するとメンバーとして追加され、利用できるようになります。</div>
+        <div id="reqAdminList"></div>
+      </div>
+
+      <!-- Invite links (招待リンク: 承認不要) -->
+      <div class="card">
+        <div class="card-title">🔗 招待リンク（承認不要）</div>
+        <div class="card-desc">このリンクから入った人は<b>承認なしで自動的にメンバー</b>になります。何人でも使えます（無効化するまで有効）。配布先は信頼できる範囲に限定してください。</div>
+        <div class="row" style="margin-top:8px;gap:8px">
+          <input id="invLabel" type="text" placeholder="メモ（任意・例: 〇〇さん用 / Discord配布）" style="flex:1;min-width:180px">
+          <button class="btn btn-primary" id="invCreateBtn">＋ リンクを発行</button>
+        </div>
+        <div id="invList" style="margin-top:12px"></div>
+      </div>
+
+      <!-- Feedback (意見一覧) -->
+      <div class="card">
+        <div class="card-title">📋 意見一覧</div>
+        <div class="card-desc">利用者からの意見・要望です。各意見にステータスを設定し、運営コメント（任意・上書き）を残せます。コメントは意見箱の各意見の下に表示されます。</div>
+        <div class="fb-counts" id="fbCounts"></div>
+        <div id="fbAdminList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notification" id="notification"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyASqL2Qp8sGrkzHz7J_HhE6QXntAZOO7RE",
+  authDomain: "animref-ef532.firebaseapp.com",
+  projectId: "animref-ef532",
+  storageBucket: "animref-ef532.firebasestorage.app",
+  messagingSenderId: "1029274074603",
+  appId: "1:1029274074603:web:f0ddc3eb69e35a47276dae"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let currentUser=null;
+let env='dev';
+let isOperator=false;
+let unsubConfig=null, unsubMaint=null, unsubBcast=null, unsubFb=null, unsubReq=null, unsubInv=null, unsubLUdev=null, unsubLUprod=null;
+let nameByEmail={};
+
+const $=id=>document.getElementById(id);
+function escH(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function notify(msg){
+  const n=$('notification');if(n){n.textContent=msg;n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',3500);}
+  if(accessWin&&!accessWin.closed){const an=accessWin.document.getElementById('awNote');if(an){an.textContent=msg;an.style.display='block';clearTimeout(an._t);an._t=setTimeout(()=>{an.style.display='none';},3500);}}
+}
+// アクセス管理は別ウィンドウ。確認ダイアログは操作中のウィンドウに出す
+// （親ウィンドウのconfirmはポップアップ操作中に背後に出る/抑制され、削除が実行されない）
+function uiConfirm(msg){ const w=(accessWin&&!accessWin.closed)?accessWin:window; return w.confirm(msg); }
+function acCol(){return env==='prod'?'access_control':'dev_access_control';}
+function configRef(){return doc(db,acCol(),'config');}
+function maintRef(){return doc(db,acCol(),'maintenance');}
+// 表示名の収集: dev/本番 両方の loggedUsers ＋ 申請の名前 ＋ 自分 を email→表示名 にまとめる
+// （人の表示名は環境に依存しないため両環境を統合。コンソールだけ使う運営やBetaのみ利用者も拾える）
+let luDevUsers={}, luProdUsers={}, reqNames={};
+function rebuildNames(){
+  nameByEmail={};
+  const add=(email,name)=>{ if(email&&name){ const k=String(email).toLowerCase(); if(!nameByEmail[k])nameByEmail[k]=name; } };
+  Object.values(luDevUsers).forEach(u=>u&&add(u.email,u.displayName));
+  Object.values(luProdUsers).forEach(u=>u&&add(u.email,u.displayName));
+  Object.entries(reqNames).forEach(([e,n])=>add(e,n));
+  if(currentUser&&currentUser.email&&currentUser.displayName)add(currentUser.email,currentUser.displayName);
+}
+function nameOf(email){ return nameByEmail[String(email||'').toLowerCase()]||''; }
+function bcastRef(){return doc(db,acCol(),'broadcast');}
+function fbCol(){return env==='prod'?'feedback':'dev_feedback';}
+function areqCol(){return env==='prod'?'access_requests':'dev_access_requests';}
+function invCol(){return env==='prod'?'access_invites':'dev_access_invites';}
+function fmtTime(ts){if(!ts)return'';const d=new Date(ts);return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+// 運営ユーザー一覧。operatorEmails未設定なら旧adminEmailsを運営として移行扱い
+function operatorListFrom(data){
+  if(data && Array.isArray(data.operatorEmails) && data.operatorEmails.length) return [...data.operatorEmails];
+  const a=[...((data&&data.adminEmails)||[])];
+  if(data&&data.adminEmail&&!a.includes(data.adminEmail))a.push(data.adminEmail);
+  return a;
+}
+
+$('loginBtn').onclick=()=>signInWithPopup(auth,provider).catch(e=>notify('ログイン失敗: '+e.message));
+$('logoutBtn').onclick=()=>signOut(auth);
+
+onAuthStateChanged(auth, async user=>{
+  $('loadingOverlay').classList.add('hidden');
+  if(user){
+    currentUser=user;
+    $('loginScreen').classList.add('hidden');
+    $('userChip').innerHTML=`<img src="${user.photoURL||''}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${user.email||''}</span>`;
+    await enterEnv(env);
+  } else {
+    currentUser=null;isOperator=false;cleanup();
+    $('console').classList.add('hidden');
+    $('loginScreen').classList.remove('hidden');
+  }
+});
+
+function cleanup(){ if(unsubConfig){unsubConfig();unsubConfig=null} if(unsubMaint){unsubMaint();unsubMaint=null} if(unsubBcast){unsubBcast();unsubBcast=null} if(unsubFb){unsubFb();unsubFb=null} if(unsubReq){unsubReq();unsubReq=null} if(unsubInv){unsubInv();unsubInv=null} if(unsubLUdev){unsubLUdev();unsubLUdev=null} if(unsubLUprod){unsubLUprod();unsubLUprod=null} nameByEmail={};luDevUsers={};luProdUsers={};reqNames={}; }
+
+$('envSwitch').querySelectorAll('button').forEach(b=>{
+  b.onclick=async()=>{
+    const target=b.dataset.env;
+    if(target===env)return;
+    if(target==='prod' && !confirm('本番環境を操作対象に切り替えます。\n本番のメンテナンス/お知らせ/アクセス権に影響します。よろしいですか？'))return;
+    env=target;
+    $('envSwitch').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.env===env));
+    await enterEnv(env);
+  };
+});
+
+async function enterEnv(e){
+  cleanup();
+  const banner=$('envBanner');
+  banner.className='env-banner '+(e==='prod'?'prod':'dev');
+  banner.textContent=(e==='prod'?'🔴 本番環境を操作中（access_control）':'🔵 DEV環境を操作中（dev_access_control）');
+  let data={};
+  try{ const snap=await getDoc(configRef()); data=snap.exists()?snap.data():{}; }
+  catch(err){ notify('設定の読み込み失敗: '+err.message); }
+  const operators=operatorListFrom(data);
+  isOperator=!!(currentUser && operators.includes(currentUser.email));
+
+  $('console').classList.remove('hidden');
+  if(!isOperator){
+    $('notOpCard').classList.remove('hidden');
+    $('opArea').classList.add('hidden');
+    $('notOpDesc').textContent=`${currentUser?currentUser.email:''} は「${e==='prod'?'本番':'DEV'}」環境の運営ユーザー(operatorEmails)に登録されていません。`;
+    return;
+  }
+  $('notOpCard').classList.add('hidden');
+  $('opArea').classList.remove('hidden');
+  subscribeAll();
+}
+
+function subscribeAll(){
+  cleanup();
+  unsubConfig=onSnapshot(configRef(), snap=>renderAccess(snap.exists()?snap.data():{}), err=>notify('アクセス監視エラー: '+err.message));
+  unsubMaint=onSnapshot(maintRef(), snap=>renderMaintenance(snap.exists()?snap.data():{}), err=>{});
+  unsubBcast=onSnapshot(bcastRef(), snap=>renderBroadcast(snap.exists()?snap.data():{}), err=>{});
+  unsubFb=onSnapshot(query(collection(db,fbCol()),orderBy('createdAt','desc')), snap=>renderFbAdmin(snap.docs.map(d=>({id:d.id,...d.data()}))), err=>{});
+  unsubReq=onSnapshot(collection(db,areqCol()), snap=>renderAccessRequests(snap.docs.map(d=>({id:d.id,...d.data()}))), err=>{});
+  unsubInv=onSnapshot(collection(db,invCol()), snap=>renderInvites(snap.docs.map(d=>({id:d.id,...d.data()}))), err=>{});
+  unsubLUdev=onSnapshot(doc(db,'dev_access_control','loggedUsers'), snap=>{ luDevUsers=snap.exists()?(snap.data().users||{}):{}; rebuildNames(); paintAccess(); }, err=>{});
+  unsubLUprod=onSnapshot(doc(db,'access_control','loggedUsers'), snap=>{ luProdUsers=snap.exists()?(snap.data().users||{}):{}; rebuildNames(); paintAccess(); }, err=>{});
+}
+
+// ── アクセス権の申請（承認＝メンバー追加 / 却下） ──
+let lastReqs=[];
+function renderAccessRequests(items){
+  lastReqs=items||[];
+  // 申請の名前も表示名ソースに取り込む（本体未ログインの承認者などを補完）
+  reqNames={}; lastReqs.forEach(r=>{ if(r&&r.email&&r.name)reqNames[String(r.email).toLowerCase()]=r.name; });
+  rebuildNames(); paintAccess();
+  const pending=lastReqs.filter(r=>(r.status||'pending')==='pending');
+  const badge=$('reqBadge');
+  if(badge){ if(pending.length){badge.style.display='';badge.textContent=pending.length+'件';}else badge.style.display='none'; }
+  const list=$('reqAdminList'); if(!list)return;
+  if(!pending.length){ list.innerHTML='<div class="empty">保留中の申請はありません</div>'; return; }
+  pending.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  list.innerHTML=pending.map(r=>`<div class="req-item">
+    <div class="req-head">
+      ${r.photoURL?`<img class="req-av" src="${escH(r.photoURL)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:''}
+      <div class="req-id"><span class="req-name">${escH(r.name||'（名前未記入）')}</span><span class="req-email">${escH(r.email||'')}</span></div>
+      <span class="req-time">${r.createdAt?fmtTime(r.createdAt):''}</span>
+    </div>
+    ${r.reason?`<div class="req-reason">${escH(r.reason)}</div>`:''}
+    <div class="req-actions">
+      <button class="btn btn-primary btn-sm" onclick="approveRequest('${escH(r.id)}')">✓ 承認（メンバー追加）</button>
+      <button class="btn btn-danger btn-sm" onclick="rejectRequest('${escH(r.id)}')">却下</button>
+    </div>
+  </div>`).join('');
+}
+window.approveRequest=async function(id){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const r=lastReqs.find(x=>x.id===id); if(!r)return;
+  if(!r.email)return notify('メールアドレスが不明な申請です');
+  if(!confirm(`${r.email} をメンバーとして承認しますか？`))return;
+  try{
+    await setRole(r.email,'member');
+    await setDoc(doc(db,areqCol(),id),{status:'approved',resolvedBy:currentUser.email||'',resolvedAt:Date.now()},{merge:true});
+    notify('承認しました: '+r.email);
+  }catch(e){ notify('承認失敗: '+e.message); }
+};
+window.rejectRequest=async function(id){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const r=lastReqs.find(x=>x.id===id); if(!r)return;
+  const note=prompt('却下理由（任意・申請者に表示されます）','');
+  if(note===null)return;
+  try{
+    await setDoc(doc(db,areqCol(),id),{status:'rejected',note:note||'',resolvedBy:currentUser.email||'',resolvedAt:Date.now()},{merge:true});
+    notify('却下しました: '+(r.email||id));
+  }catch(e){ notify('却下失敗: '+e.message); }
+};
+
+// ── 招待リンク（承認不要・自動メンバー登録） ──
+let lastInvites=[];
+function inviteBase(){
+  const dir=location.pathname.replace(/[^/]*$/,'');
+  const app=env==='prod'?'OGREF_Beta.html':'OGREF_dev.html';
+  return location.origin+dir+app+'#invite=';
+}
+function genToken(){
+  const a=new Uint8Array(12); crypto.getRandomValues(a);
+  return Array.from(a,b=>b.toString(36).padStart(2,'0')).join('').slice(0,16);
+}
+function renderInvites(items){
+  lastInvites=items||[];
+  const list=$('invList'); if(!list)return;
+  const note=env==='prod'?'<div style="font-size:11px;color:var(--amber);margin-bottom:8px">※ 本番リンクの自動許可はBeta側の対応後に有効になります（現在はDEVのみ対応）。</div>':'';
+  if(!lastInvites.length){ list.innerHTML=note+'<div style="font-size:12px;color:var(--text3)">発行済みの招待リンクはありません</div>'; return; }
+  const sorted=[...lastInvites].sort((a,b)=>(b.active!==false)-(a.active!==false)||(b.createdAt||0)-(a.createdAt||0));
+  const row=i=>{
+    const url=inviteBase()+i.id, on=i.active!==false;
+    const meta=[i.label?escH(i.label):'（メモなし）','参加 '+(i.uses||0)+'人',on?'<span style="color:var(--green)">有効</span>':'<span style="color:var(--text3)">無効</span>'].join(' ・ ');
+    const acts=on
+      ? `<button class="btn btn-sm" onclick="copyInvite('${i.id}')">コピー</button><button class="btn btn-sm" onclick="revokeInvite('${i.id}')">無効化</button>`
+      : `<button class="btn btn-sm" onclick="restoreInvite('${i.id}')">再有効化</button><button class="btn btn-sm btn-danger" onclick="deleteInvite('${i.id}')">削除</button>`;
+    return `<div style="border:1px solid var(--border2);border-radius:8px;padding:10px 11px;margin-bottom:8px;background:var(--bg3);opacity:${on?1:.6}">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">${meta}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input readonly value="${escH(url)}" onclick="this.select()" style="flex:1;min-width:200px;font-size:12px">
+        ${acts}
+      </div>
+    </div>`;
+  };
+  list.innerHTML=note+sorted.map(row).join('');
+}
+window.createInvite=async function(){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const label=($('invLabel').value||'').trim();
+  const token=genToken();
+  try{
+    await setDoc(doc(db,invCol(),token),{active:true,label,role:'member',createdBy:currentUser.email||'',createdAt:Date.now(),uses:0});
+    $('invLabel').value='';
+    const url=inviteBase()+token;
+    try{ await navigator.clipboard.writeText(url); notify('招待リンクを発行しコピーしました'); }
+    catch(_){ notify('招待リンクを発行しました'); }
+  }catch(e){ notify('発行失敗: '+e.message); }
+};
+window.copyInvite=async function(token){
+  const url=inviteBase()+token;
+  try{ await navigator.clipboard.writeText(url); notify('リンクをコピーしました'); }
+  catch(_){ notify('コピーできませんでした。リンク欄を選択して手動コピーしてください'); }
+};
+window.revokeInvite=async function(token){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  if(!confirm('このリンクを無効化しますか？（以後このリンクからは参加できなくなります。参加済みの人はそのまま利用できます）'))return;
+  try{ await setDoc(doc(db,invCol(),token),{active:false,revokedBy:currentUser.email||'',revokedAt:Date.now()},{merge:true}); notify('無効化しました'); }
+  catch(e){ notify('失敗: '+e.message); }
+};
+window.restoreInvite=async function(token){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  try{ await setDoc(doc(db,invCol(),token),{active:true},{merge:true}); notify('再有効化しました'); }
+  catch(e){ notify('失敗: '+e.message); }
+};
+window.deleteInvite=async function(token){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  if(!confirm('このリンクを完全に削除しますか？元に戻せません。'))return;
+  try{ await deleteDoc(doc(db,invCol(),token)); notify('削除しました'); }
+  catch(e){ notify('削除失敗: '+e.message); }
+};
+
+// ── 意見一覧（フィードバック） ──
+const FB_ST={
+  pending:{l:'未対応',bg:'#3a3a42',fg:'#cfcfda'},
+  review:{l:'要検討',bg:'#7c6fff',fg:'#ffffff'},
+  inprogress:{l:'対応中',bg:'#5affa0',fg:'#0b3a22'},
+  planned:{l:'対応予定',bg:'#5a8cff',fg:'#ffffff'},
+  wontfix:{l:'対応不可',bg:'#ff5a5a',fg:'#ffffff'},
+  unnecessary:{l:'対応不要',bg:'#ffd23f',fg:'#3a2e00'}
+};
+const FB_ORDER=['pending','review','inprogress','planned','wontfix','unnecessary'];
+function renderFbAdmin(items){
+  const counts={}; FB_ORDER.forEach(k=>counts[k]=0);
+  items.forEach(it=>{ const k=FB_ST[it.status]?it.status:'pending'; counts[k]++; });
+  $('fbCounts').innerHTML=FB_ORDER.map(k=>`<span class="fb-count"><span class="swatch" style="background:${FB_ST[k].bg}"></span>${FB_ST[k].l}<span class="n">${counts[k]}</span></span>`).join('');
+  const list=$('fbAdminList');
+  if(!items.length){ list.innerHTML='<div class="empty">まだ意見はありません</div>'; return; }
+  list.innerHTML=items.map(it=>{
+    const cur=FB_ST[it.status]?it.status:'pending';
+    const st=FB_ST[cur];
+    const opts=FB_ORDER.map(k=>`<option value="${k}"${k===cur?' selected':''}>${FB_ST[k].l}</option>`).join('');
+    return `<div class="fb-a-item">
+      <div class="fb-a-head">
+        <span class="fb-a-name">${escH(it.name||'（名無し）')}</span>
+        <span class="fb-a-meta">${escH(it.createdByEmail||'')}${it.createdAt?' ・ '+fmtTime(it.createdAt):''}</span>
+        <span class="fb-a-pill" style="background:${st.bg};color:${st.fg}">${st.l}</span>
+      </div>
+      <div class="fb-a-body">${escH(it.body||'')}</div>
+      <div class="fb-a-row">
+        <select class="fb-a-status" onchange="fbSetStatus('${it.id}',this.value)">${opts}</select>
+        <input class="fb-a-comment" id="fbc-${it.id}" placeholder="運営コメント（任意・上書き）" value="${escH(it.comment||'')}">
+        <button class="btn btn-primary btn-sm" onclick="fbSaveComment('${it.id}')">コメント保存</button>
+        <button class="btn btn-danger btn-sm" onclick="fbDelete('${it.id}')">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.fbSetStatus=async function(id,status){
+  if(!isOperator)return notify('運営ユーザーのみ操作できます');
+  try{ await updateDoc(doc(db,fbCol(),id),{status,updatedAt:Date.now(),updatedBy:currentUser?currentUser.email:''}); notify('ステータスを更新しました'); }
+  catch(e){ notify('更新失敗: '+e.message); }
+};
+window.fbSaveComment=async function(id){
+  if(!isOperator)return notify('運営ユーザーのみ操作できます');
+  const v=$('fbc-'+id).value.trim();
+  try{ await updateDoc(doc(db,fbCol(),id),{comment:v,updatedAt:Date.now(),updatedBy:currentUser?currentUser.email:''}); notify('コメントを保存しました'); }
+  catch(e){ notify('保存失敗: '+e.message); }
+};
+window.fbDelete=async function(id){
+  if(!isOperator)return notify('運営ユーザーのみ操作できます');
+  if(!confirm('この意見を削除します。元に戻せません。よろしいですか？'))return;
+  try{ await deleteDoc(doc(db,fbCol(),id)); notify('意見を削除しました'); }
+  catch(e){ notify('削除失敗: '+e.message); }
+};
+
+// ── Maintenance ──
+function renderMaintenance(d){
+  const active=!!(d&&d.active);
+  $('mStatus').className='mstatus '+(active?'on':'off');
+  $('mDot').className='dot '+(active?'on':'off');
+  $('mStatusText').textContent=active?'メンテナンス中（メンバーはアクセス不可）':'稼働中（メンテナンスOFF）';
+  let meta='';
+  if(active)meta=(d.by?'実行者: '+d.by+'<br>':'')+(d.startedAt?'開始: '+fmtTime(d.startedAt):'');
+  else if(d&&d.endedAt)meta='前回解除: '+fmtTime(d.endedAt);
+  $('mMeta').innerHTML=meta;
+  if(active&&d.message&&!$('mMessage').matches(':focus'))$('mMessage').value=d.message;
+}
+$('mStartBtn').onclick=async()=>{
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const message=$('mMessage').value.trim();
+  if(!confirm(`【${env==='prod'?'本番':'DEV'}】メンテナンスを開始します。\nアクセス中の全メンバーがメンテナンス画面になります。よろしいですか？`))return;
+  try{ await setDoc(maintRef(),{active:true,message,startedAt:Date.now(),by:currentUser.email||''}); notify('メンテナンスを開始しました'); }
+  catch(e){notify('失敗: '+e.message)}
+};
+$('mEndBtn').onclick=async()=>{
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  if(!confirm('メンテナンスを解除します。\n全メンバーのページが自動的に再読み込みされます。よろしいですか？'))return;
+  try{ await setDoc(maintRef(),{active:false,endedAt:Date.now()},{merge:true}); notify('解除しました（全員を再読み込み）'); }
+  catch(e){notify('失敗: '+e.message)}
+};
+
+// ── Broadcast ──
+function renderBroadcast(d){
+  const msg=d&&d.message?d.message:'';
+  const on=!!msg;
+  $('bStatus').className='mstatus '+(on?'on':'off');
+  $('bDot').className='dot '+(on?'on':'off');
+  $('bStatusText').textContent=on?'お知らせ配信中':'お知らせはありません';
+  let meta='';
+  if(on)meta=(d.by?'送信者: '+d.by+'<br>':'')+(d.createdAt?'送信: '+fmtTime(d.createdAt):'');
+  $('bMeta').innerHTML=meta;
+  if(on&&!$('bMessage').matches(':focus'))$('bMessage').value=msg;
+}
+$('bSendBtn').onclick=async()=>{
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const message=$('bMessage').value.trim();
+  if(!message)return notify('本文を入力してください');
+  try{ await setDoc(bcastRef(),{id:Date.now(),message,by:currentUser.email||'',createdAt:Date.now()}); notify('お知らせを全メンバーに送信しました'); }
+  catch(e){notify('失敗: '+e.message)}
+};
+$('bClearBtn').onclick=async()=>{
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  if(!confirm('お知らせを取り下げますか？（全メンバーの表示が消えます）'))return;
+  try{ await setDoc(bcastRef(),{id:Date.now(),message:'',by:currentUser.email||'',createdAt:Date.now()}); $('bMessage').value=''; notify('お知らせを取り下げました'); }
+  catch(e){notify('失敗: '+e.message)}
+};
+
+// ── Access management (3区分: 運営 / 管理者 / メンバー) ──
+function adminListRaw(data){const a=[...((data&&data.adminEmails)||[])];if(data&&data.adminEmail&&!a.includes(data.adminEmail))a.push(data.adminEmail);return a;}
+// アクセス権管理は別ウィンドウで表示する。最新configをキャッシュし、ウィンドウが開いていれば描画する。
+let accessWin=null, lastAccessData=null, accessQuery='';
+function renderAccess(data){ lastAccessData=data; paintAccess(); }
+function paintAccess(){
+  if(!accessWin||accessWin.closed)return;
+  const d=accessWin.document;
+  const opList=d.getElementById('opList'); if(!opList)return;   // まだ書き込み前
+  const data=lastAccessData||{};
+  const operators=operatorListFrom(data);
+  const admins=adminListRaw(data).filter(e=>!operators.includes(e));
+  const members=[...((data&&data.allowedEmails)||[])].filter(e=>!operators.includes(e)&&!admins.includes(e));
+  const q=(accessQuery||'').trim().toLowerCase();
+  const flt=arr=>q?arr.filter(e=>String(e).toLowerCase().includes(q)):arr;
+  const envEl=d.getElementById('awEnv');
+  if(envEl){ envEl.textContent=(env==='prod'?'🔴 本番（access_control）':'🔵 DEV（dev_access_control）'); envEl.className='aw-env '+(env==='prod'?'prod':'dev'); }
+  const mkRow=(email,role,btns)=>{
+    const isSelf=currentUser&&email===currentUser.email;
+    const row=d.createElement('div');row.className='u-row';
+    const nm=nameOf(email), self=isSelf?'（あなた）':'';
+    const inner=nm
+      ? `<span class="u-name">${escH(nm)}${self}</span><span class="u-mail">${escH(email)}</span>`
+      : `<span class="u-name">${escH(email)}${self}</span>`;
+    row.innerHTML=`<span class="u-email">${inner}</span><span class="role ${role.cls}">${role.label}</span>`;
+    btns.forEach(([label,fn,danger,disabled])=>{
+      const b=d.createElement('button');b.className='btn btn-sm'+(danger?' btn-danger':'');b.textContent=label;b.disabled=!!disabled;b.onclick=fn;row.appendChild(b);
+    });
+    return row;
+  };
+  const adminList=d.getElementById('adminList'), memberList=d.getElementById('memberList');
+  opList.innerHTML='';adminList.innerHTML='';memberList.innerHTML='';
+  const fo=flt(operators), fa=flt(admins), fm=flt(members);
+  fo.forEach(email=>opList.appendChild(mkRow(email,{cls:'op',label:'運営'},[
+    ['→管理者',()=>setRole(email,'admin')],['→メンバー',()=>setRole(email,'member')],['削除',()=>setRole(email,'remove'),true]])));
+  if(!fo.length)opList.innerHTML='<div class="empty">'+(q?'該当なし':'運営ユーザーはいません')+'</div>';
+  fa.forEach(email=>adminList.appendChild(mkRow(email,{cls:'admin',label:'管理者'},[
+    ['→運営',()=>setRole(email,'operator')],['→メンバー',()=>setRole(email,'member')],['削除',()=>setRole(email,'remove'),true]])));
+  if(!fa.length)adminList.innerHTML='<div class="empty">'+(q?'該当なし':'管理者はいません')+'</div>';
+  fm.forEach(email=>memberList.appendChild(mkRow(email,{cls:'member',label:'メンバー'},[
+    ['→運営',()=>setRole(email,'operator')],['→管理者',()=>setRole(email,'admin')],['削除',()=>setRole(email,'remove'),true]])));
+  if(!fm.length)memberList.innerHTML='<div class="empty">'+(q?'該当なし':'メンバーはいません')+'</div>';
+  const cnt=d.getElementById('awCounts');
+  if(cnt)cnt.textContent=`運営 ${operators.length} ・ 管理者 ${admins.length} ・ メンバー ${members.length}`+(q?`　／　「${accessQuery}」で絞込: ${fo.length+fa.length+fm.length}件`:'');
+}
+function openAccessWindow(){
+  if(accessWin&&!accessWin.closed){ accessWin.focus(); paintAccess(); return; }
+  accessWin=window.open('','ogref_access','width=720,height=860');
+  if(!accessWin){ notify('ポップアップがブロックされました。ポップアップを許可してください。'); return; }
+  accessWin.document.open(); accessWin.document.write(ACCESS_WIN_HTML); accessWin.document.close();
+  const d=accessWin.document;
+  const search=d.getElementById('awSearch');
+  search.addEventListener('input',()=>{ accessQuery=search.value; paintAccess(); });
+  d.getElementById('awAddBtn').onclick=()=>addUserFrom(d);
+  d.getElementById('awEmail').addEventListener('keydown',e=>{ if(e.key==='Enter')addUserFrom(d); });
+  accessWin.addEventListener('beforeunload',()=>{ accessWin=null; });
+  setTimeout(()=>{ try{ search.focus(); }catch(_){} },50);
+  paintAccess();
+}
+const ACCESS_WIN_HTML=`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OGREF アクセス権管理</title><style>
+:root{--bg:#0d0f14;--bg2:#151821;--bg3:#1c2030;--bg4:#252a3a;--border:#262b3a;--border2:#333a4d;--text:#e8eaf0;--text2:#aab0c0;--text3:#6b7180;--accent:#7c6fff;--green:#5affa0;--amber:#ffb85a;--red:#ff5a5a;--blue:#5a8fff;--radius:10px;--radius2:8px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;padding:18px 18px 40px}
+button{font-family:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);padding:8px 14px;border-radius:var(--radius2);font-size:13px;transition:.15s}
+.btn:hover{background:var(--bg4)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{filter:brightness(1.1)}
+.btn-danger{background:rgba(255,90,90,.15);border-color:rgba(255,90,90,.4);color:#ff7a7a}
+.btn-danger:hover{background:rgba(255,90,90,.25)}
+.btn-sm{padding:4px 9px;font-size:12px}
+input,select{font-family:inherit;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 11px;border-radius:var(--radius2);font-size:13px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+.aw-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.aw-title{font-size:16px;font-weight:800;letter-spacing:.5px}
+.aw-env{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px}
+.aw-env.dev{background:rgba(90,143,255,.12);border:1px solid rgba(90,143,255,.35);color:#9cc0ff}
+.aw-env.prod{background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.4);color:#ff9a9a}
+.aw-counts{font-size:11px;color:var(--text3);margin:0 0 12px}
+.aw-search{position:relative;margin-bottom:14px}
+.aw-search input{padding-left:32px}
+.aw-search:before{content:"🔍";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.7}
+.sub-label{font-size:12px;color:var(--text2);font-weight:700;margin:14px 0 6px}
+.u-list{display:flex;flex-direction:column;gap:8px}
+.u-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3)}
+.u-email{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.u-name{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-mail{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px}
+.role.op{background:rgba(255,184,90,.18);color:#ffcf8a;border:1px solid rgba(255,184,90,.4)}
+.role.admin{background:rgba(124,111,255,.2);color:#a79dff;border:1px solid rgba(124,111,255,.4)}
+.role.member{background:rgba(90,255,160,.13);color:#7fe6ad;border:1px solid rgba(90,255,160,.3)}
+.empty{font-size:12px;color:var(--text3);padding:6px 2px}
+.add-row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.add-row input{flex:1;min-width:160px}
+.add-row select{width:auto;flex:0 0 auto}
+.field-label{font-size:12px;color:var(--text2);margin:18px 0 6px;display:block;font-weight:700}
+.aw-note{display:none;position:sticky;bottom:0;margin-top:16px;background:var(--accent);color:#fff;padding:9px 13px;border-radius:var(--radius2);font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+</style></head><body>
+<div class="aw-head"><span class="aw-title">🔐 アクセス権管理</span><span class="aw-env dev" id="awEnv"></span></div>
+<div class="aw-counts" id="awCounts"></div>
+<label class="field-label">ユーザーを追加（メールアドレス）</label>
+<div class="add-row">
+  <input id="awEmail" type="email" placeholder="user@example.com" autocomplete="off">
+  <select id="awRole"><option value="member">メンバー</option><option value="admin">管理者</option><option value="operator">運営</option></select>
+  <button class="btn btn-primary" id="awAddBtn">追加</button>
+</div>
+<div class="aw-search"><input id="awSearch" type="text" placeholder="メールアドレスで検索…" autocomplete="off"></div>
+<div class="sub-label">運営ユーザー（権限付与・メンテ制御・コンソール可）</div>
+<div class="u-list" id="opList"></div>
+<div class="sub-label">管理者（権限付与のみ可）</div>
+<div class="u-list" id="adminList"></div>
+<div class="sub-label">メンバー（利用のみ）</div>
+<div class="u-list" id="memberList"></div>
+<div class="aw-note" id="awNote"></div>
+</body></html>`;
+async function readConfig(){const snap=await getDoc(configRef());return snap.exists()?snap.data():{};}
+
+const roleLabel={operator:'運営ユーザー',admin:'管理者',member:'メンバー',remove:'削除'};
+async function setRole(email,target){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const data=await readConfig();
+  const curOperators=operatorListFrom(data);
+  // 最後の運営ユーザーは降格・削除できない（運営ゼロ＝ロック/不整合を防止）
+  if(target!=='operator' && curOperators.includes(email) && curOperators.length<=1){
+    return notify('最後の運営ユーザーは降格・削除できません。先に別の運営ユーザーを追加してください。');
+  }
+  if(email===currentUser.email && target!=='operator'){
+    if(!uiConfirm('自分自身の権限を変更します。コンソールを操作できなくなる可能性があります。続行しますか？'))return;
+  } else if(target==='remove'){
+    if(!uiConfirm(`${email} を削除しますか？`))return;
+  }
+  try{
+    let operators=curOperators.filter(e=>e!==email);
+    let admins=adminListRaw(data).filter(e=>e!==email && !operators.includes(e));
+    let members=[...((data.allowedEmails)||[])].filter(e=>e!==email && !operators.includes(e) && !admins.includes(e));
+    if(target==='operator')operators.push(email);
+    else if(target==='admin')admins.push(email);
+    else if(target==='member')members.push(email);
+    const upd={operatorEmails:operators,adminEmails:admins,allowedEmails:members};
+    // 旧スキーマの単数フィールド adminEmail を除去（残ると削除した相手が再表示される）
+    if('adminEmail' in data) upd.adminEmail=deleteField();
+    await setDoc(configRef(),upd,{merge:true});
+    notify(target==='remove'?('削除しました: '+email):(roleLabel[target]+'に変更しました: '+email));
+  }catch(e){notify('失敗: '+e.message)}
+}
+
+async function addUserFrom(d){
+  if(!isOperator)return notify('運営ユーザーのみ実行できます');
+  const email=(d.getElementById('awEmail').value||'').trim().toLowerCase();
+  if(!email)return notify('メールアドレスを入力してください');
+  const role=d.getElementById('awRole').value;
+  try{
+    const data=await readConfig();
+    const exists=operatorListFrom(data).includes(email)||adminListRaw(data).includes(email)||((data.allowedEmails)||[]).includes(email);
+    if(exists)return notify('既に追加されています（権限変更は一覧から）');
+    await setRole(email,role);
+    d.getElementById('awEmail').value='';d.getElementById('awRole').value='member';
+  }catch(e){notify('追加失敗: '+e.message)}
+}
+$('openAccessBtn').onclick=openAccessWindow;
+$('invCreateBtn').onclick=createInvite;
+$('invLabel').addEventListener('keydown',e=>{ if(e.key==='Enter')createInvite(); });
+</script>
+</body>
+</html>
