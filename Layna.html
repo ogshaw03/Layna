@@ -406,6 +406,9 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .drawer-hd .sp{flex:1}
 .drawer-hd .drawer-acts{display:flex;gap:8px;flex-shrink:0}
 .drawer-body{flex:1;min-height:0;overflow-y:auto;padding:16px 18px}
+/* 右側スライドは幅が狭いので、フレームコメント（スクショ）列を細くして
+   動画クリップとショット全体コメントを大きく見せる（ページタブに近い比率に） */
+.drawer .log-side{width:min(210px,40%)}
 /* 右側スライドのヘッダ：ショット内の全工程をプルダウンで選択（ページで開くの左） */
 .stage-strip{display:flex;align-items:center;gap:5px;margin:0}
 .stage-strip .ss-lab{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;white-space:nowrap}
@@ -3785,9 +3788,9 @@ function openReel(){
       for(const p of (c.pending||[]))if(p.f!=null)ctx.fillRect((poff+p.f)*fw,10,Math.max(2.5,fw*pdur),5);
       poff+=clipFrames(c);
     });
-    /* キャッシュ済み（デコード済み・遅延なしで表示できる）クリップ範囲を最下部に青ライン表示 */
+    /* キャッシュ済み（デコード済み・遅延なしで表示できる）クリップ範囲を最下部に細い青ライン表示 */
     let coff=0;ctx.fillStyle='#3b82f6';
-    cs.forEach(c=>{const cf=clipFrames(c);if(isCached(c.url))ctx.fillRect(Math.round(coff*fw),H-3,Math.max(2,cf*fw),3);coff+=cf});
+    cs.forEach(c=>{const cf=clipFrames(c);if(isCached(c.url))ctx.fillRect(Math.round(coff*fw),H-1.5,Math.max(2,cf*fw),1.5);coff+=cf});
     /* プレイヘッド（全体位置） */
     const co=gOffset(reelUI.cur);
     const x=(co+dispF())*fw+fw/2;
@@ -3933,13 +3936,14 @@ function openReel(){
     if(e){e.used=++poolClock;return e.el}
     const v=mkVid();v.muted=true;v.src=url;try{v.load()}catch(_){}
     warmRest(v);
-    v.addEventListener('loadeddata',()=>{if(reelUI.drawFTL)reelUI.drawFTL()},{once:true}); /* キャッシュ完了でタイムラインの青ラインを更新 */
-    vpool.set(url,{el:v,used:++poolClock});
+    v.addEventListener('loadeddata',()=>{const en=vpool.get(url);if(en)en.ready=true;if(reelUI.drawFTL)reelUI.drawFTL()},{once:true}); /* キャッシュ完了でタイムラインの青ラインを更新 */
+    vpool.set(url,{el:v,used:++poolClock,ready:false});
     evictPool(url);
     return v;
   }
-  /* このクリップがデコード済み（プールに保持）でジャンプに遅延がない状態か */
-  function isCached(url){const e=vpool.get(url);return !!(e&&e.el&&e.el.readyState>=2)}
+  /* このクリップがデコード済み（プールに保持）でジャンプに遅延がない状態か。
+     一度デコードできたら latch する（シーク中の readyState 低下で青ラインがチラつかないように） */
+  function isCached(url){const e=vpool.get(url);return !!(e&&(e.ready||(e.el&&e.el.readyState>=2)))}
   /* プールが上限を超えたら、現在／次クリップ以外で最も古いものから破棄 */
   function evictPool(keepUrl){
     if(vpool.size<=POOL_MAX)return;
