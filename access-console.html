@@ -1,224 +1,400 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
 <title>Layna アクセス管理コンソール</title>
 <style>
-  :root{color-scheme:dark}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,'Segoe UI',sans-serif;background:#0d0d0f;color:#e8e8ec;font-size:14px;line-height:1.6}
-  .top{position:sticky;top:0;background:#141416;border-bottom:1px solid #2a2a2f;padding:14px 20px;display:flex;align-items:center;gap:12px;z-index:5}
-  .logo{font-weight:800;font-size:18px;letter-spacing:.5px}
-  .logo b{color:#4da6ff}
-  .top .sub{color:#8a8a99;font-size:12px}
-  .top .sp{flex:1}
-  .who{display:flex;align-items:center;gap:8px;font-size:12px}
-  .who img{width:26px;height:26px;border-radius:50%}
-  .wrap{max-width:920px;margin:0 auto;padding:22px 20px 60px}
-  .card{background:#141416;border:1px solid #23232a;border-radius:12px;padding:18px 20px;margin-bottom:18px}
-  h2{font-size:14px;margin:0 0 4px}
-  .hint{color:#8a8a99;font-size:12px;margin:0 0 12px}
-  label.row{display:flex;align-items:center;gap:10px;margin:10px 0}
-  textarea{width:100%;min-height:96px;resize:vertical;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;padding:10px 12px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.7}
-  textarea:focus{outline:none;border-color:#3a6bff}
-  .field{margin:14px 0}
-  .field .lab{font-weight:600;font-size:13px;margin-bottom:2px}
-  .field .desc{color:#8a8a99;font-size:11px;margin-bottom:6px}
-  .btn{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;padding:9px 16px;font-size:13px;cursor:pointer;font-family:inherit}
-  .btn:hover{border-color:#3a3a44}
-  .btn.primary{background:#2f6bff;border-color:#2f6bff;font-weight:600}
-  .btn.primary:disabled{opacity:.5;cursor:not-allowed}
-  .btn.ghost{background:transparent}
-  .actions{display:flex;gap:10px;align-items:center;margin-top:6px}
-  .gate{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
-  .gate .logo{font-size:34px}
-  .gbtn{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#111;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer}
-  .gg{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;background:#4285F4;color:#fff;border-radius:3px;font-weight:800}
-  .status{font-size:12px;color:#8a8a99;margin-top:6px}
-  .ok{color:#5affa0}.err{color:#ff7a7a}
-  .banner{background:#2a1f12;border:1px solid #5a3d1a;color:#e0b070;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px}
-  code{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:4px;padding:1px 6px;font-size:12px}
-  details{margin-top:10px}summary{cursor:pointer;color:#8a8a99;font-size:12px}
-  pre{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;padding:12px;overflow:auto;font-size:12px}
-  .readonly{opacity:.6;pointer-events:none}
+  :root{
+    --bg:#0d0f14;--bg2:#151821;--bg3:#1c2030;--bg4:#252a3a;
+    --border:#262b3a;--border2:#333a4d;
+    --text:#e8eaf0;--text2:#aab0c0;--text3:#6b7180;
+    --accent:#7c6fff;--green:#5affa0;--amber:#ffb85a;--red:#ff5a5a;--blue:#5a8fff;
+    --radius:10px;--radius2:8px;
+    --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --font-head:"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;font-size:14px}
+  .hidden{display:none!important}
+  button{font-family:inherit;cursor:pointer}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);padding:8px 14px;border-radius:var(--radius2);font-size:13px;transition:.15s}
+  .btn:hover{background:var(--bg4)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{filter:brightness(1.1)}
+  .btn-danger{background:rgba(255,90,90,.15);border-color:rgba(255,90,90,.4);color:#ff7a7a}
+  .btn-danger:hover{background:rgba(255,90,90,.25)}
+  .btn-sm{padding:4px 9px;font-size:12px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  input,textarea,select{font-family:inherit;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 11px;border-radius:var(--radius2);font-size:13px;width:100%}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+
+  .overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:1000;padding:24px;text-align:center}
+  .title-big{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:1px}
+  .title-big .sub{color:var(--accent)}
+  .muted{color:var(--text3);font-size:13px;line-height:1.7;max-width:460px}
+
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .brand{font-family:var(--font-head);font-weight:800;font-size:16px;letter-spacing:.5px}
+  .brand .sub{color:var(--accent)}
+  .spacer{flex:1}
+  .user-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+  .user-chip img{width:28px;height:28px;border-radius:50%;background:var(--bg4)}
+
+  .wrap{max-width:860px;margin:0 auto;padding:22px 20px 60px}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px}
+  .card-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card-desc{font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.6}
+  .card-desc b{color:var(--text2)}
+
+  .mstatus{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius);margin-bottom:14px;font-size:14px;font-weight:600}
+  .mstatus.on{background:rgba(90,255,160,.1);border:1px solid rgba(90,255,160,.3);color:var(--green)}
+  .mstatus.off{background:rgba(255,184,90,.12);border:1px solid rgba(255,184,90,.4);color:var(--amber)}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.off{background:var(--amber)}
+
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer}
+  .chk input{width:auto}
+  .field-label{font-size:12px;color:var(--text2);margin:2px 0 6px;display:block;font-weight:700}
+
+  .add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .add-row input{flex:1;min-width:160px}
+  .add-row select{width:auto;flex:0 0 auto}
+  .search{position:relative;margin:14px 0 6px}
+  .search input{padding-left:32px}
+  .search:before{content:"🔍";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.7}
+  .counts{font-size:11px;color:var(--text3);margin:6px 0 12px}
+  .sub-label{font-size:12px;color:var(--text2);font-weight:700;margin:16px 0 6px}
+
+  .u-list{display:flex;flex-direction:column;gap:8px}
+  .u-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3)}
+  .u-email{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+  .role{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px}
+  .role.op{background:rgba(255,184,90,.18);color:#ffcf8a;border:1px solid rgba(255,184,90,.4)}
+  .role.admin{background:rgba(124,111,255,.2);color:#a79dff;border:1px solid rgba(124,111,255,.4)}
+  .role.member{background:rgba(90,255,160,.13);color:#7fe6ad;border:1px solid rgba(90,255,160,.3)}
+  .role.dom{background:rgba(90,143,255,.15);color:#9cc0ff;border:1px solid rgba(90,143,255,.35)}
+  .empty{font-size:12px;color:var(--text3);padding:6px 2px}
+
+  .notification{position:fixed;bottom:24px;right:24px;background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:11px 16px;font-size:13px;z-index:2000;display:none;max-width:340px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  details{margin-top:6px}summary{cursor:pointer;color:var(--text3);font-size:12px}
+  pre{background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius2);padding:12px;overflow:auto;font-size:12px;margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
-<div class="top">
-  <span class="logo">La<b>y</b>na</span><span class="sub">アクセス管理コンソール</span>
-  <span class="sp"></span>
-  <span class="who" id="who"></span>
-  <button class="btn ghost" id="logout" style="display:none">ログアウト</button>
+
+<div class="overlay" id="loadingOverlay"><div class="muted">読み込み中...</div></div>
+
+<div class="overlay hidden" id="loginScreen">
+  <div class="title-big">Layna <span class="sub">アクセス管理</span></div>
+  <div class="muted">管理者専用のコンソールです。管理者アカウントでログインしてください。</div>
+  <button class="btn btn-primary" id="loginBtn">Google でログイン</button>
 </div>
 
-<div id="app"></div>
+<div id="console" class="hidden">
+  <div class="topbar">
+    <div class="brand">Layna <span class="sub">アクセス管理</span></div>
+    <div class="spacer"></div>
+    <div class="user-chip" id="userChip"></div>
+    <button class="btn btn-sm" id="logoutBtn">ログアウト</button>
+  </div>
+
+  <div class="wrap">
+    <!-- 読み込み/権限エラー -->
+    <div class="card hidden" id="errCard">
+      <div class="card-title">⚠ 設定を読み込めません</div>
+      <div class="card-desc" id="errDesc"></div>
+      <details><summary>必要な Firestore セキュリティルール</summary><pre id="rulesPre"></pre></details>
+    </div>
+
+    <!-- 初回初期化 -->
+    <div class="card hidden" id="bootstrapCard">
+      <div class="card-title">🚀 初期化</div>
+      <div class="card-desc">アクセス設定（laynaAccess/config）がまだありません。あなた（<b id="bootEmail"></b>）を<b>運営</b>として初期化します。</div>
+      <button class="btn btn-primary" id="bootBtn">この設定を作成（自分を運営に）</button>
+    </div>
+
+    <!-- 権限なし -->
+    <div class="card hidden" id="notOpCard">
+      <div class="card-title">⚠ 権限がありません</div>
+      <div class="card-desc" id="notOpDesc"></div>
+    </div>
+
+    <div id="opArea" class="hidden">
+      <!-- 認証必須トグル -->
+      <div class="card">
+        <div class="card-title">🔑 認証</div>
+        <div class="card-desc">オンにすると、下で許可したメンバーのみ Layna にログインできます。</div>
+        <div class="mstatus off" id="arStatus"><span class="dot off" id="arDot"></span><span id="arText">状態を取得中…</span></div>
+        <label class="chk"><input type="checkbox" id="authRequired"> 認証を必須にする（authRequired）</label>
+      </div>
+
+      <!-- アクセス管理 -->
+      <div class="card">
+        <div class="card-title">🔐 アクセス管理 / 権限付与</div>
+        <div class="card-desc">3区分でアクセスを管理します。<b>運営</b>=この設定を編集可、<b>管理者</b>=権限付与可、<b>メンバー</b>=利用のみ。許可したメールアドレスの Google アカウントが Layna を利用できます。行ごとのボタンで権限を変更・削除できます。</div>
+
+        <label class="field-label">ユーザーを追加（メールアドレス）</label>
+        <div class="add-row">
+          <input id="addEmail" type="email" placeholder="user@example.com" autocomplete="off">
+          <select id="addRole"><option value="member">メンバー</option><option value="admin">管理者</option><option value="operator">運営</option></select>
+          <button class="btn btn-primary" id="addBtn">追加</button>
+        </div>
+
+        <div class="search"><input id="search" type="text" placeholder="メールアドレスで検索…" autocomplete="off"></div>
+        <div class="counts" id="counts"></div>
+
+        <div class="sub-label">運営（この設定を編集可）</div>
+        <div class="u-list" id="opList"></div>
+        <div class="sub-label">管理者（権限付与のみ可）</div>
+        <div class="u-list" id="adminList"></div>
+        <div class="sub-label">メンバー（利用のみ）</div>
+        <div class="u-list" id="memberList"></div>
+      </div>
+
+      <!-- 許可ドメイン -->
+      <div class="card">
+        <div class="card-title">🌐 許可ドメイン</div>
+        <div class="card-desc">このドメインのメール全員を自動的にメンバー扱いにします（例: <b>studio.jp</b>）。<code>@</code> は不要。</div>
+        <div class="add-row">
+          <input id="domInput" type="text" placeholder="studio.jp" autocomplete="off">
+          <button class="btn btn-primary" id="domAddBtn">追加</button>
+        </div>
+        <div class="u-list" id="domList" style="margin-top:12px"></div>
+      </div>
+
+      <!-- セットアップ（ルール） -->
+      <div class="card">
+        <div class="card-title">⚙ セットアップ（Firebase コンソール・初回のみ）</div>
+        <div class="card-desc">このコンソールと Layna 本体は Firestore の <code>laynaAccess/config</code> を共有します。Firestore を有効化し、以下のルールを設定してください。</div>
+        <details open><summary>必要な Firestore セキュリティルール</summary><pre id="rulesPre2"></pre></details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notification" id="notification"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Layna 専用 Firebase プロジェクト（layna-6d687）。Layna 本体と同じ config を使用 */
 const firebaseConfig={apiKey:"AIzaSyAWWgykhkakM-OrAs1MFu5CEeLg0poIhSk",authDomain:"layna-6d687.firebaseapp.com",projectId:"layna-6d687",storageBucket:"layna-6d687.firebasestorage.app",messagingSenderId:"104594371405",appId:"1:104594371405:web:d789a911be89321ce7bd04"};
-const CFG_PATH=['laynaAccess','config']; /* Firestore ドキュメント（Layna 本体が読むのと同じパス） */
+const CFG_PATH=['laynaAccess','config']; /* Layna 本体が読むのと同じパス */
 
 const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
 const auth=getAuth(app);
 const provider=new GoogleAuthProvider();
-const db=getFirestore(app);
 
-const $=s=>document.querySelector(s);
-const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
-const lines=arr=>Array.isArray(arr)?arr.join('\n'):'';
-const parse=v=>String(v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-const lc=s=>String(s||'').toLowerCase();
-
-let me=null,cfg=null;
-
-function renderLogin(msg){
-  $('#who').textContent='';$('#logout').style.display='none';
-  const app=$('#app');app.innerHTML='';
-  const g=el('div','gate');
-  g.appendChild(el('div','logo','La<b>y</b>na'));g.querySelector('.logo').innerHTML='La<b>y</b>na';
-  g.appendChild(el('div','sub','アクセス管理コンソール — 管理者用'));
-  const b=el('button','gbtn');b.innerHTML='<span class="gg">G</span> Google でログイン';
-  b.onclick=async()=>{try{await signInWithPopup(auth,provider)}catch(e){status('ログイン失敗: '+(e&&e.message),'err')}};
-  g.appendChild(b);
-  if(msg)g.appendChild(el('div','status err',msg));
-  app.appendChild(g);
-}
-
-function status(msg,cls){const s=$('#saveStatus');if(s){s.textContent=msg||'';s.className='status '+(cls||'')}}
-
-async function loadCfg(){
-  try{const snap=await getDoc(doc(db,...CFG_PATH));return snap.exists()?snap.data():null}
-  catch(e){return {__error:e&&e.message}}
-}
-
-function isAdmin(c,email){
-  if(!c)return false;
-  return (c.adminEmails||[]).some(x=>lc(x)===lc(email))||(c.operatorEmails||[]).some(x=>lc(x)===lc(email));
-}
-
-async function renderApp(){
-  $('#who').innerHTML='';
-  if(me.photoURL){const img=document.createElement('img');img.src=me.photoURL;img.referrerPolicy='no-referrer';$('#who').appendChild(img)}
-  $('#who').appendChild(el('span',null,me.email));
-  $('#logout').style.display='';
-
-  cfg=await loadCfg();
-  const app=$('#app');app.innerHTML='';
-  const wrap=el('div','wrap');app.appendChild(wrap);
-
-  // Firestore 未設定/エラー時の案内
-  if(cfg&&cfg.__error){
-    wrap.appendChild(banner('Firestore を読み込めませんでした（'+cfg.__error+'）。Firebase コンソールで Firestore を有効化し、セキュリティルールを設定してください。下部の「セットアップ」を参照。'));
-    cfg=null;
-  }
-
-  const bootstrap=!cfg; // ドキュメントが無い＝初期化前
-  const admin=bootstrap||isAdmin(cfg,me.email);
-
-  if(!admin){
-    wrap.appendChild(banner('あなたのアカウント（'+me.email+'）は管理者ではありません。編集するには adminEmails に登録が必要です。'));
-  }
-  if(bootstrap){
-    wrap.appendChild(banner('アクセス設定がまだありません。初回はあなた（'+me.email+'）を管理者として初期化できます。「保存」で作成されます。'));
-    cfg={authRequired:true,allowedEmails:[],adminEmails:[me.email],operatorEmails:[],allowedDomains:[]};
-  }
-
-  const card=el('div','card');
-  card.appendChild(el('h2',null,'ツールへのアクセス権'));
-  card.appendChild(el('p','hint','Layna 本体はログイン時にこの設定（Firestore: laynaAccess/config）を読み、許可されたメールのみ入室できます。1行に1件で入力してください。'));
-
-  // authRequired
-  const arWrap=el('label','row');
-  const ar=document.createElement('input');ar.type='checkbox';ar.id='authRequired';ar.checked=cfg.authRequired!==false;
-  arWrap.appendChild(ar);arWrap.appendChild(el('span',null,'認証を必須にする（authRequired）'));
-  card.appendChild(arWrap);
-
-  const fields=[
-    ['adminEmails','管理者（admin）','この設定を編集できる管理者のメール。承認や管理操作の権限。'],
-    ['operatorEmails','オペレーター（operator）','管理者に準ずる運用担当のメール。'],
-    ['allowedEmails','許可メンバー（member）','ログインを許可する一般メンバーのメール。'],
-    ['allowedDomains','許可ドメイン','このドメインのメール全員を許可（例: studio.jp）。@は不要。']
-  ];
-  const tas={};
-  for(const [key,lab,desc] of fields){
-    const f=el('div','field');
-    f.appendChild(el('div','lab',lab+'（'+key+'）'));
-    f.appendChild(el('div','desc',desc));
-    const ta=document.createElement('textarea');ta.value=lines(cfg[key]);ta.spellcheck=false;tas[key]=ta;
-    f.appendChild(ta);card.appendChild(f);
-  }
-
-  const actions=el('div','actions');
-  const save=el('button','btn primary','保存');save.id='saveBtn';
-  const reload=el('button','btn ghost','再読込');
-  const stat=el('span','status');stat.id='saveStatus';
-  actions.appendChild(save);actions.appendChild(reload);actions.appendChild(stat);
-  card.appendChild(actions);
-  wrap.appendChild(card);
-
-  if(!admin){card.classList.add('readonly');save.disabled=true}
-
-  reload.onclick=()=>renderApp();
-  save.onclick=async()=>{
-    const data={
-      authRequired:ar.checked,
-      adminEmails:parse(tas.adminEmails.value),
-      operatorEmails:parse(tas.operatorEmails.value),
-      allowedEmails:parse(tas.allowedEmails.value),
-      allowedDomains:parse(tas.allowedDomains.value).map(d=>d.replace(/^@/,'')),
-      updatedBy:me.email,updatedAt:new Date().toISOString()
-    };
-    if(!data.adminEmails.length){status('管理者(adminEmails)を最低1件は残してください（自分がロックアウトされます）','err');return}
-    save.disabled=true;status('保存中…');
-    try{await setDoc(doc(db,...CFG_PATH),data);status('保存しました ✓','ok');cfg=data}
-    catch(e){status('保存失敗: '+(e&&e.message)+'（Firestore のセキュリティルールを確認してください）','err')}
-    finally{save.disabled=false}
-  };
-
-  wrap.appendChild(setupCard());
-}
-
-function banner(text){return el('div','banner',text)}
-
-function setupCard(){
-  const c=el('div','card');
-  c.appendChild(el('h2',null,'セットアップ（初回のみ・Firebase コンソール）'));
-  c.appendChild(el('p','hint','このコンソールと Layna 本体は Firestore の laynaAccess/config ドキュメントを共有します。以下を一度だけ設定してください。'));
-  const d=document.createElement('details');
-  d.appendChild(el('summary',null,'必要な Firestore セキュリティルール（クリックで表示）'));
-  const pre=document.createElement('pre');
-  pre.textContent=
-`rules_version = '2';
+const RULES=`rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // アクセス設定：ログイン済みなら読取OK。書込は管理者のみ。
     match /laynaAccess/config {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.auth.token.email in resource.data.adminEmails;
-      // 初回（ドキュメント未作成）は誰でも作成可 → 作成者を admin に入れる運用
-      allow create: if request.auth != null;
+      // 運営・管理者が編集可
+      allow write: if request.auth != null && (
+        request.auth.token.email in resource.data.operatorEmails ||
+        request.auth.token.email in resource.data.adminEmails );
+      allow create: if request.auth != null;  // 初回だけ（作成者を運営に）
     }
   }
 }`;
-  d.appendChild(pre);
-  c.appendChild(d);
-  c.appendChild(el('p','hint','手順: ① Firebase コンソールで Firestore Database を有効化 → ② 上記ルールを設定 → ③ このコンソールで初回保存（あなたが管理者になります）→ ④ 以降はここでメンバーを追加。Layna 本体はログイン時にこの設定を自動反映します（取得失敗時は同梱の access.json にフォールバック）。'));
-  return c;
+
+const $=id=>document.getElementById(id);
+const lc=s=>String(s||'').toLowerCase();
+function escH(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function notify(msg){const n=$('notification');if(!n)return;n.textContent=msg;n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',3500);}
+
+let me=null, cfg=null, unsub=null, query='';
+$('rulesPre')&&($('rulesPre').textContent=RULES);
+$('rulesPre2')&&($('rulesPre2').textContent=RULES);
+
+/* ---- 役割リストの取り出し ---- */
+const arr=v=>Array.isArray(v)?[...v]:[];
+function tiers(data){
+  const operators=arr(data.operatorEmails);
+  const admins=arr(data.adminEmails).filter(e=>!operators.includes(e));
+  const members=arr(data.allowedEmails).filter(e=>!operators.includes(e)&&!admins.includes(e));
+  const domains=arr(data.allowedDomains).map(d=>String(d).replace(/^@/,''));
+  return {operators,admins,members,domains};
+}
+function isEditor(){ if(!cfg)return true; const t=tiers(cfg); return t.operators.includes(me.email)||t.admins.includes(me.email); }
+
+$('loginBtn').onclick=()=>signInWithPopup(auth,provider).catch(e=>notify('ログイン失敗: '+e.message));
+$('logoutBtn').onclick=()=>signOut(auth);
+
+onAuthStateChanged(auth, user=>{
+  $('loadingOverlay').classList.add('hidden');
+  if(unsub){unsub();unsub=null}
+  if(!user){ me=null; $('console').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); return; }
+  me={email:user.email,name:user.displayName||user.email,photoURL:user.photoURL};
+  $('loginScreen').classList.add('hidden');
+  $('console').classList.remove('hidden');
+  $('userChip').innerHTML=`<img src="${escH(user.photoURL||'')}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${escH(user.email||'')}</span>`;
+  subscribe();
+});
+
+function subscribe(){
+  unsub=onSnapshot(doc(db,...CFG_PATH),
+    snap=>{ cfg=snap.exists()?snap.data():null; render(); },
+    err=>{ showError(err&&err.message); }
+  );
 }
 
-$('#logout').onclick=()=>signOut(auth);
+function showError(msg){
+  ['bootstrapCard','notOpCard','opArea'].forEach(id=>$(id).classList.add('hidden'));
+  $('errCard').classList.remove('hidden');
+  $('errDesc').textContent='Firestore を読み込めませんでした（'+(msg||'')+'）。Firebase コンソールで Firestore を有効化し、下記ルールを設定してください。';
+}
 
-onAuthStateChanged(auth,async u=>{
-  if(!u){me=null;renderLogin();return}
-  me={email:u.email,name:u.displayName||u.email,photoURL:u.photoURL};
-  try{await renderApp()}catch(e){renderLogin('初期化エラー: '+(e&&e.message))}
-});
+function render(){
+  $('errCard').classList.add('hidden');
+  // 初回（ドキュメントなし）
+  if(!cfg){
+    $('bootstrapCard').classList.remove('hidden');
+    $('notOpCard').classList.add('hidden');$('opArea').classList.add('hidden');
+    $('bootEmail').textContent=me.email;
+    return;
+  }
+  $('bootstrapCard').classList.add('hidden');
+  if(!isEditor()){
+    $('notOpCard').classList.remove('hidden');$('opArea').classList.add('hidden');
+    $('notOpDesc').textContent=me.email+' は運営(operatorEmails)・管理者(adminEmails)に登録されていません。編集するには管理者に追加を依頼してください。';
+    return;
+  }
+  $('notOpCard').classList.add('hidden');$('opArea').classList.remove('hidden');
+  paint();
+}
+
+function paint(){
+  const {operators,admins,members,domains}=tiers(cfg);
+  // authRequired
+  const on=cfg.authRequired!==false;
+  $('authRequired').checked=on;
+  $('arStatus').className='mstatus '+(on?'on':'off');
+  $('arDot').className='dot '+(on?'on':'off');
+  $('arText').textContent=on?'認証オン（許可メンバーのみ利用可）':'認証オフ（誰でも利用可）';
+
+  const q=lc(query.trim());
+  const flt=a=>q?a.filter(e=>lc(e).includes(q)):a;
+  const editor=isEditor();
+
+  const mkRow=(email,role,btns)=>{
+    const self=(me&&email===me.email)?'（あなた）':'';
+    const row=document.createElement('div');row.className='u-row';
+    row.innerHTML=`<span class="u-email">${escH(email)}${self}</span><span class="role ${role.cls}">${role.label}</span>`;
+    btns.forEach(([label,fn,danger])=>{
+      const b=document.createElement('button');b.className='btn btn-sm'+(danger?' btn-danger':'');b.textContent=label;b.disabled=!editor;b.onclick=fn;row.appendChild(b);
+    });
+    return row;
+  };
+  const opL=$('opList'),adL=$('adminList'),meL=$('memberList');
+  opL.innerHTML='';adL.innerHTML='';meL.innerHTML='';
+  const fo=flt(operators),fa=flt(admins),fm=flt(members);
+  fo.forEach(e=>opL.appendChild(mkRow(e,{cls:'op',label:'運営'},[['→管理者',()=>setRole(e,'admin')],['→メンバー',()=>setRole(e,'member')],['削除',()=>setRole(e,'remove'),true]])));
+  if(!fo.length)opL.innerHTML='<div class="empty">'+(q?'該当なし':'運営はいません')+'</div>';
+  fa.forEach(e=>adL.appendChild(mkRow(e,{cls:'admin',label:'管理者'},[['→運営',()=>setRole(e,'operator')],['→メンバー',()=>setRole(e,'member')],['削除',()=>setRole(e,'remove'),true]])));
+  if(!fa.length)adL.innerHTML='<div class="empty">'+(q?'該当なし':'管理者はいません')+'</div>';
+  fm.forEach(e=>meL.appendChild(mkRow(e,{cls:'member',label:'メンバー'},[['→運営',()=>setRole(e,'operator')],['→管理者',()=>setRole(e,'admin')],['削除',()=>setRole(e,'remove'),true]])));
+  if(!fm.length)meL.innerHTML='<div class="empty">'+(q?'該当なし':'メンバーはいません')+'</div>';
+  $('counts').textContent=`運営 ${operators.length} ・ 管理者 ${admins.length} ・ メンバー ${members.length}`+(q?`　／　「${query}」で絞込: ${fo.length+fa.length+fm.length}件`:'');
+
+  // domains
+  const dL=$('domList');dL.innerHTML='';
+  const fd=flt(domains);
+  fd.forEach(dom=>{
+    const row=document.createElement('div');row.className='u-row';
+    row.innerHTML=`<span class="u-email">@${escH(dom)}</span><span class="role dom">ドメイン</span>`;
+    const b=document.createElement('button');b.className='btn btn-sm btn-danger';b.textContent='削除';b.disabled=!editor;b.onclick=()=>removeDomain(dom);row.appendChild(b);
+    dL.appendChild(row);
+  });
+  if(!fd.length)dL.innerHTML='<div class="empty">'+(q?'該当なし':'許可ドメインはありません')+'</div>';
+}
+
+async function readConfig(){const snap=await getDoc(doc(db,...CFG_PATH));return snap.exists()?snap.data():{};}
+
+const roleLabel={operator:'運営',admin:'管理者',member:'メンバー',remove:'削除'};
+async function setRole(email,target){
+  email=lc(email);
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  const data=await readConfig();
+  const {operators:curOp}=tiers(data);
+  // 最後の運営は降格・削除不可（運営ゼロによるロック防止）
+  if(target!=='operator' && curOp.includes(email) && curOp.length<=1){
+    return notify('最後の運営は降格・削除できません。先に別の運営を追加してください。');
+  }
+  if(email===me.email && target!=='operator'){
+    if(!confirm('自分自身の権限を変更します。編集できなくなる可能性があります。続行しますか？'))return;
+  } else if(target==='remove'){
+    if(!confirm(email+' を削除しますか？'))return;
+  }
+  try{
+    let operators=arr(data.operatorEmails).filter(e=>e!==email);
+    let admins=arr(data.adminEmails).filter(e=>e!==email&&!operators.includes(e));
+    let members=arr(data.allowedEmails).filter(e=>e!==email&&!operators.includes(e)&&!admins.includes(e));
+    if(target==='operator')operators.push(email);
+    else if(target==='admin')admins.push(email);
+    else if(target==='member')members.push(email);
+    await setDoc(doc(db,...CFG_PATH),{operatorEmails:operators,adminEmails:admins,allowedEmails:members,updatedBy:me.email,updatedAt:new Date().toISOString()},{merge:true});
+    notify(target==='remove'?('削除しました: '+email):(roleLabel[target]+'に変更しました: '+email));
+  }catch(e){notify('失敗: '+e.message)}
+}
+
+async function addUser(){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  const email=lc(($('addEmail').value||'').trim());
+  if(!email)return notify('メールアドレスを入力してください');
+  const role=$('addRole').value;
+  const data=await readConfig();
+  const {operators,admins,members}=tiers(data);
+  if(operators.includes(email)||admins.includes(email)||members.includes(email))return notify('既に追加されています（権限変更は一覧のボタンから）');
+  await setRole(email,role);
+  $('addEmail').value='';$('addRole').value='member';
+}
+
+async function addDomain(){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  const dom=lc(($('domInput').value||'').trim().replace(/^@/,''));
+  if(!dom)return notify('ドメインを入力してください');
+  const data=await readConfig();
+  const domains=arr(data.allowedDomains).map(d=>lc(String(d).replace(/^@/,'')));
+  if(domains.includes(dom))return notify('既に追加されています');
+  domains.push(dom);
+  try{ await setDoc(doc(db,...CFG_PATH),{allowedDomains:domains,updatedBy:me.email,updatedAt:new Date().toISOString()},{merge:true}); $('domInput').value=''; notify('追加しました: @'+dom); }
+  catch(e){notify('失敗: '+e.message)}
+}
+async function removeDomain(dom){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  if(!confirm('@'+dom+' を削除しますか？'))return;
+  const data=await readConfig();
+  const domains=arr(data.allowedDomains).filter(d=>lc(String(d).replace(/^@/,''))!==lc(dom));
+  try{ await setDoc(doc(db,...CFG_PATH),{allowedDomains:domains,updatedBy:me.email,updatedAt:new Date().toISOString()},{merge:true}); notify('削除しました: @'+dom); }
+  catch(e){notify('失敗: '+e.message)}
+}
+
+$('authRequired').onchange=async()=>{
+  if(!isEditor()){ $('authRequired').checked=cfg&&cfg.authRequired!==false; return notify('運営・管理者のみ変更できます'); }
+  try{ await setDoc(doc(db,...CFG_PATH),{authRequired:$('authRequired').checked,updatedBy:me.email,updatedAt:new Date().toISOString()},{merge:true}); notify('認証設定を更新しました'); }
+  catch(e){ notify('失敗: '+e.message); }
+};
+
+$('bootBtn').onclick=async()=>{
+  try{
+    await setDoc(doc(db,...CFG_PATH),{authRequired:true,operatorEmails:[me.email],adminEmails:[],allowedEmails:[],allowedDomains:[],updatedBy:me.email,updatedAt:new Date().toISOString()});
+    notify('初期化しました（あなたが運営になりました）');
+  }catch(e){ notify('初期化失敗: '+e.message+'（Firestore のルールを確認してください）'); }
+};
+
+$('addBtn').onclick=addUser;
+$('addEmail').addEventListener('keydown',e=>{if(e.key==='Enter')addUser();});
+$('domAddBtn').onclick=addDomain;
+$('domInput').addEventListener('keydown',e=>{if(e.key==='Enter')addDomain();});
+$('search').addEventListener('input',()=>{query=$('search').value;if(cfg&&isEditor())paint();});
 </script>
 </body>
 </html>
