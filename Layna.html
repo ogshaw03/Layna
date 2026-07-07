@@ -93,7 +93,7 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .main-head{display:flex;flex-direction:column;align-items:stretch;gap:0;padding:8px 20px 0}
 .main-head h1{font-family:var(--font-head);font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
 .main-head .desc{color:var(--text3);font-size:12px;margin-top:3px}
-.main-head .spacer{flex:1}
+.main-head .spacer,.task-topbar .spacer{flex:1}
 .scroll{flex:1;overflow-y:auto;padding:0 20px 28px}
 .home-main{padding-top:14px}
 /* 単色ラインアイコン */
@@ -1816,6 +1816,7 @@ function renderSectionBody(s,cur){
     const st=stInfo(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;h1.appendChild(bg);
     h1.appendChild(elIco('span','type-chip','folder','カテゴリ'));
     topbar.appendChild(h1);
+    topbar.appendChild(el('div','spacer')); /* 設定・削除は画面右側へ */
     const rn=el('button','btn btn-ghost btn-sm','設定');rn.onclick=()=>openRename(cur);topbar.appendChild(rn);
     const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>deleteNode(cur);topbar.appendChild(del);
     s.appendChild(topbar);
@@ -1886,6 +1887,7 @@ function renderReviewBody(s,cur){
   const tst=stInfo(cur);const tbg=el('span','badge',tst.label);tbg.style.background=hexA(tst.color,.18);tbg.style.color=tst.color;h1.appendChild(tbg);
   h1.appendChild(elIco('span','type-chip','film','タスク'));
   topbar.appendChild(h1);
+  topbar.appendChild(el('div','spacer')); /* ステータス切替・設定・削除は画面右側へ */
   if(cur.versions.length)topbar.appendChild(buildStatusSelect(cur)); /* ステータス切替プルダウン */
   const trn=el('button','btn btn-ghost btn-sm','設定');trn.onclick=()=>openRename(cur);topbar.appendChild(trn);
   const tdel=el('button','btn btn-danger btn-sm','削除');tdel.onclick=()=>deleteNode(cur);topbar.appendChild(tdel);
