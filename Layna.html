@@ -100,9 +100,15 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .mp-sel{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius2);padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;max-width:160px}
 .mp-sel:focus{outline:none;border-color:var(--border2)}
 .mp-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
-.mp-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:2px 7px 2px 5px}
+.mp-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:2px 7px 2px 6px}
 .mp-badge .mp-bl{color:var(--text3);font-size:9px;letter-spacing:.02em}
 .mp-badge .mp-bn{color:var(--text);font-weight:600}
+.mp-badge .mp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+/* 作業担当＝グリーン系 / チェック担当＝アンバー系 で色分け */
+.mp-badge.mp-a{background:rgba(127,191,154,.13);border-color:rgba(127,191,154,.4)}
+.mp-badge.mp-a .mp-bl{color:var(--green)}
+.mp-badge.mp-r{background:rgba(214,169,95,.13);border-color:rgba(214,169,95,.42)}
+.mp-badge.mp-r .mp-bl{color:var(--amber)}
 .mp-filter{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 14px;padding:9px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2)}
 /* プロジェクト パスワード解錠画面 */
 .proj-lock{display:flex;justify-content:center;align-items:flex-start;padding:60px 20px}
@@ -648,12 +654,10 @@ textarea.form-input{height:70px;resize:vertical}
   <div class="header-actions">
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
     <button class="btn btn-ghost" id="submitBtn" title="サブミット — 複数ショットの提出をまとめてレビュー"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="5" rx="1"/><rect x="3" y="11" width="14" height="5" rx="1"/></svg>サブミット</button>
-    <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="このプロジェクトの保存先 / クリックでプロジェクト設定"><span class="dot"></span><span id="folderName">ブラウザ内保存</span></div>
     <button class="hd-bell" id="notifBtn" title="通知"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a4 4 0 0 1 8 0c0 4 1.5 5 1.5 5h-11S6 12 6 8z"/><path d="M8.5 16a1.7 1.7 0 0 0 3 0"/></svg><span class="nb-badge hidden" id="notifBadge">0</span></button>
     <label class="user-field" id="nameField"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4.5 16.5a5.5 5.5 0 0 1 11 0"/></svg><input id="currentUser" type="text" placeholder="名前" /></label>
     <div class="hd-user hidden" id="authUserBox"></div>
-    <button class="btn btn-primary" id="addBtn">+ 追加</button>
   </div>
 </header>
 <div class="notif-panel hidden" id="notifPanel"></div>
@@ -952,7 +956,7 @@ async function boot(){
         if(loc&&loc.lastPageId&&getNode(loc.lastPageId))state.lastPageId=loc.lastPageId;
         if(loc&&loc.id&&getNode(loc.id)){
           state.currentId=loc.id;
-          if(['timeline','progress','shots','submit','browse'].includes(loc.tab))state.projTab=loc.tab;
+          if(['timeline','progress','shots','submit','check','browse'].includes(loc.tab))state.projTab=loc.tab;
           for(const n of pathOf(loc.id))state.expanded.add(n.id);
           syncHash();render();resolveThumbs();restored=true;
         }
@@ -1134,7 +1138,7 @@ function scanMentionsForMe(){
     const pn=$('#notifPanel');if(pn&&!pn.classList.contains('hidden'))renderNotifPanel();
   }
 }
-function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}document.documentElement.style.setProperty('--cols',cols);[['S',6],['M',4],['L',3]].forEach(([lab,n])=>{const b=el('button','size-btn'+(n===cols?' active':''),lab);b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};wrap.appendChild(b)})}
+function initSizeBtns(){let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')||4}catch(_){}document.documentElement.style.setProperty('--cols',cols)}
 
 /* ============================================================
    サブミット — 複数ショットの提出をまとめてレビュー
@@ -1351,7 +1355,7 @@ function go(id){state.currentId=id;state.search='';state.projTab='timeline';stat
    #/n/<nodeId>/<tab>     プロジェクト/セクション/レビューページ（tab: timeline|progress|shots|browse）
    #/r/<nodeId>/<verId>   レビュー（動画FB）画面
    ============================================================ */
-const VALID_TABS=['timeline','progress','shots','submit','browse'];
+const VALID_TABS=['timeline','progress','shots','submit','check','browse'];
 function hashOf(){
   if(state.reviewOpen&&getNode(state.reviewOpen.nodeId))return '#/r/'+state.reviewOpen.nodeId+'/'+state.reviewOpen.versionId;
   if(!state.currentId)return '#/';
@@ -1428,8 +1432,8 @@ async function disconnectProject(id){
 function updateHeaderForContext(){
   const home=!state.currentId;
   const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
-  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#submitBtn',!home);setD('#sizeBtns',!home);
-  setD('#addBtn',true);setD('#mainHead',!home);setD('#breadcrumb',!home);
+  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#submitBtn',!home);
+  setD('#mainHead',!home);setD('#breadcrumb',!home);
   /* 保存先インジケータはプロジェクト内でのみ表示 */
   setD('#folderStatus',!home);updateFolderStatus();
 }
@@ -1506,10 +1510,8 @@ function buildStatusSelect(node){
 /* メインヘッダ */
 function renderMainHead(){
   const h=$('#mainHead');h.innerHTML='';const cur=state.currentId?getNode(state.currentId):null;
-  const addBtn=$('#addBtn');addBtn.style.display='';
-  if(!cur){addBtn.textContent='+ プロジェクト';return}
+  if(!cur)return;
   const root=rootOf(cur);
-  addBtn.textContent=cur.type==='review'?'+ 動画':'+ 項目';
   /* ── 上段：ヘッダは常にプロジェクト名を表示＋プロジェクトタブ ── */
   const row1=el('div','mh-row1');
   const box=el('div');
@@ -1564,10 +1566,10 @@ function shotOf(node){if(!node||!node.parentId)return '';const p=getNode(node.pa
 /* プロジェクトの上部タブ（常に表示）。タブクリックでプロジェクトのトップ＋該当タブへ */
 /* ヘッダ内のプロジェクトタブ（タイムライン / 進捗 / ショット） */
 function buildProjectTabsHead(root){
-  if(!['timeline','progress','shots','submit','browse'].includes(state.projTab))state.projTab='timeline';
+  if(!['timeline','progress','shots','submit','check','browse'].includes(state.projTab))state.projTab='timeline';
   const onRoot=state.currentId===root.id&&!state.search.trim();
   const nav=el('div','head-tabs');
-  [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['submit','サブミット']].forEach(([id,lab],i)=>{
+  [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['submit','サブミット'],['check','チェック待ち']].forEach(([id,lab],i)=>{
     if(i)nav.appendChild(el('span','vdiv')); /* タブ間の縦区切り線 */
     const active=onRoot&&state.projTab===id;
     const b=el('button','ptab'+(active?' on':''),lab);
@@ -1656,6 +1658,7 @@ function renderBodyMain(){
     if(state.projTab==='progress')renderProjProgress(main,root);
     else if(state.projTab==='shots')renderProjShots(main,root);
     else if(state.projTab==='submit')renderProjSubmits(main,root);
+    else if(state.projTab==='check')renderProjCheck(main,root);
     else if(state.projTab==='browse'){state.lastPageId=root.id;renderSectionBody(main,root)}
     else renderProjTimeline(main,root);
     return;
@@ -1772,6 +1775,56 @@ function renderProjSubmits(main,root){
     w.appendChild(it);
   }
   main.appendChild(w);
+}
+/* チェック待ちタブ：チェック担当者ごとに、チェック待ち（未完了）の工程（カット）をタブで切り替え表示 */
+function renderProjCheck(main,root){
+  main.appendChild(el('div','pm-h','チェック待ち — チェック担当者ごとの未チェックカット'));
+  /* 対象＝配下の工程(review)で、チェック担当が設定され、動画があり、まだ完了していないもの */
+  const all=descendants(root.id).filter(n=>n.type==='review'&&n.reviewer&&n.versions&&n.versions.length&&!isDoneStatus(root,nodeStatus(n)));
+  /* チェック担当者一覧（名簿順→名簿外ID） */
+  const reviewerIds=[];const seen=new Set();
+  for(const m of projectMembers(root)){const k=String(m.id).toLowerCase();if(!seen.has(k)&&all.some(n=>String(n.reviewer).toLowerCase()===k)){seen.add(k);reviewerIds.push(m.id)}}
+  for(const n of all){const k=String(n.reviewer).toLowerCase();if(!seen.has(k)){seen.add(k);reviewerIds.push(n.reviewer)}}
+  if(!reviewerIds.length){main.appendChild(el('div','pm-empty','チェック待ちのカットはありません。工程（タスク）の設定でチェック担当を割り当てると、担当者ごとにここへ表示されます。'));return}
+  if(!reviewerIds.some(id=>String(id).toLowerCase()===String(state.checkReviewer||'').toLowerCase()))state.checkReviewer=reviewerIds[0];
+  /* 担当者タブ */
+  const tabs=el('div','pm-tabs');
+  for(const id of reviewerIds){
+    const m=memberById(root,id);const cnt=all.filter(n=>String(n.reviewer).toLowerCase()===String(id).toLowerCase()).length;
+    const on=String(id).toLowerCase()===String(state.checkReviewer).toLowerCase();
+    const b=el('button','pm-stab'+(on?' on':''));
+    if(m&&m.color){const dot=el('span','mp-dot');dot.style.background=m.color;dot.style.marginRight='6px';b.appendChild(dot)}
+    b.appendChild(document.createTextNode((m?(m.name||m.id):id)+'（'+cnt+'）'));
+    b.onclick=()=>{if(String(state.checkReviewer).toLowerCase()!==String(id).toLowerCase()){state.checkReviewer=id;renderBody();resolveThumbs()}};
+    tabs.appendChild(b);
+  }
+  main.appendChild(tabs);
+  /* 選択担当者のチェック待ちカット（ショット名→工程名でソート） */
+  const hits=all.filter(n=>String(n.reviewer).toLowerCase()===String(state.checkReviewer).toLowerCase());
+  hits.sort((a,b)=>{const sa=shotOf(a)||'',sb=shotOf(b)||'';return sa<sb?-1:sa>sb?1:(a.name<b.name?-1:a.name>b.name?1:0)});
+  const meSel=memberById(root,state.checkReviewer);
+  main.appendChild(el('div','pm-h',(meSel?(meSel.name||meSel.id):state.checkReviewer)+' のチェック待ち（'+hits.length+'カット）'));
+  if(!hits.length){main.appendChild(el('div','pm-empty','この担当者のチェック待ちカットはありません。'));return}
+  const grid=el('div','pm-grid');
+  for(const n of hits){
+    const lv=latestVideoVersionUnder(n.id);
+    const tile=el('div','pm-tile');
+    const th=el('div','th');
+    if(lv&&lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)}else th.appendChild(icoEl('film'));
+    tile.appendChild(th);
+    const bd=el('div','bd');
+    bd.appendChild(el('div','nm',shotOf(n)||n.name)); /* ショット名 */
+    const badges=el('div','mt');
+    const stg=el('span','pm-badge',n.name);stg.style.background=stageColor(n.name);badges.appendChild(stg); /* 工程 */
+    const si=stInfo(n);const stB=el('span','pm-badge',si.label);stB.style.background=si.color;badges.appendChild(stB); /* ステータス */
+    bd.appendChild(badges);
+    const asg=n.assignee?memberById(root,n.assignee):null;
+    if(asg||n.assignee){const mt2=el('div','mt');mt2.appendChild(el('span','pth','作業: '+(asg?(asg.name||asg.id):n.assignee)));bd.appendChild(mt2)}
+    tile.appendChild(bd);
+    tile.onclick=()=>go(n.id); /* クリックでタスクページへ */
+    grid.appendChild(tile);
+  }
+  main.appendChild(grid);
 }
 /* ショットタブ：ショット親フォルダ直下の「ショット」ごとに最新動画をグリッド表示
    （ショットの中身＝工程ではなく、ショット単位で表示） */
@@ -1954,6 +2007,7 @@ function renderHome(s){
   head.appendChild(el('div','hs','使用するプロジェクトを選択・新規作成、または既存プロジェクトのフォルダを接続'));
   const hacts=el('div','home-acts');
   const conBtn=el('button','btn btn-ghost btn-sm','⇄ プロジェクトを接続');conBtn.title='他の人が作成した（または既存の）プロジェクトフォルダを開いて接続';conBtn.onclick=()=>connectProjectFlow();hacts.appendChild(conBtn);
+  const newBtn=el('button','btn btn-primary btn-sm','＋ 新規プロジェクト');newBtn.onclick=()=>openProjectModal();hacts.appendChild(newBtn);
   head.appendChild(hacts);
   wrap.appendChild(head);
   const grid=el('div','proj-grid');
@@ -2092,6 +2146,7 @@ function renderReviewBody(s,cur){
   s.appendChild(shotCommentInput(cur)); /* 上部：独立コメントの入力欄のみ */
   const ll=el('div','section-label');ll.appendChild(el('span',null,'動画FBログ / ディレクターチェック'));
   const acts=el('div','acts');
+  const addVid=el('button','btn btn-primary btn-sm','＋ 動画');addVid.title='この工程に動画・画像を追加';addVid.onclick=()=>triggerUpload(cur);acts.appendChild(addVid);
   const fo=el('button','btn btn-ghost btn-sm'+(state.frameOrder?' tool active':''),state.frameOrder?'フレーム順 ✓':'フレーム順');
   fo.title='コメントをフレーム番号順に表示（Fチップでタイル内動画がそのフレームへ移動）';
   fo.onclick=()=>{state.frameOrder=!state.frameOrder;renderBody();resolveThumbs()};
@@ -2839,8 +2894,10 @@ function memberById(root,id){if(!root||!id)return null;const k=String(id).toLowe
 /* 工程（タスク）の担当バッジ：割当があるものだけ表示 */
 function taskAssignBadges(node){
   if(!node)return null;const root=rootOf(node);const frag=el('div','mp-badges');let any=false;
-  const mk=(field,label)=>{const id=node[field];if(!id)return;const m=memberById(root,id);const b=el('span','mp-badge');b.appendChild(el('span','mp-bl',label));b.appendChild(el('span','mp-bn',m?(m.name||m.id):id));if(m&&m.color)b.style.borderLeft='3px solid '+m.color;frag.appendChild(b);any=true};
-  mk('assignee','作');mk('reviewer','チェック');
+  const mk=(field,label,cls)=>{const id=node[field];if(!id)return;const m=memberById(root,id);const b=el('span','mp-badge '+cls);
+    if(m&&m.color){const dot=el('span','mp-dot');dot.style.background=m.color;b.appendChild(dot)}
+    b.appendChild(el('span','mp-bl',label));b.appendChild(el('span','mp-bn',m?(m.name||m.id):id));frag.appendChild(b);any=true};
+  mk('assignee','作業','mp-a');mk('reviewer','チェック','mp-r');
   return any?frag:null;
 }
 /* 単一の工程が担当フィルタに一致するか */
@@ -4754,11 +4811,9 @@ async function openReelFromSaved(reelId){
    初期化
    ============================================================ */
 function triggerUpload(node){const fi=document.createElement('input');fi.type='file';fi.accept='image/*,video/*';fi.onchange=()=>{if(fi.files[0])openUploadModal(node,fi.files[0])};fi.click()}
-function headerAdd(){const cur=state.currentId?getNode(state.currentId):null;if(!cur)openProjectModal();else if(cur.type==='review')triggerUpload(cur);else openAddModal(cur.id)}
 $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 /* 保存先インジケータ：プロジェクトを開いていれば設定（保存先フォルダ指定）を開く */
 $('#folderStatus').onclick=()=>{const cur=state.currentId?getNode(state.currentId):null;const root=cur?rootOf(cur):null;if(root)openRename(root);else toast('プロジェクトを開くと、プロジェクト設定から保存先フォルダを指定できます')};
-$('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
 $('#submitBtn').onclick=()=>{if(storage.mode)openSubmitCreate()};
 $('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifPanel()};
