@@ -160,6 +160,14 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pm-stab{background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:7px 15px;font-size:13px;font-weight:600;cursor:pointer}
 .pm-stab:hover{color:var(--text)}
 .pm-stab.on{background:rgba(96,165,255,.16);border-color:var(--edge);color:var(--text)}
+/* チェック待ち：チェック担当者タブ（本体のタブUI＝アンダーライン/モノクロに統一） */
+.chk-tabs{display:flex;flex-wrap:wrap;gap:2px;align-items:flex-end;margin:2px 0 18px;border-bottom:1px solid var(--border)}
+.chk-tab{display:inline-flex;align-items:center;gap:7px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.4px;padding:8px 14px;cursor:pointer;margin-bottom:-1px}
+.chk-tab:hover{color:var(--text2)}
+.chk-tab.on{color:var(--text);border-bottom-color:var(--accent2)}
+.chk-tab .chk-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.chk-tab .chk-cnt{font-size:11px;font-weight:700;color:var(--text3);background:var(--bg3);border-radius:999px;padding:1px 7px;min-width:18px;text-align:center}
+.chk-tab.on .chk-cnt{color:var(--text);background:var(--bg4)}
 .pm-card{border:1px solid var(--border);border-radius:12px;background:var(--bg2);padding:16px 18px;margin-bottom:6px}
 .pm-body{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
 .pm-body canvas{flex-shrink:0;cursor:pointer}
@@ -1798,14 +1806,15 @@ function renderProjCheck(main,root){
   for(const n of all){const k=String(n.reviewer).toLowerCase();if(!seen.has(k)){seen.add(k);reviewerIds.push(n.reviewer)}}
   if(!reviewerIds.length){main.appendChild(el('div','pm-empty','チェック待ちのカットはありません。工程（タスク）の設定でチェック担当を割り当てると、担当者ごとにここへ表示されます。'));return}
   if(!reviewerIds.some(id=>String(id).toLowerCase()===String(state.checkReviewer||'').toLowerCase()))state.checkReviewer=reviewerIds[0];
-  /* 担当者タブ */
-  const tabs=el('div','pm-tabs');
+  /* 担当者タブ（本体のタブUIに統一：アンダーライン／モノクロ） */
+  const tabs=el('div','chk-tabs');
   for(const id of reviewerIds){
     const m=memberById(root,id);const cnt=all.filter(n=>String(n.reviewer).toLowerCase()===String(id).toLowerCase()).length;
     const on=String(id).toLowerCase()===String(state.checkReviewer).toLowerCase();
-    const b=el('button','pm-stab'+(on?' on':''));
-    if(m&&m.color){const dot=el('span','mp-dot');dot.style.background=m.color;dot.style.marginRight='6px';b.appendChild(dot)}
-    b.appendChild(document.createTextNode((m?(m.name||m.id):id)+'（'+cnt+'）'));
+    const b=el('button','chk-tab'+(on?' on':''));
+    if(m&&m.color){const dot=el('span','chk-dot');dot.style.background=m.color;b.appendChild(dot)}
+    b.appendChild(el('span','chk-nm',m?(m.name||m.id):id));
+    b.appendChild(el('span','chk-cnt',String(cnt)));
     b.onclick=()=>{if(String(state.checkReviewer).toLowerCase()!==String(id).toLowerCase()){state.checkReviewer=id;renderBody();resolveThumbs()}};
     tabs.appendChild(b);
   }
