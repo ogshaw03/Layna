@@ -1762,8 +1762,8 @@ function renderProjTimeline(main,cur){
 function tlSubmitItem(e,cur){
   const sb=(DB.submits||[]).find(s=>s.id===e.submitId);
   const open=()=>{if(sb)openSubmitDrawer(sb.id)};
-  const grp=el('div','tl-submit-group');
-  const head=el('div','tl-submit-head');head.title='クリックでサブミットを右側に表示';head.onclick=open;
+  const grp=el('div','tl-submit-group');grp.style.cursor='pointer';grp.title='クリックでサブミットを右側に表示（動画タイルはタスクページへ）';grp.onclick=open; /* 枠クリックで右スライド表示 */
+  const head=el('div','tl-submit-head');
   head.appendChild(elIco('span','tl-subbadge','folder','サブミット'));
   head.appendChild(el('span','tl-subname',e.name));
   head.appendChild(el('span','tl-subcount',e.items.length+' ショット'));
@@ -1772,7 +1772,7 @@ function tlSubmitItem(e,cur){
   const row=el('div','tl-submit-tiles');
   for(const item of e.items){
     const n=item.node,v=item.v;const shot=n.parentId?getNode(n.parentId):null;
-    const tile=el('div','tl-stile');tile.onclick=open;tile.title=(shot?shot.name+' / ':'')+n.name;
+    const tile=el('div','tl-stile');tile.onclick=ev=>{ev.stopPropagation();go(n.id)};tile.title='クリックでタスクページへ：'+((shot?shot.name+' / ':'')+n.name); /* 動画タイルは直接タスクページへ */
     const th=el('div','th');const img=el('img');if(v.thumb)img.dataset.ref=v.thumb;th.appendChild(img);tile.appendChild(th);
     const bd=el('div','bd');
     bd.appendChild(el('div','sn',shot?shot.name:n.name)); /* ショット名 */
