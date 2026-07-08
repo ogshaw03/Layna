@@ -2456,7 +2456,9 @@ function annotShotInto(cv,shot,n){
 }
 
 /* 描画のみ（コメントなし）のノートは「動画へのアノテ埋め込み専用」。コメント欄には出さない。 */
-function noteEmbedOnly(n){return !!(n&&n.drawing&&n.drawing.length&&!(n.text&&String(n.text).trim()))}
+/* 埋め込みのみ（コメント欄に出さない）＝描画だけ かつ「記入せず送信」で noShot が付いたものだけ。
+   明示的に記入ボタンを押した描画ノートは noShot が付かず、スクショ付きでコメント欄に表示する。 */
+function noteEmbedOnly(n){return !!(n&&n.drawing&&n.drawing.length&&!(n.text&&String(n.text).trim())&&n.noShot)}
 /* pending ストローク＋コメントを、各ストローク自身のフレーム(p.f)ごとに分割したノート配列にする。
    ・複数フレームにまたがって描いても、線は描いたフレームに正しく割り当てられる（ズレ防止）
    ・コメントは現在フレーム(curFrame)のノートに付け、無ければコメント単独ノートを作る
@@ -3664,25 +3666,27 @@ function openReview(nodeId,versionId,opts){
   /* 記入：コメント／アノテーションを下書き(drafts)に積む。まだレビューページには反映しない。
      ・コメント＋アノテ → テキスト＋描画スクショ／・コメントのみ → テキスト／・アノテのみ → 描画スクショ
      ・描いて記入を押さなければ pending のまま（クリップに埋め込み表示されるだけで反映されない） */
-  const record=async()=>{
+  const record=async(auto)=>{
     /* 各線は描いたフレームごとに別ノートへ（複数フレームにまたがってもズレない）。
-       コメントは現在フレームのノートに付ける。リールと同じ buildFrameNotes を使用。 */
+       コメントは現在フレームのノートに付ける。リールと同じ buildFrameNotes を使用。
+       auto=true（送信時の自動記入）で「描画のみ」ノートは noShot を付与しスクショを省略。
+       記入ボタン（auto無し）では noShot を付けず、スクショ付きで表示する。 */
     const notes=buildFrameNotes(pending,{text:ta.value,curFrame:isVideo?dispFrame():null,dur:parseInt(durSel.value)||1,isVideo,mentions:ta._mentions,root:rootOf(node)});
     if(!notes.length)return;
-    for(const n of notes)n._draft=true;
+    for(const n of notes){n._draft=true;if(auto&&n.drawing&&n.drawing.length&&!(n.text&&String(n.text).trim()))n.noShot=true;}
     drafts.push(...notes);pending=[];stroke=null;
     ta.value='';ta._mentions=[];renderNotes();drawAll();drawTimeline();updSubmit();
   };
   /* 送信：記入した内容をまとめてレビューページ(v.review.notes)へ反映。
      未記入の pending アノテ・入力中コメントも自動で記入してから送信（リールと統一）。 */
   async function submit(){
-    if(ta.value.trim()||pending.length)record(); /* 未記入分を自動記入（record は同期的に drafts へ積む） */
+    if(ta.value.trim()||pending.length)record(true); /* 未記入分を自動記入（描画のみはスクショ省略） */
     if(!drafts.length)return;
     for(const n of drafts){delete n._draft;v.review.notes.push(n)}
     drafts=[];
     await persist();renderNotes();drawAll();drawTimeline();updSubmit();renderBody();resolveThumbs();
   }
-  sb.onclick=record;submitBtn.onclick=submit;
+  sb.onclick=()=>record();submitBtn.onclick=submit; /* 記入ボタンは auto無し（スクショ付き） */
   ta.oninput=()=>updSubmit(); /* 入力中コメントでも送信バーを表示 */
   ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();record()}};
 
