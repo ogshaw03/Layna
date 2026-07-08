@@ -200,7 +200,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pm-tile:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
 .pm-tile .th{position:relative;aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
 .pm-tile .th img{width:100%;height:100%;object-fit:cover}
-.pm-tile .th canvas.tvid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.pm-tile .th video.tvid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;opacity:0;transition:opacity .15s}
+.pm-tile .th video.tvid.on{opacity:1}
 .pm-tile .bd{padding:7px 9px}.pm-tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm-tile .mt{display:flex;align-items:center;gap:6px;margin-top:5px}.pm-tile .pth{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm-stbl{border-collapse:collapse;width:100%}
@@ -1916,8 +1917,8 @@ function renderProjShots(main,cur){
     const tile=el('div','pm-tile');
     const th=el('div','th');
     if(lv){
-      if(lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)} /* ポスター（読込前・非表示時のフォールバック） */
-      if(lv.v.file){const cv=el('canvas','tvid');cv.dataset.vref=lv.v.file;th.appendChild(cv)} /* 表示中のみ自動再生（ハーフ解像度） */
+      if(lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)} /* ポスター（ホバー前・停止時） */
+      if(lv.v.file){const vid=el('video','tvid');vid.dataset.vref=lv.v.file;vid.muted=true;vid.loop=true;vid.playsInline=true;vid.setAttribute('muted','');vid.preload='none';vid.disablePictureInPicture=true;th.appendChild(vid)} /* ホバーで元解像度再生 */
     }else th.appendChild(icoEl('film'));
     tile.appendChild(th);
     const bd=el('div','bd');bd.appendChild(el('div','nm',sh.name));
@@ -1938,47 +1939,30 @@ function renderProjShots(main,cur){
     grid.appendChild(tile);
   }
   main.appendChild(grid);
-  setupShotAutoplay(); /* タイル動画：表示中のみ自動再生 */
+  setupShotAutoplay(); /* タイル動画：マウスホバーで再生 */
 }
-/* ==== ショットタブのタイル自動再生 ====
-   ・画面に表示中のタイルのみ再生（IntersectionObserver）
-   ・負荷軽減のため、表示サイズの半分の解像度のキャンバスへ描画（ハーフ解像度）。
-     フレームレートは間引かず requestAnimationFrame で毎フレーム描画
-   ・ミュート／ループ。画面外に出たら停止して動画ソースを解放 */
-let _shotObs=null,_shotCanvases=[];
-function tileStop(cv){
-  const tv=cv._tv;if(tv){if(tv.raf){cancelAnimationFrame(tv.raf);tv.raf=0}if(tv.video){try{tv.video.pause();tv.video.removeAttribute('src');tv.video.load()}catch(_){}}tv.playing=false}
-  try{const c=cv.getContext('2d');c&&c.clearRect(0,0,cv.width,cv.height)}catch(_){}
+/* ==== ショットタブのタイル：マウスホバーで再生（元解像度） ====
+   ・自動再生をやめてホバー中のタイルだけ再生 → 同時再生が減り負荷が低いので、
+     解像度は落とさず動画そのままの解像度で <video> 再生（ミュート／ループ）。
+   ・ホバーが外れたら停止してソースを解放（メモリ節約） */
+let _shotHoverVids=[];
+function _shotHoverStop(vid){if(!vid)return;vid._hover=false;vid.classList.remove('on');try{vid.pause()}catch(_){}try{if(vid.getAttribute('src')){vid.removeAttribute('src');vid.load()}}catch(_){}}
+async function _shotHoverPlay(vid){
+  if(!vid)return;vid._hover=true;
+  if(!vid.getAttribute('src')){const url=await storage.getURL(vid.dataset.vref);if(!url||!vid._hover)return;vid.src=url}
+  try{vid.currentTime=0}catch(_){}
+  try{await vid.play()}catch(_){}
+  if(vid._hover)vid.classList.add('on');else _shotHoverStop(vid);
 }
-async function tileStart(cv){
-  const vref=cv.dataset.vref;if(!vref)return;
-  let tv=cv._tv;if(!tv)tv=cv._tv={};
-  if(tv.playing)return;tv.playing=true;
-  const r=cv.getBoundingClientRect();
-  cv.width=Math.max(2,Math.round((r.width||160)/2));cv.height=Math.max(2,Math.round((r.height||90)/2)); /* ハーフ解像度 */
-  const url=await storage.getURL(vref);if(!url||!tv.playing)return;
-  let v=tv.video;if(!v){v=tv.video=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('muted','');v.preload='auto';v.disablePictureInPicture=true}
-  v.src=url;try{await v.play()}catch(_){}
-  const ctx=cv.getContext('2d');
-  const draw=()=>{
-    if(!tv.playing)return;
-    if(!document.contains(cv)){tileStop(cv);return}
-    if(v.readyState>=2){try{ctx.drawImage(v,0,0,cv.width,cv.height)}catch(_){}}
-    tv.raf=requestAnimationFrame(draw); /* フレームは間引かない */
-  };
-  tv.raf=requestAnimationFrame(draw);
-}
-function stopShotAutoplay(){
-  if(_shotObs){_shotObs.disconnect();_shotObs=null}
-  for(const cv of _shotCanvases)tileStop(cv);
-  _shotCanvases=[];
-}
+function stopShotAutoplay(){for(const v of _shotHoverVids)_shotHoverStop(v);_shotHoverVids=[]}
 function setupShotAutoplay(){
   stopShotAutoplay();
-  _shotCanvases=[...document.querySelectorAll('#scroll canvas.tvid')];
-  if(!_shotCanvases.length)return;
-  _shotObs=new IntersectionObserver(ents=>{for(const e of ents){if(e.isIntersecting)tileStart(e.target);else tileStop(e.target)}},{root:null,rootMargin:'150px',threshold:0.15});
-  for(const cv of _shotCanvases)_shotObs.observe(cv);
+  _shotHoverVids=[...document.querySelectorAll('#scroll video.tvid')];
+  for(const vid of _shotHoverVids){
+    const tile=vid.closest('.pm-tile')||vid.parentElement;if(!tile)continue;
+    tile.addEventListener('mouseenter',()=>_shotHoverPlay(vid));
+    tile.addEventListener('mouseleave',()=>_shotHoverStop(vid));
+  }
 }
 /* 進捗タブ用：プロジェクト配下でショット親になり得るノード（孫を持つ） */
 function pmProgressParents(root){const all=[root,...descendants(root.id)];const c=all.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:[root];}
@@ -2623,7 +2607,8 @@ function logItem(node,v){
 
 async function resolveThumbs(){
   for(const img of document.querySelectorAll('#scroll img[data-ref],#scroll .log-thumb[data-ref],#reviewDrawer img[data-ref]')){const ref=img.dataset.ref;const url=await storage.getURL(ref);if(url){if(img.tagName==='IMG')img.src=url;else img.style.backgroundImage='url("'+url+'")'}}
-  for(const v of document.querySelectorAll('#scroll video[data-vref],#reviewDrawer video[data-vref]')){if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}const src=await storage.getURL(v.dataset.vref);if(src&&v.src!==src)v.src=src}
+  /* .tvid（ショットタブのホバー再生）は事前ロードしない＝ホバー時のみ getURL する（負荷軽減） */
+  for(const v of document.querySelectorAll('#scroll video[data-vref]:not(.tvid),#reviewDrawer video[data-vref]:not(.tvid)')){if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}const src=await storage.getURL(v.dataset.vref);if(src&&v.src!==src)v.src=src}
 }
 /* サムネイルのトリミング表示：元画像は変えず、縦横比タイルに合わせて位置・拡大で表示。
    crop={s:拡大率(>=1), fx/fy:パン位置(-0.5..0.5, 0=中央)} は解像度非依存 */
