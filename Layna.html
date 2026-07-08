@@ -1739,8 +1739,9 @@ function renderProjTimeline(main,cur){
   for(const e of evs){
     if(e.type==='submit'){tl.appendChild(tlSubmitItem(e,cur));continue}
     /* ショットの枠全体をクリックで該当ショットへ移動 */
-    const it=el('div','tl-item');it.onclick=()=>openReviewDrawer(e.node.id);it.title='クリックでタスクページを右側に表示';
+    const it=el('div','tl-item');it.onclick=()=>openReviewDrawer(e.node.id);it.title='クリックでタスクページを右側に表示（動画タイルはタスクページへ）';
     const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;
+    th.title='クリックでタスクページへ';th.onclick=ev=>{ev.stopPropagation();go(e.node.id)}; /* 動画タイルは直接タスクページへ */
     it.appendChild(th);
     const bd=el('div','tl-body');
     const shot=e.node.parentId?getNode(e.node.parentId):null;
