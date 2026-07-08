@@ -1537,6 +1537,7 @@ function renderMainHead(){
   const title=el('h1');
   title.appendChild(document.createTextNode(root.name));
   const pb=projBadge(root);const bg=el('span','badge',pb.label);bg.style.background=hexA(pb.color,.18);bg.style.color=pb.color;title.appendChild(bg);
+  title.style.cursor='pointer';title.title='クリックでプロジェクト設定';title.onclick=()=>openRename(root); /* 設定はプロジェクト名クリック／保存先チップから */
   box.appendChild(title);
   if(root.description)box.appendChild(el('div','desc',root.description));
   row1.appendChild(box);
@@ -1569,9 +1570,7 @@ function renderMainHead(){
     btn.onclick=e=>{e.stopPropagation();panel.classList.toggle('hidden')};
     dd.appendChild(btn);dd.appendChild(panel);row1.appendChild(dd);
   }
-  /* プロジェクトの設定・削除（ヘッダはプロジェクト単位。タスク/カテゴリの設定・削除は各ページ内） */
-  const rn=el('button','btn btn-ghost btn-sm','設定');rn.onclick=()=>openRename(root);row1.appendChild(rn);
-  const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>deleteNode(root);row1.appendChild(del);
+  /* 設定・削除はナビタブ列から撤去。設定＝プロジェクト名クリック／保存先チップ、削除＝プロジェクト設定内 */
   h.appendChild(row1);
   /* ── 下段：開いているタスクのタブ列（ヘッダなので固定） ── */
   h.appendChild(buildTaskTabs(root));
@@ -2873,6 +2872,12 @@ function openRename(node){
       dcWrap.appendChild(el('div','form-label','このプロジェクトを自分の一覧から外す（フォルダ内データは保持）'));
       const dc=el('button','btn btn-ghost btn-sm','⇄ 接続を解除');dc.type='button';dc.onclick=()=>{closeModal();disconnectProject(node.id)};dcWrap.appendChild(dc);
       inner.appendChild(dcWrap);
+      /* プロジェクトの削除（ナビタブ列から移設） */
+      inner.appendChild(el('div','divider'));
+      const delWrap=el('div');delWrap.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap';
+      delWrap.appendChild(el('div','form-label','このプロジェクトを削除（プロジェクトとその配下をすべて削除）'));
+      const delB=el('button','btn btn-danger btn-sm','🗑 プロジェクトを削除');delB.type='button';delB.onclick=()=>{closeModal();deleteNode(node)};delWrap.appendChild(delB);
+      inner.appendChild(delWrap);
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
