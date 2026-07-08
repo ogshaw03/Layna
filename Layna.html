@@ -3237,7 +3237,7 @@ function openReview(nodeId,versionId,opts){
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
 
-  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;if(typeof flushCommitted==='function')flushCommitted();document.removeEventListener('keydown',onKey);ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
   /* 表示モード（モーダル⇄全画面） */
   function fbBackdropEnsure(){let bd=$('#fbBackdrop');if(!bd){bd=el('div','fb-backdrop');bd.id='fbBackdrop';bd.onclick=()=>close();if(ov.parentNode)ov.parentNode.insertBefore(bd,ov);else document.body.appendChild(bd)}return bd}
   function fbApplyMode(){if(fbFullscreen){ov.classList.remove('fb-modal');const bd=$('#fbBackdrop');if(bd)bd.remove()}else{ov.classList.add('fb-modal');fbBackdropEnsure()}if(fsBtn){fsBtn.textContent=fbFullscreen?'❐':'⛶';fsBtn.title=fbFullscreen?'モーダル表示に戻す':'全画面表示'}}
@@ -3599,15 +3599,29 @@ function openReview(nodeId,versionId,opts){
   drawBtn.onclick=()=>setTool(tool==='draw'?null:'draw');
   eraserBtn.onclick=()=>setTool(tool==='erase'?null:'erase');
   /* 消しゴム：ブラシのようになぞった部分だけ消す（選択中レイヤーのみ・線は分割） */
+  let committedDirty=false; /* 送信済み描画をその場編集したら true → pointerup/close で保存 */
+  function flushCommitted(){if(committedDirty){committedDirty=false;persist();try{renderBody();resolveThumbs()}catch(_){}}}
   function eraseAt(e){
     const [x,y]=pt(e);
-    const r=eraseW/2/canvas.width;
+    const r=eraseW/2/canvas.width;const aspect=canvas.height/canvas.width;
     const f=dispFrame();const pdur=parseInt(durSel.value)||1;
     const inWin=p=>!isVideo||(p.f!=null&&f>=p.f&&f<p.f+pdur);
+    let any=false;
+    /* 未送信（pending）を消す */
     const cand=[],rest=[];
     for(const p of pending)(inWin(p)?cand:rest).push(p);
-    const res=eraseFromList(cand,x,y,r,canvas.height/canvas.width,activeLayer);
-    if(res){pending=rest.concat(res);drawAll();drawTimeline()}
+    const res=eraseFromList(cand,x,y,r,aspect,activeLayer);
+    if(res){pending=rest.concat(res);any=true}
+    /* 送信済みの描画もその場で編集（消しゴムで部分消し）— モーダルを開いたらそのまま編集できる */
+    for(const n of v.review.notes){
+      if(!n.drawing||!n.drawing.length)continue;
+      if(isVideo&&!(n.frame!=null&&f>=n.frame&&f<n.frame+durOf(n)))continue;
+      const r2=eraseFromList(n.drawing,x,y,r,aspect,activeLayer);
+      if(r2){n.drawing=r2;n.edited=true;any=true;committedDirty=true}
+    }
+    /* 描画もテキストも無くなった送信済みノートは掃除（アップロード等の kind 付きは残す） */
+    if(committedDirty)v.review.notes=v.review.notes.filter(n=>n.kind||(n.text&&String(n.text).trim())||(n.drawing&&n.drawing.length));
+    if(any){drawAll();drawTimeline()}
   }
   canvas.onpointerdown=e=>{
     if(e.button!==0)return; // 中/右ボタンはパン等に譲る
@@ -3615,7 +3629,7 @@ function openReview(nodeId,versionId,opts){
     else if(tool==='erase'){canvas.setPointerCapture(e.pointerId);erasing=true;eraseAt(e)}
   };
   canvas.onpointermove=e=>{if(stroke){const evs=e.getCoalescedEvents?e.getCoalescedEvents():null;if(evs&&evs.length){for(const ce of evs)stroke.points.push(pt(ce))}else stroke.points.push(pt(e));drawAll()}else if(erasing)eraseAt(e)}; /* 合体イベントで速書きの中間点も取得 */
-  canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll();drawTimeline();updSubmit()}erasing=false};
+  canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll();drawTimeline();updSubmit()}erasing=false;flushCommitted()};
   /* Alt+右ドラッグでブラシ/消しゴムサイズ調整（サイズプレビュー円付き） */
   brushSel.onchange=()=>{brushW=parseInt(brushSel.value)||brushW};
   eraseSel.onchange=()=>{eraseW=parseInt(eraseSel.value)||eraseW};
