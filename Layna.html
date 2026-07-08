@@ -427,6 +427,10 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .sub-cmt label{font-size:11px;color:var(--text3)}
 .sub-cmt textarea{flex:1;min-height:110px;resize:vertical;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px;font-family:inherit}
 .sub-empty{color:var(--text3);text-align:center;padding:60px 10px}
+.sub-detail{margin-top:16px;border-top:1px solid var(--border);padding-top:14px}
+.sub-detail-hd{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.sub-detail-hd .ttl{flex:1;min-width:0;font-family:var(--font-head);font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm-tile.sel{outline:2px solid var(--accent2);outline-offset:-1px}
 .sub-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
 /* サブミット：ショットピッカー */
 .subpick{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1450;display:flex;flex-direction:column}
@@ -2003,7 +2007,7 @@ function renderProjProgress(main,cur){
       const badge=el('span','pm-badge',isStage?(ps.stageName||'未着手'):stInfo(ps.curNode||ps.shot).label);
       badge.style.background=isStage?stageColor(ps.stageName):(stInfo(ps.curNode||ps.shot).color||'#5a5a6a');mt.appendChild(badge);
       mt.appendChild(el('span','pth',lv?('最新: '+lv.v.name):'動画なし'));bd.appendChild(mt);tile.appendChild(bd);
-      tile.onclick=()=>{if(lv)pmPreview(ps.shot,lv.v);else toast('このショットには動画がありません')};grid.appendChild(tile);
+      tile.onclick=()=>{if(lv)go(lv.node.id);else toast('このショットには動画がありません')};grid.appendChild(tile); /* タイル → タスクページへ */
     }
     main.appendChild(grid);
   }else{
@@ -2284,23 +2288,39 @@ function fillSubmitDrawer(){
   const toReel=el('button','btn btn-primary btn-sm','▶ まとめて REEL に送る');toReel.onclick=()=>subSendToReel(sb);back._acts.appendChild(toReel);
   const body=back._body;body.innerHTML='';curUploadUI=null;
   if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットへのコメント'));bc.appendChild(el('div','tx',sb.comment));body.appendChild(bc);}
-  body.appendChild(el('div','section-label','提出物（タイルをクリックしてタスクページへ）'));
+  body.appendChild(el('div','section-label','提出物（タイルをクリックすると下にタスクページを表示）'));
   const grid=el('div','pm-grid');
+  const detail=el('div','sub-detail');
+  const tiles=[];
   for(const item of (sb.items||[])){
     const n=getNode(item.nodeId);if(!n)continue;const v=n.versions.find(x=>x.id===item.versionId);if(!v)continue;
     const shot=n.parentId?getNode(n.parentId):null;
-    const tile=el('div','pm-tile');
+    const tile=el('div','pm-tile'+(state.drawer.detailId===n.id?' sel':''));
     const th=el('div','th');if(v.thumb)storage.getURL(v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
     tile.appendChild(th);
     const bd=el('div','bd');bd.appendChild(el('div','nm',(shot&&shot.id!==sb.projectId?shot.name+' / ':'')+n.name));
     const mt=el('div','mt');const badge=el('span','pm-badge',n.name);badge.style.background=stageColor(n.name);mt.appendChild(badge);mt.appendChild(el('span','pth',v.name));bd.appendChild(mt);
     if(item.comment)bd.appendChild(el('div','pth',item.comment));
     tile.appendChild(bd);
-    tile.onclick=()=>{closeReviewDrawer();go(n.id)}; /* 右側スライドのタイル → タスクページへ */
-    grid.appendChild(tile);
+    tile.onclick=()=>{state.drawer.detailId=n.id;tiles.forEach(t=>t.classList.remove('sel'));tile.classList.add('sel');showSubDetail()}; /* タイル → その下にタスクページを展開 */
+    tiles.push(tile);grid.appendChild(tile);
   }
-  if(!(sb.items&&sb.items.length))body.appendChild(el('div','sub-empty','項目がありません。'));
-  else body.appendChild(grid);
+  if(!(sb.items&&sb.items.length)){body.appendChild(el('div','sub-empty','項目がありません。'));return}
+  body.appendChild(grid);body.appendChild(detail);
+  /* 選択したタイルのタスクページをタイルの下（ドロワー内）に表示 */
+  function showSubDetail(){
+    detail.innerHTML='';
+    const n=state.drawer.detailId&&getNode(state.drawer.detailId);
+    if(!n||n.type!=='review')return;
+    const hd=el('div','sub-detail-hd');
+    hd.appendChild(elIco('span','ttl','film',(shotOf(n)?shotOf(n)+' / ':'')+n.name+' — タスクページ'));
+    const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
+    detail.appendChild(hd);
+    const inner=el('div','sub-detail-body');renderReviewBody(inner,n);detail.appendChild(inner);
+    resolveThumbs();
+    try{detail.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(_){}
+  }
+  if(state.drawer.detailId)showSubDetail();
 }
 
 function nodeCard(node,isRoot){
