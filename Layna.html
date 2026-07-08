@@ -109,6 +109,16 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .mp-badge.mp-a .mp-bl{color:var(--green)}
 .mp-badge.mp-r{background:rgba(214,169,95,.13);border-color:rgba(214,169,95,.42)}
 .mp-badge.mp-r .mp-bl{color:var(--amber)}
+/* 検索付き担当ピッカー */
+.mps{position:relative}
+.mps-input{width:100%}
+.mps-dd{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:30;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius2);max-height:230px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.mps-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:13px}
+.mps-opt:hover,.mps-opt.on{background:var(--bg4)}
+.mps-opt .mps-nm{font-weight:600;color:var(--text);white-space:nowrap}
+.mps-opt .mps-sub{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:auto}
+.mps-opt .mps-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mps-empty{padding:9px 10px;color:var(--text3);font-size:12px}
 .mp-filter{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 14px;padding:9px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2)}
 /* プロジェクト パスワード解錠画面 */
 .proj-lock{display:flex;justify-content:center;align-items:flex-start;padding:60px 20px}
@@ -2779,14 +2789,13 @@ function openRename(node){
       inner.appendChild(addStg);
     }
     /* タスク（工程）：作業担当・チェック担当（メンバーから選択。ショット単位ではなく工程ごとに設定） */
-    let asgSel=null,revSel=null;
+    let asgPick=null,revPick=null;
     if(node.type==='review'){
       const aroot=rootOf(node);const members=projectMembers(aroot).filter(m=>m.active!==false);
       inner.appendChild(el('div','divider'));
       inner.appendChild(el('div','form-label','担当（この工程／タスクの作業担当者・チェック担当者。同じショットでも工程ごとに個別に設定できます）'));
-      const fillOpts=(sel,cur)=>{sel.appendChild(new Option('— 未割当',''));for(const m of members)sel.appendChild(new Option(m.name||m.id,m.id));const mm=members.find(m=>String(m.id).toLowerCase()===String(cur||'').toLowerCase());sel.value=mm?mm.id:''};
-      const ar=frow('作業担当','select');asgSel=ar.f;fillOpts(asgSel,node.assignee);inner.appendChild(ar.r);
-      const rr=frow('チェック担当','select');revSel=rr.f;fillOpts(revSel,node.reviewer);inner.appendChild(rr.r);
+      asgPick=memberSearchPicker(aroot,node.assignee,'作業担当');inner.appendChild(asgPick.row);
+      revPick=memberSearchPicker(aroot,node.reviewer,'チェック担当');inner.appendChild(revPick.row);
       if(!members.length)inner.appendChild(el('div','form-label','※ メンバーが未登録です。プロジェクト設定 → メンバー管理で登録してください。'));
     }
     /* プロジェクト（ルート）ならステータス／進捗のショット親フォルダを編集できる */
@@ -2881,8 +2890,8 @@ function openRename(node){
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
-      if(asgSel){if(asgSel.value)node.assignee=asgSel.value;else delete node.assignee}
-      if(revSel){if(revSel.value)node.reviewer=revSel.value;else delete node.reviewer}
+      if(asgPick){const v=asgPick.get();if(v)node.assignee=v;else delete node.assignee}
+      if(revPick){const v=revPick.get();if(v)node.reviewer=v;else delete node.reviewer}
       /* プロジェクトのパスワード保護：新規入力があれば設定/変更、解除チェックで削除 */
       if(!node.parentId){
         if(pwRemove&&pwRemove.checked){delete node.passHash;delete node.passSalt;unlockedSet().delete(node.id)}
@@ -2922,6 +2931,37 @@ function taskAssignBadges(node){
     b.appendChild(el('span','mp-bl',label));b.appendChild(el('span','mp-bn',m?(m.name||m.id):id));frag.appendChild(b);any=true};
   mk('assignee','作業','mp-a');mk('reviewer','チェック','mp-r');
   return any?frag:null;
+}
+/* 検索付きメンバーピッカー（担当設定用）。{row, get()} を返す。get() は選択中のメンバーID（未割当は ''） */
+function memberSearchPicker(root,current,label){
+  const members=projectMembers(root).filter(m=>m.active!==false);
+  const row=el('div','form-row');row.appendChild(el('label','form-label',label));
+  const box=el('div','mps');
+  const input=el('input','form-input mps-input');input.type='text';input.placeholder='名前・メール・ロールで検索（空欄で未割当）';input.autocomplete='off';
+  const dd=el('div','mps-dd');dd.style.display='none';
+  let value=current||'';
+  const setDisplay=()=>{const m=memberById(root,value);input.value=m?(m.name||m.id):''};
+  const hide=()=>{dd.style.display='none'};
+  const render=q=>{
+    dd.innerHTML='';const ql=(q||'').trim().toLowerCase();
+    const none=el('div','mps-opt'+(!value?' on':''));none.textContent='— 未割当';none.onmousedown=e=>{e.preventDefault();value='';setDisplay();hide()};dd.appendChild(none);
+    const matches=members.filter(m=>!ql||((m.name||'')+' '+(m.id||'')+' '+((m.roles||[]).join(' '))).toLowerCase().includes(ql));
+    if(!matches.length)dd.appendChild(el('div','mps-empty','該当するメンバーがいません'));
+    for(const m of matches){
+      const o=el('div','mps-opt'+(String(value).toLowerCase()===String(m.id).toLowerCase()?' on':''));
+      if(m.color){const dot=el('span','mps-dot');dot.style.background=m.color;o.appendChild(dot)}
+      o.appendChild(el('span','mps-nm',m.name||m.id));
+      o.appendChild(el('span','mps-sub',(m.roles||[]).join(', ')||m.id));
+      o.onmousedown=e=>{e.preventDefault();value=m.id;setDisplay();hide()};
+      dd.appendChild(o);
+    }
+  };
+  input.onfocus=()=>{try{input.select()}catch(_){}render('');dd.style.display=''};
+  input.oninput=()=>{render(input.value);dd.style.display=''};
+  input.onblur=()=>{setTimeout(()=>{hide();setDisplay()},160)};
+  box.appendChild(input);box.appendChild(dd);row.appendChild(box);
+  setDisplay();
+  return {row,get:()=>value};
 }
 /* 単一の工程が担当フィルタに一致するか */
 function reviewMatchesFilter(rv){
