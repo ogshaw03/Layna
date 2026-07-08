@@ -1825,26 +1825,24 @@ function renderProjCheck(main,root){
   const meSel=memberById(root,state.checkReviewer);
   main.appendChild(el('div','pm-h',(meSel?(meSel.name||meSel.id):state.checkReviewer)+' のチェック待ち（'+hits.length+'カット）'));
   if(!hits.length){main.appendChild(el('div','pm-empty','この担当者のチェック待ちカットはありません。'));return}
-  const grid=el('div','pm-grid');
+  /* タイムライン風の横長・縦並び：左に動画タイル、右にショットの各種情報 */
+  const list=el('div','tl');
   for(const n of hits){
     const lv=latestVideoVersionUnder(n.id);
-    const tile=el('div','pm-tile');
-    const th=el('div','th');
-    if(lv&&lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)}else th.appendChild(icoEl('film'));
-    tile.appendChild(th);
-    const bd=el('div','bd');
-    bd.appendChild(el('div','nm',shotOf(n)||n.name)); /* ショット名 */
-    const badges=el('div','mt');
-    const stg=el('span','pm-badge',n.name);stg.style.background=stageColor(n.name);badges.appendChild(stg); /* 工程 */
-    const si=stInfo(n);const stB=el('span','pm-badge',si.label);stB.style.background=si.color;badges.appendChild(stB); /* ステータス */
-    bd.appendChild(badges);
-    const asg=n.assignee?memberById(root,n.assignee):null;
-    if(asg||n.assignee){const mt2=el('div','mt');mt2.appendChild(el('span','pth','作業: '+(asg?(asg.name||asg.id):n.assignee)));bd.appendChild(mt2)}
-    tile.appendChild(bd);
-    tile.onclick=()=>go(n.id); /* クリックでタスクページへ */
-    grid.appendChild(tile);
+    const it=el('div','tl-item');it.title='クリックでタスクページへ';it.onclick=()=>go(n.id);
+    const th=el('img','tl-thumb');if(lv&&lv.v.thumb)th.dataset.ref=lv.v.thumb;it.appendChild(th);
+    const bd=el('div','tl-body');
+    bd.appendChild(el('div','tl-path',shotOf(n)||n.name)); /* ショット名 */
+    const t=el('div','tl-title');
+    const stg=el('span','tl-stage',n.name);stg.style.background=stageColor(n.name);t.appendChild(stg); /* 工程 */
+    const si=stInfo(n);const stB=el('span','tl-stage',si.label);stB.style.background=si.color;t.appendChild(stB); /* ステータス */
+    bd.appendChild(t);
+    const ab=taskAssignBadges(n);if(ab)bd.appendChild(ab); /* 作業/チェック担当 */
+    bd.appendChild(el('div','tl-meta',lv?('最新: '+lv.v.name+'　by '+(lv.v.uploadedBy||'-')+'・'+fmt(lv.v.uploadedAt)):'動画なし'));
+    it.appendChild(bd);
+    list.appendChild(it);
   }
-  main.appendChild(grid);
+  main.appendChild(list);
 }
 /* ショットタブ：ショット親フォルダ直下の「ショット」ごとに最新動画をグリッド表示
    （ショットの中身＝工程ではなく、ショット単位で表示） */
