@@ -178,6 +178,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .chk-tab .chk-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .chk-tab .chk-cnt{font-size:11px;font-weight:700;color:var(--text3);background:var(--bg3);border-radius:999px;padding:1px 7px;min-width:18px;text-align:center}
 .chk-tab.on .chk-cnt{color:var(--text);background:var(--bg4)}
+.tl-item.tl-done{opacity:.5}
+.chk-done-chip{font-size:10px;font-weight:700;color:var(--green);background:rgba(127,191,154,.14);border:1px solid rgba(127,191,154,.4);border-radius:5px;padding:1px 7px;white-space:nowrap}
 .pm-card{border:1px solid var(--border);border-radius:12px;background:var(--bg2);padding:16px 18px;margin-bottom:6px}
 .pm-body{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
 .pm-body canvas{flex-shrink:0;cursor:pointer}
@@ -1613,7 +1615,7 @@ function buildProjectTabsHead(root){
     if(i)nav.appendChild(el('span','vdiv')); /* タブ間の縦区切り線 */
     const active=onRoot&&state.projTab===id;
     const b=el('button','ptab'+(active?' on':''),lab);
-    b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
+    b.onclick=()=>{if(id==='check')state.checkReset=true;state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
     nav.appendChild(b);
   });
   return nav;
@@ -1820,12 +1822,24 @@ function renderProjSubmits(main,root){
 /* チェック待ちタブ：チェック担当者ごと＋未割り当てで、チェック待ち（未完了）の工程（カット）をタブ切替表示 */
 const CHK_NONE='__none__';
 function renderProjCheck(main,root){
-  main.appendChild(el('div','pm-h','チェック待ち — チェック担当者ごと／未割り当ての未チェックカット'));
+  /* ヘッダ（更新ボタン付き）。ステータス変更してもその場では消えず、更新するまで残る（誤操作防止） */
+  const head=el('div','pm-h');head.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  head.appendChild(el('span',null,'チェック待ち — チェック担当者ごと／未割り当て'));
+  const refresh=el('button','btn btn-ghost btn-sm','🗘 更新');refresh.title='ステータスを変更したカットを一覧から整理（更新するまで消えません）';
+  refresh.onclick=()=>{state.checkReset=true;renderBody();resolveThumbs()};head.appendChild(refresh);
+  main.appendChild(head);
   /* 対象＝配下の工程(review)で、動画があり、まだ完了していないもの（チェック担当の有無は問わない） */
-  const all=descendants(root.id).filter(n=>n.type==='review'&&n.versions&&n.versions.length&&!isDoneStatus(root,nodeStatus(n)));
+  const pendingNow=descendants(root.id).filter(n=>n.type==='review'&&n.versions&&n.versions.length&&!isDoneStatus(root,nodeStatus(n)));
+  const pendingIds=new Set(pendingNow.map(n=>n.id));
+  /* スナップショット：タブに入った時（またはチェック待ちタブ再クリック/更新）に確定。
+     以後のステータス変更ではリストからカットを消さず、済みは薄く表示のまま残す（誤操作防止）。 */
+  if(!state.checkSnap||state.checkSnapRoot!==root.id||state.checkReset){state.checkSnap=new Set(pendingIds);state.checkSnapRoot=root.id;state.checkReset=false}
+  else{for(const id of pendingIds)state.checkSnap.add(id)} /* 新規の未チェックカットは随時追加 */
+  const all=descendants(root.id).filter(n=>n.type==='review'&&n.versions&&n.versions.length&&state.checkSnap.has(n.id));
   if(!all.length){main.appendChild(el('div','pm-empty','チェック待ちのカットはありません。動画が上がっていて未完了の工程がここに表示されます。'));return}
-  /* バケット：チェック担当者ごと（名簿順→名簿外）＋未割り当て */
-  const cntFor=key=>key===CHK_NONE?all.filter(n=>!n.reviewer).length:all.filter(n=>n.reviewer&&String(n.reviewer).toLowerCase()===String(key).toLowerCase()).length;
+  const isPend=n=>pendingIds.has(n.id);
+  /* バケット：チェック担当者ごと（名簿順→名簿外）＋未割り当て。件数は「未チェック（残り）」で表示 */
+  const cntFor=key=>{const inB=n=>key===CHK_NONE?!n.reviewer:(n.reviewer&&String(n.reviewer).toLowerCase()===String(key).toLowerCase());return all.filter(n=>inB(n)&&isPend(n)).length};
   const keys=[];const seen=new Set();
   for(const m of projectMembers(root)){const k=String(m.id).toLowerCase();if(!seen.has(k)&&all.some(n=>n.reviewer&&String(n.reviewer).toLowerCase()===k)){seen.add(k);keys.push(m.id)}}
   for(const n of all){if(!n.reviewer)continue;const k=String(n.reviewer).toLowerCase();if(!seen.has(k)){seen.add(k);keys.push(n.reviewer)}}
@@ -1851,13 +1865,17 @@ function renderProjCheck(main,root){
   const hits=all.filter(n=>selNone?!n.reviewer:(n.reviewer&&String(n.reviewer).toLowerCase()===String(state.checkReviewer).toLowerCase()));
   hits.sort((a,b)=>{const sa=shotOf(a)||'',sb=shotOf(b)||'';return sa<sb?-1:sa>sb?1:(a.name<b.name?-1:a.name>b.name?1:0)});
   const meSel=selNone?null:memberById(root,state.checkReviewer);
-  main.appendChild(el('div','pm-h',(selNone?'未割り当て':(meSel?(meSel.name||meSel.id):state.checkReviewer))+' のチェック待ち（'+hits.length+'カット）'));
+  const pendCnt=hits.filter(isPend).length;const doneCnt=hits.length-pendCnt;
+  main.appendChild(el('div','pm-h',(selNone?'未割り当て':(meSel?(meSel.name||meSel.id):state.checkReviewer))+' のチェック待ち（未チェック '+pendCnt+' カット'+(doneCnt?'・チェック済 '+doneCnt+' カット':'')+'）'));
   if(!hits.length){main.appendChild(el('div','pm-empty','このバケットのチェック待ちカットはありません。'));return}
+  /* 未チェックを上に、チェック済みを下にまとめる */
+  hits.sort((a,b)=>(isPend(a)?0:1)-(isPend(b)?0:1));
   /* タイムライン風の横長・縦並び：左に動画タイル、右にショットの各種情報 */
   const list=el('div','tl');
   for(const n of hits){
+    const done=!isPend(n);
     const lv=latestVideoVersionUnder(n.id);
-    const it=el('div','tl-item');it.title='クリックでタスクページをタブ表示（動画タイルはアノテーション表示）';it.onclick=()=>go(n.id);
+    const it=el('div','tl-item'+(done?' tl-done':''));it.title='クリックでタスクページをタブ表示（動画タイルはアノテーション表示）';it.onclick=()=>go(n.id);
     const th=el('img','tl-thumb');if(lv&&lv.v.thumb)th.dataset.ref=lv.v.thumb;
     if(lv){th.title='クリックでアノテーションウィンドウを開く';th.onclick=ev=>{ev.stopPropagation();openReview(lv.node.id,lv.v.id,{modal:true})}} /* 動画タイルはアノテーションをモーダル表示 */
     it.appendChild(th);
@@ -1866,6 +1884,7 @@ function renderProjCheck(main,root){
     const t=el('div','tl-title');
     const stg=el('span','tl-stage',n.name);stg.style.background=stageColor(n.name);t.appendChild(stg); /* 工程 */
     const sp=buildStatusSelect(n);sp.onclick=e=>e.stopPropagation();t.appendChild(sp); /* ステータス変更（行クリックの遷移を抑止） */
+    if(done)t.appendChild(el('span','chk-done-chip','✓ チェック済（更新で整理）'));
     bd.appendChild(t);
     const ab=taskAssignBadges(n);if(ab)bd.appendChild(ab); /* 作業/チェック担当 */
     bd.appendChild(el('div','tl-meta',lv?('最新: '+lv.v.name+'　by '+(lv.v.uploadedBy||'-')+'・'+fmt(lv.v.uploadedAt)):'動画なし'));
