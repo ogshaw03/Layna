@@ -1434,7 +1434,10 @@ function updateHeaderForContext(){
   setD('#folderStatus',!home);updateFolderStatus();
 }
 function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline',lastPageId:state.lastPageId||null}))}catch(_){}}
-function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
+function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();maybeScanMentions();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
+/* 表示のたびに（スロットル付きで）自分宛メンションを走査 */
+let _mentionScanAt=0;
+function maybeScanMentions(){let now=0;try{now=Date.now()}catch(_){}if(now-_mentionScanAt<3000)return;_mentionScanAt=now;try{scanMentionsForMe()}catch(_){}}
 
 /* サイドバー：ツリー */
 function renderSidebar(){
