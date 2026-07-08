@@ -489,6 +489,9 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .drawer-hd .sp{flex:1}
 .drawer-hd .drawer-acts{display:flex;gap:8px;flex-shrink:0}
 .drawer-body{flex:1;min-height:0;overflow-y:auto;padding:16px 18px}
+/* レビュードロワー：タスクページの固定バーを上部メニュー直下に詰める（隙間を無くす） */
+.drawer.drawer-review .drawer-body{padding-top:0}
+.drawer.drawer-review .drawer-body .task-topbar{margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px}
 /* 右側スライドは幅が狭いので、フレームコメント（スクショ）列を細くして
    動画クリップとショット全体コメントを大きく見せる（ページタブに近い比率に） */
 .drawer .log-side{width:min(210px,40%)}
@@ -2281,8 +2284,9 @@ function fillReviewDrawer(){
   /* 工程プルダウン：ヘッダの「ページで開く」ボタンの左（工程テキストの右）に配置 */
   const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
   const strip=buildStageStrip(shot,node.id);if(strip)back._acts.appendChild(strip);
-  if(node.versions.length)back._acts.appendChild(buildStatusSelect(node)); /* ステータス切替プルダウン */
-  const openB=el('button','btn btn-open btn-sm','⤢ ページで開く');openB.title='このタスクページを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
+  /* ステータスはタスクページ側に表示があるため、上部メニューでは重複を避けて非表示 */
+  const openB=el('button','btn btn-open btn-sm','＋ タブに追加');openB.title='このタスクページをタブとして開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
+  back.classList.add('drawer-review'); /* タスクページ表示：上部メニューとの隙間を詰める */
   back._body.innerHTML='';curUploadUI=null;
   renderReviewBody(back._body,node);
   resolveThumbs();
@@ -2294,6 +2298,7 @@ function openSubmitDrawer(submitId){
 }
 function fillSubmitDrawer(){
   const back=$('#reviewDrawer');if(!back||!state.drawer||state.drawer.kind!=='submit')return;
+  back.classList.remove('drawer-review');
   const sb=(DB.submits||[]).find(s=>s.id===state.drawer.id);if(!sb){closeReviewDrawer();return}
   back._t.textContent=sb.name;
   back._p.textContent='サブミット — '+((sb.items&&sb.items.length)||0)+' 件の提出';
@@ -2327,7 +2332,7 @@ function fillSubmitDrawer(){
     if(!n||n.type!=='review')return;
     const hd=el('div','sub-detail-hd');
     hd.appendChild(elIco('span','ttl','film',(shotOf(n)?shotOf(n)+' / ':'')+n.name+' — タスクページ'));
-    const openB=el('button','btn btn-open btn-sm','⤢ ページで開く');openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
+    const openB=el('button','btn btn-open btn-sm','＋ タブに追加');openB.title='このタスクページをタブとして開く';openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
     detail.appendChild(hd);
     const inner=el('div','sub-detail-body');renderReviewBody(inner,n);detail.appendChild(inner);
     resolveThumbs();
