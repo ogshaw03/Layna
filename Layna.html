@@ -1129,6 +1129,17 @@ function scanMentionsForMe(){
       for(const c of (n.comments||[]))consider(c,c.author,c.text,n.id);
       if(n.type==='review')for(const v of (n.versions||[]))for(const note of ((v.review&&v.review.notes)||[]))consider(note,note.author,note.text,n.id);
     }
+    /* レビュー依頼：サブミット提出時、自分がチェック担当のカットを通知 */
+    for(const sb of (DB.submits||[])){
+      if(!sb||sb.projectId!==root.id||!Array.isArray(sb.items))continue;
+      if((sb.by||'')===currentUser())continue; /* 自分が提出したものは通知しない */
+      for(const it of sb.items){
+        const n=getNode(it.nodeId);if(!n||!n.reviewer)continue;
+        if(!me.ids.has(String(n.reviewer).toLowerCase()))continue; /* 自分がチェック担当のときのみ */
+        const key='rq:'+sb.id+':'+it.nodeId;if(seen.has(key))continue;seen.add(key);
+        pending.push({title:'チェック依頼',text:(sb.by||'誰か')+'：'+(shotOf(n)?shotOf(n)+' / ':'')+n.name+'（'+(sb.name||'サブミット')+'）',nodeId:it.nodeId});
+      }
+    }
   }
   _saveSeenMentions(seen);
   if(pending.length){if(!Array.isArray(DB.notifications))DB.notifications=[];
@@ -1300,7 +1311,7 @@ async function createSubmitBlock(){
       if(b.status)b.node.status=b.status;
     }
   }
-  DB.submits.push({id:subId,projectId:pid,name,createdAt:nowIso(),comment:blockComment,items});
+  DB.submits.push({id:subId,projectId:pid,name,createdAt:nowIso(),by:currentUser(),comment:blockComment,items});
   await persist();
   for(const b of blocks){if(b.thumbUrl){try{URL.revokeObjectURL(b.thumbUrl)}catch(_){}}}
   subS.blocks=[];subS.blockComment='';
