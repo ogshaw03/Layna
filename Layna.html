@@ -1805,36 +1805,42 @@ function renderProjSubmits(main,root){
   }
   main.appendChild(w);
 }
-/* チェック待ちタブ：チェック担当者ごとに、チェック待ち（未完了）の工程（カット）をタブで切り替え表示 */
+/* チェック待ちタブ：チェック担当者ごと＋未割り当てで、チェック待ち（未完了）の工程（カット）をタブ切替表示 */
+const CHK_NONE='__none__';
 function renderProjCheck(main,root){
-  main.appendChild(el('div','pm-h','チェック待ち — チェック担当者ごとの未チェックカット'));
-  /* 対象＝配下の工程(review)で、チェック担当が設定され、動画があり、まだ完了していないもの */
-  const all=descendants(root.id).filter(n=>n.type==='review'&&n.reviewer&&n.versions&&n.versions.length&&!isDoneStatus(root,nodeStatus(n)));
-  /* チェック担当者一覧（名簿順→名簿外ID） */
-  const reviewerIds=[];const seen=new Set();
-  for(const m of projectMembers(root)){const k=String(m.id).toLowerCase();if(!seen.has(k)&&all.some(n=>String(n.reviewer).toLowerCase()===k)){seen.add(k);reviewerIds.push(m.id)}}
-  for(const n of all){const k=String(n.reviewer).toLowerCase();if(!seen.has(k)){seen.add(k);reviewerIds.push(n.reviewer)}}
-  if(!reviewerIds.length){main.appendChild(el('div','pm-empty','チェック待ちのカットはありません。工程（タスク）の設定でチェック担当を割り当てると、担当者ごとにここへ表示されます。'));return}
-  if(!reviewerIds.some(id=>String(id).toLowerCase()===String(state.checkReviewer||'').toLowerCase()))state.checkReviewer=reviewerIds[0];
+  main.appendChild(el('div','pm-h','チェック待ち — チェック担当者ごと／未割り当ての未チェックカット'));
+  /* 対象＝配下の工程(review)で、動画があり、まだ完了していないもの（チェック担当の有無は問わない） */
+  const all=descendants(root.id).filter(n=>n.type==='review'&&n.versions&&n.versions.length&&!isDoneStatus(root,nodeStatus(n)));
+  if(!all.length){main.appendChild(el('div','pm-empty','チェック待ちのカットはありません。動画が上がっていて未完了の工程がここに表示されます。'));return}
+  /* バケット：チェック担当者ごと（名簿順→名簿外）＋未割り当て */
+  const cntFor=key=>key===CHK_NONE?all.filter(n=>!n.reviewer).length:all.filter(n=>n.reviewer&&String(n.reviewer).toLowerCase()===String(key).toLowerCase()).length;
+  const keys=[];const seen=new Set();
+  for(const m of projectMembers(root)){const k=String(m.id).toLowerCase();if(!seen.has(k)&&all.some(n=>n.reviewer&&String(n.reviewer).toLowerCase()===k)){seen.add(k);keys.push(m.id)}}
+  for(const n of all){if(!n.reviewer)continue;const k=String(n.reviewer).toLowerCase();if(!seen.has(k)){seen.add(k);keys.push(n.reviewer)}}
+  if(all.some(n=>!n.reviewer))keys.push(CHK_NONE); /* 未割り当てバケット */
+  /* 選択が無効なら、未割り当てがあれば未割り当てを、なければ先頭を既定表示 */
+  const has=k=>keys.some(x=>String(x).toLowerCase()===String(k||'').toLowerCase());
+  if(!has(state.checkReviewer))state.checkReviewer=keys.includes(CHK_NONE)?CHK_NONE:keys[0];
   /* 担当者タブ（本体のタブUIに統一：アンダーライン／モノクロ） */
   const tabs=el('div','chk-tabs');
-  for(const id of reviewerIds){
-    const m=memberById(root,id);const cnt=all.filter(n=>String(n.reviewer).toLowerCase()===String(id).toLowerCase()).length;
-    const on=String(id).toLowerCase()===String(state.checkReviewer).toLowerCase();
+  for(const key of keys){
+    const isNone=key===CHK_NONE;const m=isNone?null:memberById(root,key);const cnt=cntFor(key);
+    const on=String(key).toLowerCase()===String(state.checkReviewer).toLowerCase();
     const b=el('button','chk-tab'+(on?' on':''));
     if(m&&m.color){const dot=el('span','chk-dot');dot.style.background=m.color;b.appendChild(dot)}
-    b.appendChild(el('span','chk-nm',m?(m.name||m.id):id));
+    b.appendChild(el('span','chk-nm',isNone?'未割り当て':(m?(m.name||m.id):key)));
     b.appendChild(el('span','chk-cnt',String(cnt)));
-    b.onclick=()=>{if(String(state.checkReviewer).toLowerCase()!==String(id).toLowerCase()){state.checkReviewer=id;renderBody();resolveThumbs()}};
+    b.onclick=()=>{if(String(state.checkReviewer).toLowerCase()!==String(key).toLowerCase()){state.checkReviewer=key;renderBody();resolveThumbs()}};
     tabs.appendChild(b);
   }
   main.appendChild(tabs);
-  /* 選択担当者のチェック待ちカット（ショット名→工程名でソート） */
-  const hits=all.filter(n=>String(n.reviewer).toLowerCase()===String(state.checkReviewer).toLowerCase());
+  /* 選択バケットのチェック待ちカット（ショット名→工程名でソート） */
+  const selNone=state.checkReviewer===CHK_NONE;
+  const hits=all.filter(n=>selNone?!n.reviewer:(n.reviewer&&String(n.reviewer).toLowerCase()===String(state.checkReviewer).toLowerCase()));
   hits.sort((a,b)=>{const sa=shotOf(a)||'',sb=shotOf(b)||'';return sa<sb?-1:sa>sb?1:(a.name<b.name?-1:a.name>b.name?1:0)});
-  const meSel=memberById(root,state.checkReviewer);
-  main.appendChild(el('div','pm-h',(meSel?(meSel.name||meSel.id):state.checkReviewer)+' のチェック待ち（'+hits.length+'カット）'));
-  if(!hits.length){main.appendChild(el('div','pm-empty','この担当者のチェック待ちカットはありません。'));return}
+  const meSel=selNone?null:memberById(root,state.checkReviewer);
+  main.appendChild(el('div','pm-h',(selNone?'未割り当て':(meSel?(meSel.name||meSel.id):state.checkReviewer))+' のチェック待ち（'+hits.length+'カット）'));
+  if(!hits.length){main.appendChild(el('div','pm-empty','このバケットのチェック待ちカットはありません。'));return}
   /* タイムライン風の横長・縦並び：左に動画タイル、右にショットの各種情報 */
   const list=el('div','tl');
   for(const n of hits){
