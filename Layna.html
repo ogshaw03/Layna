@@ -70,6 +70,16 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .sidebar-label .add{color:var(--accent);cursor:pointer;font-size:14px}
 .sidebar-label .side-ctrls{display:flex;align-items:center;gap:11px}
 .sidebar-label .side-ctrls .add:hover{color:var(--text)}
+/* サイドバー内 検索＋作業者フィルタ */
+.side-filter{display:flex;flex-direction:column;gap:7px;padding:0 8px 10px;margin-bottom:6px;border-bottom:1px solid var(--border)}
+.side-search{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);padding:6px 9px;font-size:12px;font-family:inherit}
+.side-search:focus{outline:none;border-color:var(--border2)}
+.side-asg.form-row{margin:0}
+.side-asg .form-label{font-size:10px;color:var(--text3);letter-spacing:.04em;margin:0 0 3px}
+.side-asg .mps-input{font-size:12px;padding:6px 8px}
+.side-clr{align-self:flex-start;padding:3px 9px;font-size:11px}
+.tree-row.hit .tree-name{color:var(--text);font-weight:700}
+.tree-row.hit{background:rgba(96,165,255,.08)}
 /* TREE */
 .tree{font-size:13px}
 .tree-row{display:flex;align-items:center;gap:5px;padding:5px 6px;border-radius:6px;color:var(--text2);cursor:pointer;white-space:nowrap;overflow:hidden}
@@ -1515,17 +1525,52 @@ function renderSidebar(){
   const col=el('span','add','⊟');col.title='現在の階層以外を閉じる';col.onclick=()=>{state.expanded=new Set(pathOf(state.currentId).map(n=>n.id));renderSidebar()};ctrls.appendChild(col);
   const add=el('span','add','＋');add.title='この直下に項目を追加';add.onclick=()=>openAddModal(root.id);ctrls.appendChild(add);
   lab.appendChild(ctrls);sb.appendChild(lab);
-  const kids=childrenOf(root.id);
-  if(!kids.length){sb.appendChild(el('div','tree-empty','項目なし'));return}
-  const tree=el('div','tree');
-  for(const c of kids)renderTreeNode(tree,c,0);
-  sb.appendChild(tree);
+  /* ── サイドバー内 検索＋作業者フィルタ ── */
+  const fbar=el('div','side-filter');
+  const si=el('input','side-search');si.type='text';si.placeholder='🔍 ショット・工程を検索';si.value=state.sideSearch||'';
+  fbar.appendChild(si);
+  const ap=memberSearchPicker(root,state.sideAssignee,'作業者で絞り込み',v=>{state.sideAssignee=v||'';paint()},'— 全員');
+  ap.row.classList.add('side-asg');fbar.appendChild(ap.row);
+  const clr=el('button','btn btn-ghost btn-sm side-clr','フィルタ解除');clr.style.display=(state.sideSearch||state.sideAssignee)?'':'none';
+  clr.onclick=()=>{state.sideSearch='';state.sideAssignee='';renderSidebar()};
+  fbar.appendChild(clr);
+  sb.appendChild(fbar);
+  const treeC=el('div','tree');sb.appendChild(treeC);
+  function paint(){
+    treeC.innerHTML='';
+    clr.style.display=(state.sideSearch||state.sideAssignee)?'':'none';
+    const filt=computeSidebarVisible(root);
+    const kids=childrenOf(root.id).filter(c=>!filt||filt.vis.has(c.id));
+    if(!kids.length){treeC.appendChild(el('div','tree-empty',(state.sideSearch||state.sideAssignee)?'一致する項目がありません':'項目なし'));return}
+    for(const c of kids)renderTreeNode(treeC,c,0,filt);
+  }
+  si.oninput=()=>{state.sideSearch=si.value;paint()};
+  paint();
 }
-function renderTreeNode(container,node,depth){
-  const kids=childrenOf(node.id);const row=el('div','tree-row'+(node.id===state.currentId?' active':''));
+/* サイドバー フィルタ：検索語・作業者に一致するノード＋その先祖の集合（未指定なら null＝全表示） */
+function computeSidebarVisible(root){
+  const q=(state.sideSearch||'').trim().toLowerCase();
+  const fa=(state.sideAssignee||'').toLowerCase();
+  if(!q&&!fa)return null;
+  const matchIds=new Set();
+  for(const n of descendants(root.id)){
+    let m=true;
+    if(fa){if(!(n.type==='review'&&String(n.assignee||'').toLowerCase()===fa))m=false}
+    if(q){const hay=(n.name+' '+pathOf(n.id).slice(1).map(x=>x.name).join(' ')).toLowerCase();if(!hay.includes(q))m=false}
+    if(m)matchIds.add(n.id);
+  }
+  const vis=new Set();
+  for(const id of matchIds){let n=getNode(id);while(n&&n.id!==root.id){vis.add(n.id);n=n.parentId?getNode(n.parentId):null}}
+  return {vis,matchIds};
+}
+function renderTreeNode(container,node,depth,filt){
+  if(filt&&!filt.vis.has(node.id))return;
+  const kids=childrenOf(node.id).filter(c=>!filt||filt.vis.has(c.id));
+  const row=el('div','tree-row'+(node.id===state.currentId?' active':'')+(filt&&filt.matchIds.has(node.id)?' hit':''));
   row.style.paddingLeft=(6+depth*13)+'px';
-  const tg=el('span','tree-toggle'+(state.expanded.has(node.id)?' open':''),kids.length?'▶':'');
-  if(kids.length)tg.onclick=e=>{e.stopPropagation();if(state.expanded.has(node.id))state.expanded.delete(node.id);else state.expanded.add(node.id);renderSidebar()};
+  const expanded=filt?true:state.expanded.has(node.id); /* フィルタ中は一致枝を自動展開 */
+  const tg=el('span','tree-toggle'+(kids.length&&expanded?' open':''),kids.length?'▶':'');
+  if(kids.length&&!filt)tg.onclick=e=>{e.stopPropagation();if(state.expanded.has(node.id))state.expanded.delete(node.id);else state.expanded.add(node.id);renderSidebar()};
   row.appendChild(tg);
   const dot=el('span','tree-dot');dot.style.background=stInfo(node).color;row.appendChild(dot);
   const ico=icoEl(node.type==='review'?'film':'folder');ico.style.flexShrink='0';row.appendChild(ico);
@@ -1534,7 +1579,7 @@ function renderTreeNode(container,node,depth){
   else if(kids.length){const tb=elIco('span','tree-badge','folder',String(kids.length));row.appendChild(tb)}
   row.onclick=()=>go(node.id);
   container.appendChild(row);
-  if(kids.length&&state.expanded.has(node.id)){const wrap=el('div');for(const c of kids)renderTreeNode(wrap,c,depth+1);container.appendChild(wrap)}
+  if(kids.length&&expanded){const wrap=el('div');for(const c of kids)renderTreeNode(wrap,c,depth+1,filt);container.appendChild(wrap)}
 }
 
 /* パンくず */
@@ -3000,7 +3045,7 @@ function taskAssignBadges(node){
   return any?frag:null;
 }
 /* 検索付きメンバーピッカー（担当設定用）。{row, get()} を返す。get() は選択中のメンバーID（未割当は ''） */
-function memberSearchPicker(root,current,label){
+function memberSearchPicker(root,current,label,onChange,noneLabel){
   const members=projectMembers(root).filter(m=>m.active!==false);
   const row=el('div','form-row');row.appendChild(el('label','form-label',label));
   const box=el('div','mps');
@@ -3009,9 +3054,10 @@ function memberSearchPicker(root,current,label){
   let value=current||'';
   const setDisplay=()=>{const m=memberById(root,value);input.value=m?(m.name||m.id):''};
   const hide=()=>{dd.style.display='none'};
+  const pick=v=>{value=v;setDisplay();hide();if(onChange)onChange(value)};
   const render=q=>{
     dd.innerHTML='';const ql=(q||'').trim().toLowerCase();
-    const none=el('div','mps-opt'+(!value?' on':''));none.textContent='— 未割当';none.onmousedown=e=>{e.preventDefault();value='';setDisplay();hide()};dd.appendChild(none);
+    const none=el('div','mps-opt'+(!value?' on':''));none.textContent=noneLabel||'— 未割当';none.onmousedown=e=>{e.preventDefault();pick('')};dd.appendChild(none);
     const matches=members.filter(m=>!ql||((m.name||'')+' '+(m.id||'')+' '+((m.roles||[]).join(' '))).toLowerCase().includes(ql));
     if(!matches.length)dd.appendChild(el('div','mps-empty','該当するメンバーがいません'));
     for(const m of matches){
@@ -3019,7 +3065,7 @@ function memberSearchPicker(root,current,label){
       if(m.color){const dot=el('span','mps-dot');dot.style.background=m.color;o.appendChild(dot)}
       o.appendChild(el('span','mps-nm',m.name||m.id));
       o.appendChild(el('span','mps-sub',(m.roles||[]).join(', ')||m.id));
-      o.onmousedown=e=>{e.preventDefault();value=m.id;setDisplay();hide()};
+      o.onmousedown=e=>{e.preventDefault();pick(m.id)};
       dd.appendChild(o);
     }
   };
