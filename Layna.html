@@ -452,6 +452,10 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .subpick{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1450;display:flex;flex-direction:column}
 .subpick .pk{background:var(--bg2);margin:auto;width:min(960px,94vw);max-height:88vh;display:flex;flex-direction:column;border:1px solid var(--edge);border-radius:12px;box-shadow:0 12px 50px rgba(0,0,0,.6)}
 .subpick .pkh{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.subpick .pk-asg.form-row{margin:0;display:flex;flex-direction:row;align-items:center;gap:7px;width:auto}
+.subpick .pk-asg .form-label{margin:0;font-size:11px;color:var(--text3);white-space:nowrap}
+.subpick .pk-asg .mps{width:190px}
+.subpick .pk-asg .mps-input{font-size:12px;padding:5px 8px}
 .subpick .pkb{flex:1;min-height:0;overflow-y:auto;padding:16px}
 .subpick .pkf{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border)}
 .pk-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
@@ -1310,31 +1314,46 @@ function subBlockEl(block){
   return bl;
 }
 function openSubPicker(){
-  const parent=getNode(shotsParentOf(getNode(subS.projectId)));
+  const root=getNode(subS.projectId);
+  const parent=getNode(shotsParentOf(root));
   const shots=childrenOf(parent.id);
   const sel=new Set();
+  let filterAsg='';
   const modal=el('div','subpick');
   const pk=el('div','pk');
   const pkh=el('div','pkh');pkh.appendChild(el('div',null,'提出するショット・工程を選択'));const hsp=el('div');hsp.style.flex='1';pkh.appendChild(hsp);
+  /* 作業者で絞り込み（検索付きプルダウン） */
+  const ap=memberSearchPicker(root,'','作業者で絞り込み',v=>{filterAsg=(v||'').toLowerCase();buildGrid()},'— 全員');
+  ap.row.classList.add('pk-asg');pkh.appendChild(ap.row);
   const pkb=el('div','pkb');const grid=el('div','pk-grid');pkb.appendChild(grid);
-  for(const shot of shots){
-    const card=el('div','pk-shot');
-    const th=el('div','th');const lv=latestVideoVersionUnder(shot.id);if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
-    card.appendChild(th);
-    card.appendChild(el('div','nm',shot.name));
-    const chips=el('div','pk-stages');chips.style.display='none';
-    for(const stg of submitStagesOf(shot)){
-      const chip=el('div','pk-chip',stg.name);
-      chip.onclick=e=>{e.stopPropagation();if(sel.has(stg.id))sel.delete(stg.id);else sel.add(stg.id);chip.classList.toggle('on',sel.has(stg.id));updCount()};
-      chips.appendChild(chip);
+  const cnt=el('span','sub',' ');const updCount=()=>cnt.textContent=sel.size+' 件選択';
+  const stgAssignee=stg=>{const n=getNode(stg.id);return n?String(n.assignee||'').toLowerCase():''};
+  function buildGrid(){
+    grid.innerHTML='';let shown=0;
+    for(const shot of shots){
+      const stages=submitStagesOf(shot);
+      const visStages=filterAsg?stages.filter(s=>stgAssignee(s)===filterAsg):stages;
+      if(filterAsg&&!visStages.length)continue; /* 該当作業者の工程が無いショットは非表示 */
+      shown++;
+      const card=el('div','pk-shot'+(filterAsg?' sel':''));
+      const th=el('div','th');const lv=latestVideoVersionUnder(shot.id);if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
+      card.appendChild(th);
+      card.appendChild(el('div','nm',shot.name));
+      const chips=el('div','pk-stages');chips.style.display=filterAsg?'flex':'none'; /* 絞り込み中は該当工程を自動表示 */
+      for(const stg of visStages){
+        const chip=el('div','pk-chip'+(sel.has(stg.id)?' on':''),stg.name);
+        chip.onclick=e=>{e.stopPropagation();if(sel.has(stg.id))sel.delete(stg.id);else sel.add(stg.id);chip.classList.toggle('on',sel.has(stg.id));updCount()};
+        chips.appendChild(chip);
+      }
+      card.appendChild(chips);
+      th.onclick=()=>{const show=chips.style.display==='none';chips.style.display=show?'flex':'none';card.classList.toggle('sel',show)};
+      grid.appendChild(card);
     }
-    card.appendChild(chips);
-    th.onclick=()=>{const show=chips.style.display==='none';chips.style.display=show?'flex':'none';card.classList.toggle('sel',show)};
-    grid.appendChild(card);
+    if(!shown)grid.appendChild(el('div','sub-empty',shots.length?'該当する作業者のショットがありません。':'ショットがありません。'));
   }
-  if(!shots.length)pkb.appendChild(el('div','sub-empty','ショットがありません。'));
+  buildGrid();
   const pkf=el('div','pkf');
-  const cnt=el('span','sub',' ');const updCount=()=>cnt.textContent=sel.size+' 件選択';updCount();
+  updCount();
   const cancel=el('button','btn btn-ghost btn-sm','キャンセル');cancel.onclick=()=>modal.remove();
   const ok=el('button','btn btn-primary btn-sm','ブロックに追加');
   ok.onclick=()=>{for(const id of sel){if(!subS.blocks.some(b=>b.node.id===id)){const n=getNode(id);if(n)subS.blocks.push({node:n,comment:'',file:null,thumbUrl:null})}}modal.remove();subShowCreate()};
