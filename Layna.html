@@ -2351,17 +2351,34 @@ function buildStageStrip(shot,curReviewId){
 function fillReviewDrawer(){
   const back=$('#reviewDrawer');if(!back||!state.drawer||state.drawer.kind!=='review')return;
   const node=getNode(state.drawer.id);if(!node||node.type!=='review'){closeReviewDrawer();return}
-  back._t.textContent=node.name;
-  back._p.textContent=pathOf(node.id).slice(1,-1).map(x=>x.name).join(' / ')||rootOf(node).name;
-  back._acts.innerHTML='';
-  /* 工程プルダウン：ヘッダの「ページで開く」ボタンの左（工程テキストの右）に配置 */
   const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
-  const strip=buildStageStrip(shot,node.id);if(strip)back._acts.appendChild(strip);
-  /* ステータスはタスクページ側に表示があるため、上部メニューでは重複を避けて非表示 */
-  const openB=el('button','btn btn-open btn-sm','＋ タブに追加');openB.title='このタスクページをタブとして開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
-  back.classList.add('drawer-review'); /* タスクページ表示：上部メニューとの隙間を詰める */
-  back._body.innerHTML='';curUploadUI=null;
-  renderReviewBody(back._body,node);
+  back._t.textContent=shot?shot.name:node.name;
+  back._p.textContent=(shot?pathOf(shot.id).slice(1).map(x=>x.name).join(' / '):pathOf(node.id).slice(1,-1).map(x=>x.name).join(' / '))||rootOf(node).name;
+  back._acts.innerHTML='';
+  /* ＋タブに追加：現在選択中の工程をタスクタブに追加 */
+  const openB=el('button','btn btn-open btn-sm','＋ タブに追加');openB.title='この工程のタスクページをタブとして開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
+  back.classList.add('drawer-review');
+  const body=back._body;body.innerHTML='';curUploadUI=null;
+  /* 上部：各工程のタイル（サブミットの右スライドと同形）。クリックで下のタスクページを切替 */
+  const stages=shot?descendants(shot.id).filter(n=>n.type==='review'):[node];
+  if(stages.length>1||shot){
+    body.appendChild(el('div','section-label','工程（タイルをクリックで下のタスクページを切替）'));
+    const grid=el('div','pm-grid');
+    for(const st of stages){
+      const tile=el('div','pm-tile'+(st.id===node.id?' sel':''));
+      const th=el('div','th');const lv=latestVideoVersionUnder(st.id);if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
+      tile.appendChild(th);
+      const bd=el('div','bd');bd.appendChild(el('div','nm',st.name));
+      const mt=el('div','mt');const sg=el('span','pm-badge',st.name);sg.style.background=stageColor(st.name);mt.appendChild(sg);const si=stInfo(st);const sb2=el('span','pm-badge',si.label);sb2.style.background=si.color;mt.appendChild(sb2);bd.appendChild(mt);
+      tile.appendChild(bd);
+      tile.onclick=()=>{if(state.drawer.id!==st.id){state.drawer.id=st.id;fillReviewDrawer()}};
+      grid.appendChild(tile);
+    }
+    body.appendChild(grid);
+  }
+  /* 下部：選択中の工程のタスクページ（水色ラインで区切り＝サブミットと共通） */
+  const detail=el('div','sub-detail');body.appendChild(detail);
+  renderReviewBody(detail,node);
   resolveThumbs();
 }
 /* サブミットを右側スライドで表示 */
