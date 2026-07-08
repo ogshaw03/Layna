@@ -56,6 +56,9 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .btn-primary:hover{background:#fff}
 .btn-ghost{border:1px solid var(--border);color:var(--text2)}
 .btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+/* 右側スライドの「ページで開く」を目立たせるアクセント（緑系・ステータスとは別トーン） */
+.btn-open{background:var(--green);color:#0d0d0f;border:1px solid var(--green);font-weight:700}
+.btn-open:hover{background:#9bd3b3;border-color:#9bd3b3}
 .btn-danger{border:1px solid var(--red);color:var(--red)}
 .btn-danger:hover{background:rgba(255,90,90,.12)}
 .btn-sm{padding:4px 9px;font-size:12px}
@@ -2279,7 +2282,7 @@ function fillReviewDrawer(){
   const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
   const strip=buildStageStrip(shot,node.id);if(strip)back._acts.appendChild(strip);
   if(node.versions.length)back._acts.appendChild(buildStatusSelect(node)); /* ステータス切替プルダウン */
-  const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.title='このタスクページを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
+  const openB=el('button','btn btn-open btn-sm','⤢ ページで開く');openB.title='このタスクページを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
   back._body.innerHTML='';curUploadUI=null;
   renderReviewBody(back._body,node);
   resolveThumbs();
@@ -2324,7 +2327,7 @@ function fillSubmitDrawer(){
     if(!n||n.type!=='review')return;
     const hd=el('div','sub-detail-hd');
     hd.appendChild(elIco('span','ttl','film',(shotOf(n)?shotOf(n)+' / ':'')+n.name+' — タスクページ'));
-    const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
+    const openB=el('button','btn btn-open btn-sm','⤢ ページで開く');openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
     detail.appendChild(hd);
     const inner=el('div','sub-detail-body');renderReviewBody(inner,n);detail.appendChild(inner);
     resolveThumbs();
