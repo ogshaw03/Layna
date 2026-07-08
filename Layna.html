@@ -556,6 +556,41 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .fb-overlay{position:fixed;inset:0;background:#0a0a0c;z-index:1500;display:flex;flex-direction:column}
 .fb-backdrop{position:fixed;inset:0;background:rgba(6,6,10,.66);z-index:1490}
 .fb-overlay.fb-modal{inset:5.5vh 6.5vw;background:#0a0a0c;border:1px solid var(--border2);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.7)}
+/* 比較再生（A/B） */
+.cmp-overlay{position:fixed;inset:4vh 4vw;z-index:1600;background:#0a0a0c;border:1px solid var(--border2);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden}
+.cmp-top{display:flex;align-items:center;gap:12px;padding:10px 48px 10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.cmp-top .cmp-title{font-family:var(--font-head);font-weight:700;font-size:15px}
+.cmp-top .spacer{flex:1}
+.cmp-wrap{flex:1;min-height:0;display:flex;gap:2px;background:#000}
+.cmp-pane{flex:1;min-width:0;display:flex;flex-direction:column;background:#000}
+.cmp-lab{font-size:12px;padding:6px 10px;color:var(--text);background:var(--bg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--border)}
+.cmp-lab.a{border-left:3px solid var(--edge)}
+.cmp-lab.b{border-left:3px solid var(--green)}
+.cmp-video{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
+.cmp-video video{max-width:100%;max-height:100%;object-fit:contain}
+.cmp-ctr{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.cmp-slider{flex:1;accent-color:var(--accent2)}
+.cmp-time{font-variant-numeric:tabular-nums;color:var(--text2);font-size:12px;white-space:nowrap}
+/* 比較相手の選択（タイル＋検索） */
+.cmp-search{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);padding:6px 10px;font-size:13px;width:240px;font-family:inherit}
+.cmp-search:focus{outline:none;border-color:var(--border2)}
+.cmp-list{display:flex;flex-direction:column;gap:8px}
+.cmp-node{border:1px solid var(--border);border-radius:9px;background:var(--bg);overflow:hidden}
+.cmp-node.open{border-color:var(--border2)}
+.cmp-node-hd{display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer}
+.cmp-node-hd:hover{background:var(--bg3)}
+.cmp-node-hd .th{width:64px;height:36px;flex-shrink:0;background:#000 center/cover no-repeat;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.cmp-node-hd .info{flex:1;min-width:0}
+.cmp-node-hd .info .pth{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmp-node-hd .info .nm{font-size:13px;color:var(--text);font-weight:600}
+.cmp-tg{color:var(--text3);flex-shrink:0}
+.cmp-vl{padding:4px 10px 10px;display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--border)}
+.cmp-ver{display:flex;align-items:center;gap:9px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;cursor:pointer}
+.cmp-ver:hover{border-color:var(--edge);background:var(--bg3)}
+.cmp-ver.cur{opacity:.55;cursor:default}
+.cmp-ver .vth{width:52px;height:29px;flex-shrink:0;background:#000 center/cover no-repeat;border-radius:3px}
+.cmp-ver .vnm{font-size:12px;color:var(--text)}
+.cmp-ver .vcur{margin-left:auto;font-size:10px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:0 6px}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fb-fs{flex-shrink:0}
@@ -2677,7 +2712,7 @@ function logItem(node,v){
   const title=el('div','log-title');title.appendChild(document.createTextNode(v.name));
   head.appendChild(title);
   head.appendChild(el('span','log-meta','by '+(v.uploadedBy||'-')+'・'+fmt(v.uploadedAt)));
-  if(v.type==='video'){const rb=elIco('button','btn btn-ghost btn-sm','reel',' REELに送る');rb.title='この動画を REEL に送る';rb.onclick=()=>sendToReel(node,v);head.appendChild(rb)}
+  if(v.type==='video'){const cmp=el('button','btn btn-ghost btn-sm','⇄ 比較');cmp.title='別の版・カットと横並びで比較再生';cmp.onclick=()=>openComparePicker(node,v);head.appendChild(cmp);const rb=elIco('button','btn btn-ghost btn-sm','reel',' REELに送る');rb.title='この動画を REEL に送る';rb.onclick=()=>sendToReel(node,v);head.appendChild(rb)}
   /* この動画が含まれる保存済みリール */
   for(const r of (DB.reels||[]).filter(r=>r.clips.some(c=>c.vId===v.id)).slice(0,2)){
     const lb=elIco('button','btn btn-ghost btn-sm','reel',' '+r.name);lb.title='保存済みリールを開く';
@@ -5090,6 +5125,94 @@ async function reelAddClip(node,v,noDedup){
   probe.onloadedmetadata=()=>{clip.dur=probe.duration||0;cleanup();reelRender();if(reelUI.drawFTL)reelUI.drawFTL()};
   probe.onerror=cleanup;
   reelRender();
+}
+/* ============================================================
+   比較再生（A/B）— 2つの動画を横並びで同期再生（MVP）
+   ============================================================ */
+/* 比較相手の選択：REEL読み込みと同様のタイル表示＋検索。既定で現在の工程を展開しておく */
+function openComparePicker(aNode,aVer){
+  const root=rootOf(aNode);
+  const revs=descendants(root.id).filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
+  const modal=el('div','subpick');const pk=el('div','pk');
+  const pkh=el('div','pkh');pkh.appendChild(el('div',null,'比較する動画を選択'));const hsp=el('div');hsp.style.flex='1';pkh.appendChild(hsp);
+  const search=el('input','cmp-search');search.type='text';search.placeholder='🔍 ショット・工程を検索';pkh.appendChild(search);
+  const pkb=el('div','pkb');const list=el('div','cmp-list');pkb.appendChild(list);
+  const openedFor=new Set([aNode.id]); /* 既定で現在の工程まで潜って（展開して）おく */
+  function paint(){
+    list.innerHTML='';const q=(search.value||'').trim().toLowerCase();let shown=0;
+    const ordered=revs.slice().sort((x,y)=>(x.id===aNode.id?-1:0)-(y.id===aNode.id?-1:0)); /* 現在の工程を先頭に */
+    for(const n of ordered){
+      const path=pathOf(n.id).slice(1).map(x=>x.name).join(' / ');
+      if(q&&!(n.name+' '+path).toLowerCase().includes(q))continue;
+      shown++;
+      const card=el('div','cmp-node'+(openedFor.has(n.id)?' open':''));
+      const hd=el('div','cmp-node-hd');
+      const th=el('div','th');const lv=latestVideoVersionUnder(n.id);if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
+      hd.appendChild(th);
+      const info=el('div','info');info.appendChild(el('div','pth',path||root.name));info.appendChild(el('div','nm',n.name));
+      const vids=n.versions.filter(x=>x.type==='video');info.appendChild(el('div','pth',vids.length+' 版'));hd.appendChild(info);
+      hd.appendChild(el('span','cmp-tg',openedFor.has(n.id)?'▾':'▸'));
+      hd.onclick=()=>{if(openedFor.has(n.id))openedFor.delete(n.id);else openedFor.add(n.id);paint()};
+      card.appendChild(hd);
+      if(openedFor.has(n.id)){
+        const vl=el('div','cmp-vl');
+        for(const vv of vids.slice().reverse()){
+          const isCur=(n.id===aNode.id&&vv.id===aVer.id);
+          const row=el('div','cmp-ver'+(isCur?' cur':''));
+          const vth=el('div','vth');if(vv.thumb)storage.getURL(vv.thumb).then(u=>{if(u)vth.style.backgroundImage='url("'+u+'")'});row.appendChild(vth);
+          row.appendChild(el('div','vnm',vv.name));
+          if(isCur)row.appendChild(el('span','vcur','比較元'));
+          else row.onclick=()=>{modal.remove();openCompare({node:aNode,ver:aVer},{node:n,ver:vv})};
+          vl.appendChild(row);
+        }
+        card.appendChild(vl);
+      }
+      list.appendChild(card);
+    }
+    if(!shown)list.appendChild(el('div','sub-empty','動画のあるタスクがありません。'));
+  }
+  search.oninput=paint;paint();
+  const pkf=el('div','pkf');pkf.appendChild(el('span','sub','比較元: '+((shotOf(aNode)?shotOf(aNode)+' / ':'')+aNode.name+' '+aVer.name)));
+  const cancel=el('button','btn btn-ghost btn-sm','キャンセル');cancel.onclick=()=>modal.remove();pkf.appendChild(cancel);
+  pk.appendChild(pkh);pk.appendChild(pkb);pk.appendChild(pkf);modal.appendChild(pk);
+  modal.onclick=e=>{if(e.target===modal)modal.remove()};document.body.appendChild(modal);
+  setTimeout(()=>{try{search.focus()}catch(_){}},0);
+}
+/* 比較再生ウィンドウ（横並び・同期スクラブ） */
+function openCompare(a,b){
+  const old=$('#cmpOverlay');if(old)old.remove();const oldb=$('#cmpBackdrop');if(oldb)oldb.remove();
+  const nameOf=x=>((shotOf(x.node)?shotOf(x.node)+' / ':'')+x.node.name+'  '+x.ver.name);
+  const ov=el('div','cmp-overlay');ov.id='cmpOverlay';
+  const top=el('div','cmp-top');top.appendChild(el('div','cmp-title','⇄ 比較再生'));top.appendChild(el('div','spacer'));ov.appendChild(top);
+  const wrap=el('div','cmp-wrap');
+  const makePane=(label,x2,cls)=>{const pane=el('div','cmp-pane');const lab=el('div','cmp-lab '+cls);lab.textContent=label+'  '+nameOf(x2);pane.appendChild(lab);const holder=el('div','cmp-video');const vid=el('video');vid.muted=true;vid.playsInline=true;vid.preload='auto';holder.appendChild(vid);pane.appendChild(holder);return {pane,vid}};
+  const A=makePane('A（比較元）',a,'a');const B=makePane('B',b,'b');
+  wrap.appendChild(A.pane);wrap.appendChild(B.pane);ov.appendChild(wrap);
+  const ctr=el('div','cmp-ctr');
+  const play=el('button','btn btn-primary btn-sm','▶ 再生');
+  const pF=el('button','btn btn-ghost btn-sm','−1F');const nF=el('button','btn btn-ghost btn-sm','+1F');
+  const slider=el('input','cmp-slider');slider.type='range';slider.min='0';slider.max='1000';slider.value='0';
+  const tlab=el('span','cmp-time','0:00 / 0:00');
+  let loop=false;const loopB=el('button','btn btn-ghost btn-sm','ループ');loopB.onclick=()=>{loop=!loop;loopB.classList.toggle('active',loop)};
+  ctr.appendChild(play);ctr.appendChild(pF);ctr.appendChild(nF);ctr.appendChild(slider);ctr.appendChild(tlab);ctr.appendChild(loopB);ov.appendChild(ctr);
+  const bd=el('div','fb-backdrop');bd.id='cmpBackdrop';bd.onclick=()=>close();document.body.appendChild(bd);
+  document.body.appendChild(ov);
+  const x=el('button','fb-close','✕');x.title='閉じる';x.onclick=()=>close();ov.appendChild(x);
+  const fps=(a.ver.fps||b.ver.fps||24);
+  const dur=()=>Math.max(A.vid.duration||0,B.vid.duration||0)||1;
+  const fmtT=s=>{s=Math.max(0,s||0);return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')};
+  const updTime=()=>{const d=dur();slider.value=String(Math.round((A.vid.currentTime/d)*1000));tlab.textContent=fmtT(A.vid.currentTime)+' / '+fmtT(d)};
+  const seekBoth=t=>{try{A.vid.currentTime=t}catch(_){}try{B.vid.currentTime=Math.min(t,(B.vid.duration||t))}catch(_){}};
+  A.vid.addEventListener('timeupdate',()=>{if(Math.abs((B.vid.currentTime||0)-A.vid.currentTime)>0.06){try{B.vid.currentTime=Math.min(A.vid.currentTime,B.vid.duration||A.vid.currentTime)}catch(_){}}updTime()});
+  A.vid.addEventListener('ended',()=>{if(loop){seekBoth(0);A.vid.play();B.vid.play()}else play.textContent='▶ 再生'});
+  play.onclick=()=>{if(A.vid.paused){A.vid.play();B.vid.play();play.textContent='⏸ 停止'}else{A.vid.pause();B.vid.pause();play.textContent='▶ 再生'}};
+  slider.oninput=()=>{const d=dur();const t=(parseInt(slider.value)/1000)*d;seekBoth(t);tlab.textContent=fmtT(t)+' / '+fmtT(d)};
+  const step=df=>{A.vid.pause();B.vid.pause();play.textContent='▶ 再生';const t=Math.max(0,A.vid.currentTime+df/fps);seekBoth(t);updTime()};
+  pF.onclick=()=>step(-1);nF.onclick=()=>step(1);
+  function close(){try{A.vid.pause();B.vid.pause()}catch(_){}ov.remove();const b2=$('#cmpBackdrop');if(b2)b2.remove();document.removeEventListener('keydown',onKey)}
+  function onKey(e){const tg=e.target&&e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA')return;if(e.key==='Escape'){close()}else if(e.key===' '){e.preventDefault();play.onclick()}else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}else if(e.key==='ArrowRight'){e.preventDefault();step(1)}}
+  document.addEventListener('keydown',onKey);
+  Promise.all([storage.getURL(a.ver.file),storage.getURL(b.ver.file)]).then(([ua,ub])=>{if(ua)A.vid.src=ua;if(ub)B.vid.src=ub;setTimeout(updTime,300)});
 }
 async function sendToReel(node,v){
   if(v.type!=='video'){toast('REEL に送れるのは動画のみです');return}
