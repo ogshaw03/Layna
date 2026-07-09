@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.18';
+const APP_VERSION='2026.07.09.19';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2599,11 +2599,7 @@ function paintHead(ctx,W,H,s,alpha){
   /* 正面マーカー（鼻＝+Z方向）＝向きの目印。裏を向いたら非表示 */
   const nose=rotv(0,0,1);
   if(nose[2]>=0){const nx=cx+R*nose[0],ny=cy-R*nose[1];ctx.beginPath();ctx.arc(nx,ny,Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}
-  /* 移動ハンドル（中心の円。ここをドラッグ＝移動、外側の球面＝回転） */
-  const hr=R*0.24;
-  ctx.beginPath();ctx.arc(cx,cy,hr,0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.13;ctx.fill();
-  ctx.beginPath();ctx.arc(cx,cy,hr,0,2*Math.PI);ctx.strokeStyle=col;ctx.globalAlpha=alpha*0.5;ctx.lineWidth=Math.max(1,R*0.012);ctx.setLineDash([R*0.05,R*0.05]);ctx.stroke();ctx.setLineDash([]);
-  ctx.beginPath();ctx.arc(cx,cy,Math.max(1.5,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();
+  /* ※移動ハンドルは編集UIのため paintHead では描かない（アノテ本体には出さない）。ホバー時に別途描画 */
   ctx.restore();
 }
 /* ブラシ型消しゴム：半径内の点だけを取り除き、残った区間で線を分割。
@@ -3471,7 +3467,16 @@ function openReview(nodeId,versionId,opts){
   let FPS=v.fps||24,totalFrames=1,lastFrame=-1;
   let tool=null,erasing=false,pending=[],stroke=null,brushW=4,eraseW=16;
   /* 顔の向きガイド（ヘッドジンバル）操作状態 */
-  let headActive=null,headDrag=null;
+  let headActive=null,headDrag=null,hoverPt=null;
+  /* 移動ハンドル（中心の破線円）。ホバー時のみ表示。アノテ本体には描かない */
+  function drawMoveHandle(ctx,s){
+    const W=canvas.width,H=canvas.height,cx=(s.cx||0)*W,cy=(s.cy||0)*H,R=Math.max(6,(s.r||0.12)*W),hr=R*0.24,col=s.color||'#ff4d4d';
+    ctx.save();
+    ctx.beginPath();ctx.arc(cx,cy,hr,0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=0.13;ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,hr,0,2*Math.PI);ctx.strokeStyle=col;ctx.globalAlpha=0.6;ctx.lineWidth=Math.max(1,R*0.012);ctx.setLineDash([R*0.05,R*0.05]);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(cx,cy,Math.max(1.5,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=1;ctx.fill();
+    ctx.restore();
+  }
   /* 未送信の描画に対する undo/redo（Ctrl+Z / Ctrl+Y） */
   let redoStack=[];
   /* 比較再生（A/B）：B は同じウィンドウ内で横並び表示・A に同期。アノテーションは A（開いている版）に描く */
@@ -3872,6 +3877,8 @@ function openReview(nodeId,versionId,opts){
     const pend=pending.filter(p=>inWin(p)&&layerOn(p));
     if(stroke&&inWin(stroke)&&layerOn(stroke))pend.push(stroke);
     paintStrokes(ctx,pend,1);
+    /* 移動ハンドルは、顔の向きツール選択中にカーソルが球体内に入ったときだけ表示 */
+    if(tool==='head'&&hoverPt){const asp=canvas.height/canvas.width;for(const p of pending){if(p.kind!=='head'||(p.layer||1)!==activeLayer)continue;if(isVideo&&!inWin(p))continue;if(Math.hypot(p.cx-hoverPt[0],(p.cy-hoverPt[1])*asp)<=(p.r||0.12)*1.15)drawMoveHandle(ctx,p)}}
     updateLayerPanel();
   }
   durSel.onchange=()=>{drawAll();drawTimeline()};
@@ -3927,14 +3934,16 @@ function openReview(nodeId,versionId,opts){
     let mode='rotate';
     if(e.shiftKey)mode='roll';else if(e.altKey)mode='size';
     else if(hit&&d<(s.r||0.12)*0.24)mode='move'; /* 中心の移動ハンドル内＝移動（新規配置は回転で開始） */
-    headDrag={s,mode,sx:e.clientX,sy:e.clientY,yaw0:s.yaw,pitch0:s.pitch,roll0:s.roll,r0:s.r,cx0:s.cx,cy0:s.cy};
+    const rc=canvas.getBoundingClientRect();const scx=rc.left+s.cx*rc.width,scy=rc.top+s.cy*rc.height;
+    const ang0=Math.atan2(e.clientY-scy,e.clientX-scx); /* ロール用：掴んだ点の中心まわり角度 */
+    headDrag={s,mode,sx:e.clientX,sy:e.clientY,yaw0:s.yaw,pitch0:s.pitch,roll0:s.roll,r0:s.r,cx0:s.cx,cy0:s.cy,ang0};
     headActive=s;drawAll();drawTimeline();updSubmit();
   }
   function headPointerMove(e){
     if(!headDrag)return;const r=canvas.getBoundingClientRect();
     const ndx=(e.clientX-headDrag.sx)/r.width,ndy=(e.clientY-headDrag.sy)/r.height;const s=headDrag.s;
     if(headDrag.mode==='rotate'){const cr=Math.cos(headDrag.roll0),sr=Math.sin(headDrag.roll0);const ldx=ndx*cr+ndy*sr,ldy=-ndx*sr+ndy*cr;s.yaw=headDrag.yaw0+ldx*Math.PI*2;s.pitch=headDrag.pitch0+ldy*Math.PI*2;} /* ロール分だけドラッグ方向を補正し、画面基準で回す */
-    else if(headDrag.mode==='roll'){s.roll=headDrag.roll0+ndx*Math.PI*2;}
+    else if(headDrag.mode==='roll'){const scx=r.left+s.cx*r.width,scy=r.top+s.cy*r.height;const ang1=Math.atan2(e.clientY-scy,e.clientX-scx);s.roll=headDrag.roll0+(ang1-headDrag.ang0);} /* 掴んだ点が指に追従＝上下どちらでも自然に回る */
     else if(headDrag.mode==='size'){s.r=Math.max(0.03,Math.min(0.6,headDrag.r0+ndx));}
     else if(headDrag.mode==='move'){s.cx=headDrag.cx0+ndx;s.cy=headDrag.cy0+ndy;}
     drawAll();
@@ -3945,7 +3954,8 @@ function openReview(nodeId,versionId,opts){
     else if(tool==='erase'){canvas.setPointerCapture(e.pointerId);erasing=true;eraseAt(e)}
     else if(tool==='head'){headPointerDown(e)}
   };
-  canvas.onpointermove=e=>{if(stroke){const evs=e.getCoalescedEvents?e.getCoalescedEvents():null;if(evs&&evs.length){for(const ce of evs)stroke.points.push(pt(ce))}else stroke.points.push(pt(e));drawAll()}else if(erasing)eraseAt(e);else if(headDrag)headPointerMove(e)}; /* 合体イベントで速書きの中間点も取得 */
+  canvas.onpointermove=e=>{if(stroke){const evs=e.getCoalescedEvents?e.getCoalescedEvents():null;if(evs&&evs.length){for(const ce of evs)stroke.points.push(pt(ce))}else stroke.points.push(pt(e));drawAll()}else if(erasing)eraseAt(e);else if(headDrag)headPointerMove(e);else if(tool==='head'){hoverPt=pt(e);drawAll()}}; /* 合体イベントで速書きの中間点も取得。head時はホバー位置で移動ハンドル表示 */
+  canvas.addEventListener('pointerleave',()=>{if(hoverPt){hoverPt=null;drawAll()}});
   canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;redoStack=[];drawAll();drawTimeline();updSubmit()}erasing=false;if(headDrag){headDrag=null;drawTimeline();updSubmit()}flushCommitted()};
   /* Alt+右ドラッグでブラシ/消しゴムサイズ調整（サイズプレビュー円付き） */
   brushSel.onchange=()=>{brushW=parseInt(brushSel.value)||brushW};
