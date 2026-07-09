@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.10';
+const APP_VERSION='2026.07.09.11';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2579,19 +2579,28 @@ function paintHead(ctx,W,H,s,alpha){
     c=Math.cos(roll);n=Math.sin(roll);let x3=c*x2-n*y2,y3=n*x2+c*y2,z3=z2;
     return [x3,y3,z3];
   }
-  const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
+  /* 前後(奥行き)を潰した扁平な球（顔の奥行きに近づける） */
+  const flat=p=>[p[0],p[1],p[2]*0.62];
+  const proj=p=>{const d=flat(p);const r=rotv(d[0],d[1],d[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
-  /* 八面体（ひし形）。前方(+Z)頂点=鼻先の角。凸多面体の隠面消去で「見えている面」の辺のみ表示 */
-  const V=[[0,1,0],[0,-1,0],[-1,0,0],[1,0,0],[0,-0.04,0.6],[0,0,-0.58]]; /* 0:上 1:下 2:左 3:右 4:鼻先F 5:後B。前後(奥行き)を潰した扁平な八面体（顔の奥行きに近づける） */
-  const rot=V.map(v=>rotv(v[0],v[1],v[2]));
-  const faces=[[4,0,3],[4,0,2],[4,1,3],[4,1,2],[5,0,3],[5,0,2],[5,1,3],[5,1,2]];
-  const ek=(i,j)=>i<j?i+'-'+j:j+'-'+i;const vis=new Set();
-  for(const f of faces){const cz=(rot[f[0]][2]+rot[f[1]][2]+rot[f[2]][2])/3;if(cz>0.001){vis.add(ek(f[0],f[1]));vis.add(ek(f[1],f[2]));vis.add(ek(f[2],f[0]));}} /* 面の重心z>0＝手前を向く面のみ表示（隠れる面は非表示） */
-  const P=i=>[cx+R*rot[i][0],cy-R*rot[i][1]];
-  const edges=[[0,3],[3,1],[1,2],[2,0],[0,4],[1,4],[2,4],[3,4],[0,5],[1,5],[2,5],[3,5]];
-  ctx.globalAlpha=alpha;
-  for(const [i,j] of edges){if(!vis.has(ek(i,j)))continue;const nose=(i===4||j===4);const pa=P(i),pb=P(j);ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.strokeStyle=col;ctx.lineWidth=Math.max(1.4,R*(nose?0.05:0.032));ctx.stroke();}
-  {if(rot[4][2]>0){const pf=P(4);ctx.beginPath();ctx.arc(pf[0],pf[1],Math.max(1.6,R*0.055),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}} /* 鼻先の角（手前のときのみ） */
+  /* 球の外周シルエット */
+  ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
+  /* 点列を投影して前面セグメントのみ描画（奥側は非表示） */
+  function poly(pts,wf){
+    let prev=null,pf=false;
+    for(const q of pts){const p=proj(q);const front=p[2]>=-0.03;
+      if(prev&&front&&pf){ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();}
+      prev=p;pf=front;
+    }
+    ctx.globalAlpha=alpha;
+  }
+  /* アイライン（横の大円）＝球面の緯線。滑らかな曲線 */
+  {const e=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;e.push([Math.sin(t),0,Math.cos(t)]);}poly(e,0.03);}
+  /* 正中線（縦）＝直線的な菱形。先端(F)が鼻先の角 */
+  const F=[0,-0.05,1.0];
+  poly([[0,1,0],F,[0,-1,0],[0,0,-1],[0,1,0]],0.05);
+  /* 鼻先の角（手前のときのみ強調） */
+  {const pf=proj(F);if(pf[2]>=0){ctx.beginPath();ctx.arc(pf[0],pf[1],Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}}
   /* 中心（移動ハンドル） */
   ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.6;ctx.fill();
   ctx.restore();
