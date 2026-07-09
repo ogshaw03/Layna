@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.2';
+const APP_VERSION='2026.07.09.3';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2587,19 +2587,19 @@ function paintHead(ctx,W,H,s,alpha){
   function circle(fn,wf){
     const N=72;let prev=null,pf=false;
     for(let i=0;i<=N;i++){const t=i/N*2*Math.PI;const p=proj(fn(t));const front=p[2]>=0;
-      if(prev){const f=front&&pf;ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);
-        ctx.strokeStyle=col;ctx.globalAlpha=alpha*(f?1:0.3);ctx.lineWidth=Math.max(1.5,R*(f?wf:wf*0.7));
-        ctx.setLineDash(f?[]:[R*0.07,R*0.07]);ctx.stroke();}
+      if(prev&&front&&pf){ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);
+        ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.5,R*wf);ctx.stroke();} /* 前面セグメントのみ（奥側の線は非表示） */
       prev=p;pf=front;
     }
-    ctx.setLineDash([]);ctx.globalAlpha=alpha;
+    ctx.globalAlpha=alpha;
   }
   circle(t=>[0,Math.sin(t),Math.cos(t)],0.05); /* 正中線（縦） */
   circle(t=>[Math.sin(t),0,Math.cos(t)],0.035); /* アイライン（横） */
-  /* 鼻ベクトル（正面 +Z） */
-  const nose=rotv(0,0,1);const nx=cx+R*1.35*nose[0],ny=cy-R*1.35*nose[1];
-  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny);ctx.strokeStyle=col;ctx.globalAlpha=alpha*(nose[2]>=0?1:0.35);ctx.lineWidth=Math.max(2,R*0.06);ctx.setLineDash(nose[2]<0?[R*0.07,R*0.07]:[]);ctx.stroke();ctx.setLineDash([]);
-  if(nose[2]>=-0.15){const a=Math.atan2(ny-cy,nx-cx),ah=R*0.2;ctx.globalAlpha=alpha;ctx.beginPath();ctx.moveTo(nx,ny);ctx.lineTo(nx-ah*Math.cos(a-0.4),ny-ah*Math.sin(a-0.4));ctx.moveTo(nx,ny);ctx.lineTo(nx-ah*Math.cos(a+0.4),ny-ah*Math.sin(a+0.4));ctx.stroke();}
+  /* 鼻ベクトル（正面 +Z）— 前を向いているときのみ表示 */
+  const nose=rotv(0,0,1);
+  if(nose[2]>=0){const nx=cx+R*1.35*nose[0],ny=cy-R*1.35*nose[1];
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(2,R*0.06);ctx.setLineDash([]);ctx.stroke();
+    const a=Math.atan2(ny-cy,nx-cx),ah=R*0.2;ctx.beginPath();ctx.moveTo(nx,ny);ctx.lineTo(nx-ah*Math.cos(a-0.4),ny-ah*Math.sin(a-0.4));ctx.moveTo(nx,ny);ctx.lineTo(nx-ah*Math.cos(a+0.4),ny-ah*Math.sin(a+0.4));ctx.stroke();}
   /* 中心 */
   ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();
   ctx.restore();
