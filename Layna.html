@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.16';
+const APP_VERSION='2026.07.09.17';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2574,9 +2574,10 @@ function paintHead(ctx,W,H,s,alpha){
   const cx=(s.cx||0)*W, cy=(s.cy||0)*H, R=Math.max(6,(s.r||0.12)*W);
   const yaw=s.yaw||0, pitch=s.pitch||0, roll=s.roll||0, col=s.color||'#ff4d4d';
   function rotv(x,y,z){
-    let c=Math.cos(yaw),n=Math.sin(yaw);let x1=c*x+n*z,z1=-n*x+c*z,y1=y;
+    /* roll（顔の前後軸まわり）→ pitch → yaw の順。roll では正面軸(0,0,1)＝正中線とアイラインの交点が動かない */
+    let c=Math.cos(roll),n=Math.sin(roll);let x1=c*x-n*y,y1=n*x+c*y,z1=z;
     c=Math.cos(pitch);n=Math.sin(pitch);let y2=c*y1-n*z1,z2=n*y1+c*z1,x2=x1;
-    c=Math.cos(roll);n=Math.sin(roll);let x3=c*x2-n*y2,y3=n*x2+c*y2,z3=z2;
+    c=Math.cos(yaw);n=Math.sin(yaw);let x3=c*x2+n*z2,z3=-n*x2+c*z2,y3=y2;
     return [x3,y3,z3];
   }
   const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
