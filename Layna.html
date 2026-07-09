@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.9';
+const APP_VERSION='2026.07.09.10';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2582,11 +2582,11 @@ function paintHead(ctx,W,H,s,alpha){
   const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
   /* 八面体（ひし形）。前方(+Z)頂点=鼻先の角。凸多面体の隠面消去で「見えている面」の辺のみ表示 */
-  const V=[[0,1,0.05],[0,-1,0.05],[-1,0,0],[1,0,0],[0,-0.05,1.34],[0,0,-1]]; /* 0:上 1:下 2:左 3:右 4:鼻先F 5:後B */
+  const V=[[0,1,0],[0,-1,0],[-1,0,0],[1,0,0],[0,-0.04,0.6],[0,0,-0.58]]; /* 0:上 1:下 2:左 3:右 4:鼻先F 5:後B。前後(奥行き)を潰した扁平な八面体（顔の奥行きに近づける） */
   const rot=V.map(v=>rotv(v[0],v[1],v[2]));
   const faces=[[4,0,3],[4,0,2],[4,1,3],[4,1,2],[5,0,3],[5,0,2],[5,1,3],[5,1,2]];
   const ek=(i,j)=>i<j?i+'-'+j:j+'-'+i;const vis=new Set();
-  for(const f of faces){const cz=(rot[f[0]][2]+rot[f[1]][2]+rot[f[2]][2])/3;if(cz>0.015){vis.add(ek(f[0],f[1]));vis.add(ek(f[1],f[2]));vis.add(ek(f[2],f[0]));}} /* 面の重心z>0＝手前を向く面 */
+  for(const f of faces){const cz=(rot[f[0]][2]+rot[f[1]][2]+rot[f[2]][2])/3;if(cz>0.001){vis.add(ek(f[0],f[1]));vis.add(ek(f[1],f[2]));vis.add(ek(f[2],f[0]));}} /* 面の重心z>0＝手前を向く面のみ表示（隠れる面は非表示） */
   const P=i=>[cx+R*rot[i][0],cy-R*rot[i][1]];
   const edges=[[0,3],[3,1],[1,2],[2,0],[0,4],[1,4],[2,4],[3,4],[0,5],[1,5],[2,5],[3,5]];
   ctx.globalAlpha=alpha;
