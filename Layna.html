@@ -3560,9 +3560,9 @@ function openReview(nodeId,versionId,opts){
     media.addEventListener('seeked',()=>{clearTimeout(seekGuard);seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}else snapToFrame()});
     playBtn.onclick=()=>{if(media.paused)media.play();else media.pause()};
     loopBtn.onclick=()=>{media.loop=!media.loop;loopBtn.classList.toggle('active',media.loop)};
-    media.addEventListener('play',()=>{playBtn.textContent='⏸';if(cmpOn&&bVid)bVid.play().catch(()=>{})});
-    media.addEventListener('pause',()=>{playBtn.textContent='▶';if(cmpOn&&bVid){try{bVid.pause()}catch(_){}syncBToA(true)}snapToFrame()});
-    media.addEventListener('timeupdate',()=>{if(cmpOn)syncBToA()});
+    media.addEventListener('play',()=>{playBtn.textContent='⏸';if(cmpOn&&bVid){syncBToA(true);bVid.play().catch(()=>{})}});
+    media.addEventListener('pause',()=>{playBtn.textContent='▶';if(cmpOn&&bVid){try{bVid.pause()}catch(_){}bVid.playbackRate=1;syncBToA(true)}snapToFrame()});
+    media.addEventListener('ratechange',()=>{if(cmpOn&&bVid&&media.paused)bVid.playbackRate=media.playbackRate||1});
     prevBtn.onclick=()=>seekFrame(dispFrame()-1);
     nextBtn.onclick=()=>seekFrame(dispFrame()+1);
     fpsSel.onchange=async()=>{FPS=parseInt(fpsSel.value);v.fps=FPS;await persist();setupDuration();sync(true)};
@@ -3622,9 +3622,17 @@ function openReview(nodeId,versionId,opts){
   /* B を A に同期：停止・シーク中は厳密に、再生中はドリフト補正のみ */
   function syncBToA(hard){
     if(!cmpOn||!bVid)return;
-    const t=Math.min(media.currentTime,(bVid.duration||media.currentTime));
-    if(hard||media.paused){if(Math.abs((bVid.currentTime||0)-t)>0.008){try{bVid.currentTime=t}catch(_){}}}
-    else if(Math.abs((bVid.currentTime||0)-media.currentTime)>0.15){try{bVid.currentTime=t}catch(_){}}
+    /* 停止・シーク・コマ送り時は厳密にフレーム一致（再生速度も戻す） */
+    if(hard||media.paused){const t=Math.min(media.currentTime,(bVid.duration||media.currentTime));if(Math.abs((bVid.currentTime||0)-t)>0.004){try{bVid.currentTime=t}catch(_){}}bVid.playbackRate=media.playbackRate||1;}
+  }
+  /* 再生中の追従：ハードシークはカクつくため、B の再生速度を微調整して A に連続的にロックする
+     （2つの video は decode タイミングでどうしてもドリフトするため、rAF ごとに補正） */
+  function correctBRate(){
+    if(!cmpOn||!bVid||!bVid.duration)return;
+    const base=media.playbackRate||1;
+    const diff=Math.min(media.currentTime,bVid.duration)-bVid.currentTime; /* +ならBが遅れている */
+    if(Math.abs(diff)>0.2){try{bVid.currentTime=Math.min(media.currentTime,bVid.duration)}catch(_){}bVid.playbackRate=base;return}
+    bVid.playbackRate=Math.max(0.25,Math.min(2,base+diff*4)); /* 遅れ→少し速く / 進み→少し遅く */
   }
   /* 比較モードに入る：B ペインを右に追加し動画を読み込む（A の transport に追従） */
   function enterCompare(bNode,bVer){
@@ -3828,6 +3836,7 @@ function openReview(nodeId,versionId,opts){
     if(isVideo){
       const f=dispFrame();
       if(f!==lastFrame||force){lastFrame=f;refreshView()}
+      if(cmpOn&&bVid&&!media.paused&&!scrubbing)correctBRate(); /* 再生中は毎フレーム B の速度を微調整して A にロック */
       requestAnimationFrame(()=>sync(false));
     }else drawAll();
   }
