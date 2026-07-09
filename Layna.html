@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.12';
+const APP_VERSION='2026.07.09.13';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2579,13 +2579,11 @@ function paintHead(ctx,W,H,s,alpha){
     c=Math.cos(roll);n=Math.sin(roll);let x3=c*x2-n*y2,y3=n*x2+c*y2,z3=z2;
     return [x3,y3,z3];
   }
-  /* 前後(奥行き)を潰した扁平な球（顔の奥行きに近づける） */
-  const flat=p=>[p[0],p[1],p[2]*0.62];
-  const proj=p=>{const d=flat(p);const r=rotv(d[0],d[1],d[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
+  const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
   /* 球の外周シルエット */
   ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
-  /* 点列を投影して描画。線が途切れないよう全周描く（奥側は薄めにして立体感を残す） */
+  /* 点列を投影して描画。全周描き、奥側は薄めにして立体感を残す */
   function poly(pts,wf){
     let prev=null;
     for(const q of pts){const p=proj(q);
@@ -2594,13 +2592,12 @@ function paintHead(ctx,W,H,s,alpha){
     }
     ctx.globalAlpha=alpha;
   }
-  /* アイライン（横の大円）＝球面の緯線。滑らかな曲線 */
-  {const e=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;e.push([Math.sin(t),0,Math.cos(t)]);}poly(e,0.03);}
-  /* 正中線（縦）＝直線的な菱形。先端(F)が鼻先の角 */
-  const F=[0,-0.05,1.0];
-  poly([[0,1,0],F,[0,-1,0],[0,0,-1],[0,1,0]],0.05);
-  /* 鼻先の角（手前のときのみ強調） */
-  {const pf=proj(F);if(pf[2]>=0){ctx.beginPath();ctx.arc(pf[0],pf[1],Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}}
+  const ring=fn=>{const a=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;a.push(fn(t));}return a;};
+  poly(ring(t=>[0,Math.sin(t),Math.cos(t)]),0.04);  /* 正中線（縦の大円） */
+  poly(ring(t=>[Math.sin(t),0,Math.cos(t)]),0.03);  /* アイライン（横の大円） */
+  /* 正面マーカー（鼻＝+Z方向）＝向きの目印 */
+  const nose=rotv(0,0,1);const nx=cx+R*nose[0],ny=cy-R*nose[1];
+  ctx.beginPath();ctx.arc(nx,ny,Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*(nose[2]>=0?1:0.35);ctx.fill();ctx.globalAlpha=alpha;
   /* 中心（移動ハンドル） */
   ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.6;ctx.fill();
   ctx.restore();
