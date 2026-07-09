@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.20';
+const APP_VERSION='2026.07.09.21';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3485,7 +3485,7 @@ function openReview(nodeId,versionId,opts){
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
 
-  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;if(typeof flushCommitted==='function')flushCommitted();document.removeEventListener('keydown',onKey);ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;if(typeof flushCommitted==='function')flushCommitted();document.removeEventListener('keydown',onKey);try{document.removeEventListener('keydown',fbKeyDownSpin);document.removeEventListener('keyup',fbKeyUpSpin)}catch(_){}ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
   /* 表示モード（モーダル⇄全画面） */
   function fbBackdropEnsure(){let bd=$('#fbBackdrop');if(!bd){bd=el('div','fb-backdrop');bd.id='fbBackdrop';bd.onclick=()=>close();if(ov.parentNode)ov.parentNode.insertBefore(bd,ov);else document.body.appendChild(bd)}return bd}
   function fbApplyMode(){if(fbFullscreen){ov.classList.remove('fb-modal');const bd=$('#fbBackdrop');if(bd)bd.remove()}else{ov.classList.add('fb-modal');fbBackdropEnsure()}if(fsBtn){fsBtn.textContent=fbFullscreen?'❐':'⛶';fsBtn.title=fbFullscreen?'モーダル表示に戻す':'全画面表示'}}
@@ -3522,8 +3522,10 @@ function openReview(nodeId,versionId,opts){
   const media=isVideo?el('video'):el('img');
   if(isVideo){media.playsInline=true;media.preload='auto'}
   /* ズーム/トラック用ラッパー（media/トレペ/キャンバスをまとめて変形） */
+  const rotEl=el('div');rotEl.style.cssText='position:absolute;inset:0;transform-origin:center center';/* 画面回転用（クリスタ風 Shift+Space+ドラッグ） */
+  wrap.appendChild(rotEl);
   const zoomEl=el('div');zoomEl.style.cssText='position:absolute;inset:0;transform-origin:0 0';
-  wrap.appendChild(zoomEl);
+  rotEl.appendChild(zoomEl);
   zoomEl.appendChild(media);
   const trace=el('div','fb-trace');zoomEl.appendChild(trace); // トラッキングペーパー（白レイヤー）
   const canvas=el('canvas','fb-canvas');canvas.style.pointerEvents='none';zoomEl.appendChild(canvas);
@@ -3585,8 +3587,8 @@ function openReview(nodeId,versionId,opts){
   body.appendChild(stage);
 
   /* --- ズーム / トラック（寄った状態でアノテ描画可） --- */
-  const Zm={s:1,x:0,y:0,hand:false,panning:false,px:0,py:0};
-  function applyZoom(){zoomEl.style.transform='translate('+Zm.x+'px,'+Zm.y+'px) scale('+Zm.s+')';zoomLab.textContent=Math.round(Zm.s*100)+'%'}
+  const Zm={s:1,x:0,y:0,rot:0,hand:false,panning:false,spinning:false,px:0,py:0,scx:0,scy:0,sa0:0,sr0:0};
+  function applyZoom(){zoomEl.style.transform='translate('+Zm.x+'px,'+Zm.y+'px) scale('+Zm.s+')';rotEl.style.transform='rotate('+Zm.rot+'deg)';zoomLab.textContent=Math.round(Zm.s*100)+'%'+(Math.round(Zm.rot)?' '+Math.round(Zm.rot)+'°':'')}
   function zoomTo(ns,cx,cy){
     ns=Math.max(1,Math.min(8,ns));
     const r=wrap.getBoundingClientRect();
@@ -3598,17 +3600,30 @@ function openReview(nodeId,versionId,opts){
   }
   ziBtn.onclick=()=>zoomTo(Zm.s*1.4);
   zoBtn.onclick=()=>zoomTo(Zm.s/1.4);
-  zrBtn.onclick=()=>zoomTo(1);
+  zrBtn.onclick=()=>{Zm.rot=0;zoomTo(1);applyZoom()}; /* 等倍：ズーム・パン・回転をリセット */
   handBtn.onclick=()=>{Zm.hand=!Zm.hand;handBtn.classList.toggle('active',Zm.hand);if(Zm.hand)setTool(null);wrap.style.cursor=Zm.hand?'grab':''};
   wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoomTo(Zm.s*(e.deltaY<0?1.15:1/1.15),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+  /* クリスタ風：Shift+Space+ドラッグで画面回転 */
+  let spaceDown=false;
+  function fbKeyDownSpin(e){if(e.code==='Space'){spaceDown=true;if(e.shiftKey){wrap.style.cursor='alias';e.preventDefault()}}}
+  function fbKeyUpSpin(e){if(e.code==='Space'){spaceDown=false;wrap.style.cursor=Zm.hand?'grab':''}}
+  document.addEventListener('keydown',fbKeyDownSpin);document.addEventListener('keyup',fbKeyUpSpin);
   wrap.addEventListener('pointerdown',e=>{
+    if(spaceDown&&e.shiftKey){ /* 回転開始（中心まわり） */
+      const wr=wrap.getBoundingClientRect();Zm.scx=wr.left+wr.width/2;Zm.scy=wr.top+wr.height/2;
+      Zm.spinning=true;Zm.sa0=Math.atan2(e.clientY-Zm.scy,e.clientX-Zm.scx);Zm.sr0=Zm.rot;
+      try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='grabbing';e.preventDefault();return;
+    }
     if(!(Zm.hand||e.button===1))return;
     Zm.panning=true;Zm.px=e.clientX;Zm.py=e.clientY;
     try{wrap.setPointerCapture(e.pointerId)}catch(_){}
     wrap.style.cursor='grabbing';e.preventDefault();
   });
-  wrap.addEventListener('pointermove',e=>{if(!Zm.panning)return;Zm.x+=e.clientX-Zm.px;Zm.y+=e.clientY-Zm.py;Zm.px=e.clientX;Zm.py=e.clientY;applyZoom()});
-  wrap.addEventListener('pointerup',()=>{Zm.panning=false;wrap.style.cursor=Zm.hand?'grab':''});
+  wrap.addEventListener('pointermove',e=>{
+    if(Zm.spinning){const a=Math.atan2(e.clientY-Zm.scy,e.clientX-Zm.scx);Zm.rot=Zm.sr0+(a-Zm.sa0)*180/Math.PI;applyZoom();return}
+    if(!Zm.panning)return;Zm.x+=e.clientX-Zm.px;Zm.y+=e.clientY-Zm.py;Zm.px=e.clientX;Zm.py=e.clientY;applyZoom();
+  });
+  wrap.addEventListener('pointerup',()=>{Zm.panning=false;Zm.spinning=false;wrap.style.cursor=(Zm.hand||spaceDown)?'grab':''});
 
   /* --- レイヤーパネル（動画右側・プレビュー付き縦並び） --- */
   const layersPanel=el('div','fb-layers');
@@ -3883,7 +3898,17 @@ function openReview(nodeId,versionId,opts){
   }
   durSel.onchange=()=>{drawAll();drawTimeline()};
   ghostBtn.onclick=()=>{ghostOn=!ghostOn;ghostBtn.classList.toggle('active',ghostOn);drawAll()};
-  const pt=e=>{const r=canvas.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
+  /* スクリーン座標→キャンバス正規化。回転(rotEl)・ズーム/パン(zoomEl)・canvas配置を逆変換 */
+  const pt=e=>{
+    const cl=parseFloat(canvas.style.left), ct=parseFloat(canvas.style.top);
+    if(isNaN(cl)||isNaN(ct)||!canvas.width){const r=canvas.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];} /* fit前はそのまま */
+    const wr=wrap.getBoundingClientRect();
+    const x=e.clientX-wr.left, y=e.clientY-wr.top;
+    const rad=-Zm.rot*Math.PI/180, ccx=wr.width/2, ccy=wr.height/2, dx=x-ccx, dy=y-ccy;
+    const rx=dx*Math.cos(rad)-dy*Math.sin(rad)+ccx, ry=dx*Math.sin(rad)+dy*Math.cos(rad)+ccy; /* rotEl 逆回転 */
+    const zx=(rx-Zm.x)/Zm.s, zy=(ry-Zm.y)/Zm.s; /* zoomEl 逆変換 */
+    return [(zx-cl)/canvas.width,(zy-ct)/canvas.height];
+  };
   /* ツール切替（描画 / 消しゴム） */
   function setTool(t){
     tool=t;
@@ -4050,7 +4075,7 @@ function openReview(nodeId,versionId,opts){
     if(e.key==='Escape')close();
     else if(isVideo&&e.key==='ArrowLeft'){e.preventDefault();seekFrame(dispFrame()-1)}
     else if(isVideo&&e.key==='ArrowRight'){e.preventDefault();seekFrame(dispFrame()+1)}
-    else if(isVideo&&e.key===' '){e.preventDefault();playBtn.onclick()}
+    else if(isVideo&&e.key===' '&&!e.shiftKey){e.preventDefault();playBtn.onclick()} /* Shift+Spaceは画面回転に使うため除外 */
   }
   document.addEventListener('keydown',onKey);
 
