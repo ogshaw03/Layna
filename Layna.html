@@ -1043,7 +1043,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.33';
+const APP_VERSION='2026.07.09.34';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2243,15 +2243,16 @@ function renderProjProgress(main,cur){
   }
   main.appendChild(tabs);
   const parents=state.pmParentIds;
-  /* 円グラフの表示方法（複数エピソード時のみ選択可）：まとめて1つ／エピソードごとに並べる */
+  /* 円グラフの表示（複数エピソード時のみ選択可）：全エピソードを並べる／特定のエピソードのみ */
   if(state.pmDonutMode==null){try{state.pmDonutMode=localStorage.getItem('layna_pmDonutMode')||'all'}catch(_){state.pmDonutMode='all'}}
-  const donutMode=parents.length>1?(state.pmDonutMode==='one'?'one':'all'):'one';
+  /* 選択が現在の親フォルダに存在しない（別プロジェクト等）場合は「並べる」に戻す */
+  const donutMode=(parents.length>1&&(state.pmDonutMode==='all'||parents.includes(state.pmDonutMode)))?state.pmDonutMode:'all';
   if(parents.length>1){
     const modeRow=el('div','pm-sel');
-    modeRow.appendChild(el('label',null,'円グラフの表示：'));
+    modeRow.appendChild(el('label',null,'表示するエピソード：'));
     const msel=el('select');msel.style.cssText='padding:4px 10px;font-size:12px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;cursor:pointer';
-    msel.appendChild(new Option('エピソードごとに並べる','all'));
-    msel.appendChild(new Option('まとめて1つ','one'));
+    msel.appendChild(new Option('すべて並べる','all'));
+    for(const pid of parents){const n=getNode(pid);msel.appendChild(new Option(n?n.name:pid,pid))}
     msel.value=donutMode;
     msel.onchange=()=>{state.pmDonutMode=msel.value;try{localStorage.setItem('layna_pmDonutMode',msel.value)}catch(_){}state.pmPick=null;renderBody();resolveThumbs()};
     modeRow.appendChild(msel);
@@ -2282,8 +2283,9 @@ function renderProjProgress(main,cur){
     }
     return;
   }
-  /* まとめて1つ（単一ショット親、または「まとめて1つ」選択時）：全ショットを1つの円グラフに集約 */
-  const p=progressData(parents,state.pmTab,shotFilterPass);
+  /* 単一ショット親、または特定エピソード選択時：対象ショットを1つの円グラフで表示 */
+  const targetIds=(parents.length>1&&donutMode!=='all')?[donutMode]:parents;
+  const p=progressData(targetIds,state.pmTab,shotFilterPass);
   if(!p.total){main.appendChild(el('div','pm-empty',emptyMsg));return}
   const onePick=(state.pmPick&&String(state.pmPick).includes('::'))?null:state.pmPick; /* エピソード別の選択キーは無視 */
   main.appendChild(pmDonutCard(p,isStage,r=>r.id,{}));
