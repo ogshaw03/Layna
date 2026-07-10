@@ -1122,7 +1122,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.41';
+const APP_VERSION='2026.07.09.42';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -1230,7 +1230,10 @@ function updateFolderStatus(){const cur=(DB&&state&&state.currentId)?getNode(sta
 async function grantProjectAccess(id){
   const ph=await storage.projRoot(id,true); /* ユーザージェスチャ内で requestPermission */
   if(!ph){toast('フォルダへのアクセスが許可されませんでした');return false}
-  const data=await storage.loadProject(id);
+  let data=await storage.loadProject(id);
+  /* 競合コピー（layna (1).project.json 等）があれば統合して復旧 */
+  let _absMerged=0;
+  if(data&&Array.isArray(data.nodes)&&!data.enc){try{const _a=await absorbConflictCopies(ph,data);data=_a.data;if(_a.merged)_absMerged=_a.count}catch(_){}}
   /* 解錠済みの暗号化プロジェクトはフォルダから読むとスタブになるため、現在のメモリ内データを保持（上書きしない） */
   if(data&&Array.isArray(data.nodes)&&!(projectIsEncrypted(id)&&projKey(id))){
     const ids=new Set([id,...DB.nodes.filter(n=>rootOfId(n)===id).map(n=>n.id)]);
@@ -1244,7 +1247,7 @@ async function grantProjectAccess(id){
   }
   delete _saveCache.proj[id];delete _saveCache.reels[id];
   updateFolderStatus();render();resolveThumbs();
-  toast('フォルダに再接続しました');
+  toast('フォルダに再接続しました'+(_absMerged?'（競合コピー'+_absMerged+'件を統合して復旧）':''));
   return true;
 }
 
@@ -1738,6 +1741,8 @@ async function connectProjectFlow(){
     toast('保護されたプロジェクト「'+(data.name||'project')+'」を接続しました（開くときにパスワードが必要です）');
     go(data.id);return;
   }
+  /* Drive等の競合コピー（layna (1).project.json 等）があれば統合して復旧 */
+  const _abs=await absorbConflictCopies(handle,data);data=_abs.data;
   /* 既に接続済みなら古いデータを入れ替え */
   const oldIds=new Set([data.id,...DB.nodes.filter(n=>rootOfId(n)===data.id).map(n=>n.id)]);
   DB.nodes=DB.nodes.filter(n=>!oldIds.has(n.id)&&n.id!==data.id);
@@ -1752,7 +1757,7 @@ async function connectProjectFlow(){
   normalizeNodes();
   if(!REG.some(e=>e.id===data.id))REG.push({id:data.id,name:data.name||(root&&root.name)||'project',folderName:handle.name});
   await persist();
-  toast('プロジェクト「'+((root&&root.name)||data.name)+'」を接続しました');
+  toast('プロジェクト「'+((root&&root.name)||data.name)+'」を接続しました'+(_abs.merged?'（競合コピー'+_abs.count+'件を統合して復旧）':''));
   go(data.id);
 }
 /* DB を辿らずに rootOf の id を返す簡易版（接続処理中の一時判定用） */
@@ -3681,6 +3686,74 @@ function applyMergedIntoDB(id,merged){
   for(const s of (merged.submits||[]))if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
   normalizeNodes();
 }
+/* ===== Google ドライブ等の「競合コピー」からの復旧（無損失 union マージ） =====
+   同時保存で分裂した layna (1).project.json 等を検知し、正規ファイルと中身を統合する。
+   ノードは id で union、同一ノードは versions / review.notes / comments を union、
+   欠けているスカラー項目は補完、members/statuses/shotsParentIds は情報量の多い方を採用。 */
+function _mergeNodeInto(a,b){
+  a.versions=Array.isArray(a.versions)?a.versions:[];
+  const vids=new Set(a.versions.map(v=>v.id));
+  for(const v of (b.versions||[])){
+    if(!vids.has(v.id)){a.versions.push(v);vids.add(v.id);continue}
+    const av=a.versions.find(x=>x.id===v.id);
+    if(av&&v.review&&Array.isArray(v.review.notes)){
+      av.review=av.review||{status:'pending',notes:[]};av.review.notes=Array.isArray(av.review.notes)?av.review.notes:[];
+      const nk=n=>n.id||((n.time||'')+'|'+(n.text||'')+'|'+(n.frame!=null?n.frame:''));
+      const seen=new Set(av.review.notes.map(nk));
+      for(const nt of v.review.notes){const k=nk(nt);if(!seen.has(k)){av.review.notes.push(nt);seen.add(k)}}
+    }
+    if(av&&(av.thumb==null||av.thumb==='')&&v.thumb)av.thumb=v.thumb;
+  }
+  if(Array.isArray(b.comments)&&b.comments.length){
+    a.comments=Array.isArray(a.comments)?a.comments:[];
+    const ck=c=>c.id||((c.time||'')+'|'+(c.text||''));
+    const seen=new Set(a.comments.map(ck));
+    for(const c of b.comments){const k=ck(c);if(!seen.has(k)){a.comments.push(c);seen.add(k)}}
+  }
+  for(const k of ['thumbnail','status','assignee','reviewer','description','folderName','thumbCrop','type','name'])
+    if((a[k]==null||a[k]==='')&&b[k]!=null&&b[k]!=='')a[k]=b[k];
+  for(const k of ['members','statuses','shotsParentIds','stages'])
+    if(Array.isArray(b[k])&&(!Array.isArray(a[k])||b[k].length>a[k].length))a[k]=b[k];
+}
+function mergeRecoverDatas(datas){
+  const base=datas[0]||{nodes:[],submits:[]};
+  const nodeMap=new Map();
+  for(const n of (base.nodes||[]))nodeMap.set(n.id,n);
+  for(let i=1;i<datas.length;i++)for(const n of (datas[i].nodes||[])){
+    if(!nodeMap.has(n.id))nodeMap.set(n.id,n);else _mergeNodeInto(nodeMap.get(n.id),n);
+  }
+  const subMap=new Map();
+  for(const d of datas)for(const s of (d.submits||[]))if(!subMap.has(s.id))subMap.set(s.id,s);
+  return {v:3,id:base.id,name:base.name,nodes:[...nodeMap.values()],submits:[...subMap.values()]};
+}
+/* 正規ファイルと同フォルダ内の競合コピーを統合し、正規ファイルに書き戻す。統合したら data を差し替えて返す。 */
+async function absorbConflictCopies(ph,data){
+  if(!ph||!data||data.enc||!data.id)return {data,merged:false,count:0};
+  let names=[];
+  try{
+    for await(const [name,entry] of ph.entries()){
+      if(!entry||entry.kind!=='file')continue;
+      if(name===storage._projFileName)continue;
+      if(/conflict-/i.test(name))continue; /* 自前バックアップは除外 */
+      if(/^layna.*\.project.*\.json$/i.test(name))names.push(name);
+    }
+  }catch(_){return {data,merged:false,count:0}}
+  if(!names.length)return {data,merged:false,count:0};
+  const datas=[data];
+  for(const name of names){try{const fh=await ph.getFileHandle(name);const p=JSON.parse(await (await fh.getFile()).text());if(p&&Array.isArray(p.nodes)&&p.id===data.id&&!p.enc)datas.push(p)}catch(_){}}
+  if(datas.length<2)return {data,merged:false,count:0};
+  const merged=mergeRecoverDatas(datas);
+  try{await storage._write(()=>ph,storage._projFileName,JSON.stringify(merged,null,2))}catch(_){return {data,merged:false,count:0}}
+  /* 競合コピーはバックアップ名に退避して除去（再検知を防ぐ） */
+  let idx=0;
+  for(const name of names){try{
+    const fh=await ph.getFileHandle(name);const t=await (await fh.getFile()).text();
+    await storage._write(()=>ph,'layna.project.conflict-'+nowIso().replace(/[:.]/g,'-')+'-'+(idx++)+'.bak.json',t);
+    await ph.removeEntry(name);
+  }catch(_){}}
+  return {data:merged,merged:true,count:datas.length-1};
+}
+
 /* 復号したプロジェクトデータを DB に展開（スタブを実データで置換） */
 function loadDecryptedIntoDB(id,data){
   const ids=new Set([id,...DB.nodes.filter(n=>rootOfId(n)===id).map(n=>n.id)]);
