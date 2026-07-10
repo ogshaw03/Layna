@@ -1043,7 +1043,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.32';
+const APP_VERSION='2026.07.09.33';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2242,12 +2242,26 @@ function renderProjProgress(main,cur){
     tabs.appendChild(b);
   }
   main.appendChild(tabs);
+  const parents=state.pmParentIds;
+  /* 円グラフの表示方法（複数エピソード時のみ選択可）：まとめて1つ／エピソードごとに並べる */
+  if(state.pmDonutMode==null){try{state.pmDonutMode=localStorage.getItem('layna_pmDonutMode')||'all'}catch(_){state.pmDonutMode='all'}}
+  const donutMode=parents.length>1?(state.pmDonutMode==='one'?'one':'all'):'one';
+  if(parents.length>1){
+    const modeRow=el('div','pm-sel');
+    modeRow.appendChild(el('label',null,'円グラフの表示：'));
+    const msel=el('select');msel.style.cssText='padding:4px 10px;font-size:12px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;cursor:pointer';
+    msel.appendChild(new Option('エピソードごとに並べる','all'));
+    msel.appendChild(new Option('まとめて1つ','one'));
+    msel.value=donutMode;
+    msel.onchange=()=>{state.pmDonutMode=msel.value;try{localStorage.setItem('layna_pmDonutMode',msel.value)}catch(_){}state.pmPick=null;renderBody();resolveThumbs()};
+    modeRow.appendChild(msel);
+    main.appendChild(modeRow);
+  }
   const fb=assignFilterBar(cur);if(fb)main.appendChild(fb); /* 担当フィルタ */
   const filterOn=!!(state.filterAssignee||state.filterReviewer);
   const isStage=state.pmTab==='stage';
-  const parents=state.pmParentIds;
   const emptyMsg=filterOn?'フィルタに一致するショットがありません。':'このフォルダ直下にショットがありません。';
-  if(parents.length>1){
+  if(parents.length>1&&donutMode==='all'){
     /* 複数エピソード：ショット親フォルダごとに区切って表示。円グラフは横並び */
     const datas=parents.map(pid=>({pid,node:getNode(pid),p:progressData([pid],state.pmTab,shotFilterPass)}));
     const grand=datas.reduce((a,d)=>a+d.p.total,0);
@@ -2268,11 +2282,12 @@ function renderProjProgress(main,cur){
     }
     return;
   }
-  /* 単一のショット親フォルダ（従来表示） */
+  /* まとめて1つ（単一ショット親、または「まとめて1つ」選択時）：全ショットを1つの円グラフに集約 */
   const p=progressData(parents,state.pmTab,shotFilterPass);
   if(!p.total){main.appendChild(el('div','pm-empty',emptyMsg));return}
+  const onePick=(state.pmPick&&String(state.pmPick).includes('::'))?null:state.pmPick; /* エピソード別の選択キーは無視 */
   main.appendChild(pmDonutCard(p,isStage,r=>r.id,{}));
-  pmShotBreakdown(main,p,isStage,state.pmPick);
+  pmShotBreakdown(main,p,isStage,onePick);
 }
 /* 円グラフ＋集計表カード。keyOf(row) が state.pmPick と一致する行をハイライト。small=横並び用の小型（進捗バー列なし） */
 function pmDonutCard(p,isStage,keyOf,opts){
