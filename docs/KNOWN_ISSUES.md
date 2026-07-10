@@ -42,6 +42,9 @@
   マージ時は元のフォルダ内容を `layna.project.conflict-<時刻>.json` にバックアップ。詳細は `docs/DRIVE_SHARED_OPERATION.md`。
 - **[中] メディア/サムネの同期待ちを自動リトライ**（Drive 共有 #3）… `resolveThumbs` が未解決分をバックオフで再試行、
   その間は「同期待ち」表示（`.thumb-wait`）。レビュー窓の動画も `getURLRetry` でリトライ。
+- **[中] サムネ未生成の動画をバックフィル**（Drive 共有 #3）… `v.thumb` が無い動画は取得元が無くリトライしても出せないため、
+  `backfillThumbs`（`render` から 1.5s デバウンスで起動）が動画本体から中間フレームを生成し `thumbnails/` に保存・共有。
+  現在のプロジェクト内・1パス最大8件・ver毎最大3回まで。
 
 ## 未対応（残す）
 

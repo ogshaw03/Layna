@@ -1122,7 +1122,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.38';
+const APP_VERSION='2026.07.09.39';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -1780,7 +1780,7 @@ function updateHeaderForContext(){
   setD('#folderStatus',!home);updateFolderStatus();
 }
 function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline',lastPageId:state.lastPageId||null}))}catch(_){}}
-function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();maybeScanMentions();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
+function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();maybeScanMentions();scheduleBackfillThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
 /* 表示のたびに（スロットル付きで）自分宛メンションを走査 */
 let _mentionScanAt=0;
 function maybeScanMentions(){let now=0;try{now=Date.now()}catch(_){}if(now-_mentionScanAt<3000)return;_mentionScanAt=now;try{scanMentionsForMe()}catch(_){}}
@@ -3091,6 +3091,39 @@ async function _resolvePass(gen,attempt){
     const delays=[1200,3000,6000,12000,20000];
     setTimeout(()=>_resolvePass(gen,attempt+1),delays[attempt]||20000);
   }
+}
+/* ===== サムネ未生成の動画から、その場でサムネを生成して保存・反映（バックフィル） =====
+   パイプライン取り込みやサムネ書き込み失敗などで v.thumb が無い動画は、リトライしても
+   取得元が無いので出せない。動画本体から中間フレームを生成し thumbnails/ に保存して共有する。 */
+function genThumbFromUrl(url){return new Promise(resolve=>{
+  const vid=document.createElement('video');vid.preload='metadata';vid.muted=true;vid.playsInline=true;vid.src=url;
+  let done=false;const finish=cv=>{if(done)return;done=true;try{vid.removeAttribute('src');vid.load()}catch(_){}resolve(cv?cv.toDataURL('image/jpeg',0.72):null)};
+  vid.onloadeddata=()=>{try{vid.currentTime=Math.min(1,(vid.duration||2)/2)}catch(_){finish(null)}};
+  vid.onseeked=()=>{try{const w=vid.videoWidth,h=vid.videoHeight;if(!w||!h)return finish(null);const s=Math.min(1,640/w);const cv=document.createElement('canvas');cv.width=Math.round(w*s);cv.height=Math.round(h*s);cv.getContext('2d').drawImage(vid,0,0,cv.width,cv.height);finish(cv)}catch(_){finish(null)}};
+  vid.onerror=()=>finish(null);
+  setTimeout(()=>finish(null),20000);
+})}
+let _bfTried=new Map(),_bfRunning=false,_bfTimer=null;
+function scheduleBackfillThumbs(){if(_bfTimer)clearTimeout(_bfTimer);_bfTimer=setTimeout(()=>{backfillThumbs()},1500);}
+async function backfillThumbs(){
+  if(_bfRunning||!DB||!state.currentId)return;
+  const cur=getNode(state.currentId);const root=cur?rootOf(cur):null;if(!root||projectLocked(root))return;
+  const ids=new Set([root.id,...descendants(root.id).map(n=>n.id)]);
+  const targets=[];
+  for(const n of DB.nodes){if(!ids.has(n.id)||!n.versions)continue;
+    for(const v of n.versions)if(v.type==='video'&&!v.thumb&&v.file&&(_bfTried.get(v.id)||0)<3)targets.push({n,v});}
+  if(!targets.length)return;
+  _bfRunning=true;let changed=false;
+  try{
+    for(const {n,v} of targets.slice(0,8)){
+      _bfTried.set(v.id,(_bfTried.get(v.id)||0)+1);
+      let ref=null;
+      try{const url=await storage.getURL(v.file);if(!url)continue;const dataUrl=await genThumbFromUrl(url);if(!dataUrl)continue;const blob=await(await fetch(dataUrl)).blob();ref=await storage.putMedia('thumbnails',newId('media')+'.jpg',blob,{projectId:root.id})}catch(_){}
+      if(ref){v.thumb=ref;if(!n.thumbnail)n.thumbnail=ref;changed=true}
+    }
+  }finally{_bfRunning=false}
+  if(changed){await persist();render();resolveThumbs()}
+  else if(targets.length>8)scheduleBackfillThumbs(); /* まだ残りがあれば次パスへ */
 }
 /* サムネイルのトリミング表示：元画像は変えず、縦横比タイルに合わせて位置・拡大で表示。
    crop={s:拡大率(>=1), fx/fy:パン位置(-0.5..0.5, 0=中央)} は解像度非依存 */
