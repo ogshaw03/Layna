@@ -215,6 +215,14 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pm-h{font-family:var(--font-head);font-size:10px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin:22px 2px 10px}
 .pm-badge{display:inline-block;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;color:#101013}
 .pm-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+/* 複数エピソード（ショット親フォルダ）の進捗を並べて表示 */
+.pm-donrow{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px}
+.pm-epcard{flex:1 1 320px;min-width:290px;margin-bottom:0}
+.pm-epcard .pm-body{gap:16px}
+.pm-epcard .pm-ptbl{min-width:140px}
+.pm-eph{font-family:var(--font-head);font-weight:700;font-size:13px;margin-bottom:12px;color:var(--text);display:flex;align-items:center;gap:8px}
+.pm-eph .cnt{font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--text3)}
+.pm-eph2{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--text);border-left:3px solid #60a5ff;padding-left:9px;margin:26px 2px 8px}
 .pm-tile{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg2)}
 .pm-tile:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
 .pm-tile .th{position:relative;aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
@@ -1035,7 +1043,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.31';
+const APP_VERSION='2026.07.09.32';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2236,26 +2244,62 @@ function renderProjProgress(main,cur){
   main.appendChild(tabs);
   const fb=assignFilterBar(cur);if(fb)main.appendChild(fb); /* 担当フィルタ */
   const filterOn=!!(state.filterAssignee||state.filterReviewer);
-  const p=progressData(state.pmParentIds,state.pmTab,shotFilterPass);
-  if(!p.total){main.appendChild(el('div','pm-empty',filterOn?'フィルタに一致するショットがありません。':'このフォルダ直下にショットがありません。'));return}
   const isStage=state.pmTab==='stage';
-  const card=el('div','pm-card');const body=el('div','pm-body');
-  const cv=el('canvas');cv.width=180;cv.height=180;body.appendChild(cv);
-  const pick=row=>{state.pmPick=(state.pmPick===row.id?null:row.id);renderBody();resolveThumbs()};
-  drawDonut(cv,p.rows,p.total,pick);
+  const parents=state.pmParentIds;
+  const emptyMsg=filterOn?'フィルタに一致するショットがありません。':'このフォルダ直下にショットがありません。';
+  if(parents.length>1){
+    /* 複数エピソード：ショット親フォルダごとに区切って表示。円グラフは横並び */
+    const datas=parents.map(pid=>({pid,node:getNode(pid),p:progressData([pid],state.pmTab,shotFilterPass)}));
+    const grand=datas.reduce((a,d)=>a+d.p.total,0);
+    if(!grand){main.appendChild(el('div','pm-empty',emptyMsg));return}
+    const donrow=el('div','pm-donrow');
+    for(const d of datas){
+      const keyOf=r=>d.pid+'::'+r.id;
+      const head=el('div','pm-eph');head.appendChild(el('span',null,d.node?d.node.name:'—'));head.appendChild(el('span','cnt','ショット '+d.p.total+' 件'));
+      donrow.appendChild(pmDonutCard(d.p,isStage,keyOf,{small:true,ep:true,head}));
+    }
+    main.appendChild(donrow);
+    for(const d of datas){
+      if(!d.p.total)continue;
+      main.appendChild(el('div','pm-eph2',(d.node?d.node.name:'—')));
+      const pre=d.pid+'::';
+      const myPick=(state.pmPick&&String(state.pmPick).startsWith(pre))?String(state.pmPick).slice(pre.length):null;
+      pmShotBreakdown(main,d.p,isStage,myPick);
+    }
+    return;
+  }
+  /* 単一のショット親フォルダ（従来表示） */
+  const p=progressData(parents,state.pmTab,shotFilterPass);
+  if(!p.total){main.appendChild(el('div','pm-empty',emptyMsg));return}
+  main.appendChild(pmDonutCard(p,isStage,r=>r.id,{}));
+  pmShotBreakdown(main,p,isStage,state.pmPick);
+}
+/* 円グラフ＋集計表カード。keyOf(row) が state.pmPick と一致する行をハイライト。small=横並び用の小型（進捗バー列なし） */
+function pmDonutCard(p,isStage,keyOf,opts){
+  opts=opts||{};
+  const card=el('div','pm-card'+(opts.ep?' pm-epcard':''));
+  if(opts.head)card.appendChild(opts.head);
+  const body=el('div','pm-body');
+  const cv=el('canvas');cv.width=opts.small?160:180;cv.height=opts.small?160:180;body.appendChild(cv);
+  const pick=row=>{const k=keyOf(row);state.pmPick=(state.pmPick===k?null:k);renderBody();resolveThumbs()};
+  drawDonut(cv,p.rows,p.total,p.total?pick:null);
   const tbl=el('table','pm-ptbl');
-  const thead=el('tr');[(isStage?'工程':'ステータス'),'ショット数','割合','進捗'].forEach(h=>thead.appendChild(el('th',null,h)));tbl.appendChild(thead);
+  const cols=opts.small?[(isStage?'工程':'ステータス'),'数','割合']:[(isStage?'工程':'ステータス'),'ショット数','割合','進捗'];
+  const thead=el('tr');cols.forEach(h=>thead.appendChild(el('th',null,h)));tbl.appendChild(thead);
   for(const r of p.rows){
-    const tr=el('tr',state.pmPick===r.id?'pick':null);
+    const tr=el('tr',state.pmPick===keyOf(r)?'pick':null);
     const c1=el('td');const sw=el('span','pm-sw');sw.style.background=r.color;c1.appendChild(sw);c1.appendChild(el('span',null,r.label));tr.appendChild(c1);
     tr.appendChild(el('td','pm-num',String(r.count)));
     const pct=p.total?Math.round(r.count/p.total*100):0;tr.appendChild(el('td','pm-pct',pct+'%'));
-    const c4=el('td');const bar=el('div','pm-bar');const fill=el('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4);
+    if(!opts.small){const c4=el('td');const bar=el('div','pm-bar');const fill=el('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4)}
     tr.onclick=()=>pick(r);tbl.appendChild(tr);
   }
-  body.appendChild(tbl);card.appendChild(body);main.appendChild(card);
-  if(state.pmPick!=null){
-    const row=p.rows.find(r=>r.id===state.pmPick);const hits=p.perShot.filter(ps=>ps.key===state.pmPick);
+  body.appendChild(tbl);card.appendChild(body);return card;
+}
+/* ショット別の内訳（円グラフの行を選択中はそのショット一覧グリッド、未選択は一覧表） */
+function pmShotBreakdown(main,p,isStage,pickId){
+  if(pickId!=null){
+    const row=p.rows.find(r=>r.id===pickId);const hits=p.perShot.filter(ps=>ps.key===pickId);
     main.appendChild(el('div','pm-h','「'+(row?row.label:'')+'」のショット（'+hits.length+'件）'));
     const grid=el('div','pm-grid');
     for(const ps of hits){
