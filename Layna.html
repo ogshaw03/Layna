@@ -1016,7 +1016,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.28';
+const APP_VERSION='2026.07.09.29';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -5647,10 +5647,10 @@ async function initApp(){
 initApp();
 </script>
 <script type="module">
-  // Googleログイン用（Layna 専用 Firebase プロジェクト layna-6d687。承認済みドメインに ogshaw03.github.io を追加すること）
+  // Googleログイン用（LayCAT 専用 Firebase プロジェクト laycat-54ee4。承認済みドメインに ogshaw03.github.io を追加すること）
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  const firebaseConfig={apiKey:"AIzaSyAWWgykhkakM-OrAs1MFu5CEeLg0poIhSk",authDomain:"layna-6d687.firebaseapp.com",projectId:"layna-6d687",storageBucket:"layna-6d687.firebasestorage.app",messagingSenderId:"104594371405",appId:"1:104594371405:web:d789a911be89321ce7bd04"};
+  const firebaseConfig={apiKey:"AIzaSyBn9TFT7lMdEVcatGo6v_qzIPXeDay5Cvw",authDomain:"laycat-54ee4.firebaseapp.com",projectId:"laycat-54ee4",storageBucket:"laycat-54ee4.firebasestorage.app",messagingSenderId:"1016486781774",appId:"1:1016486781774:web:f41f9546fd47e73774b41f"};
   window.__laynaFBUser=undefined;
   try{
     const app=initializeApp(firebaseConfig);const auth=getAuth(app);const provider=new GoogleAuthProvider();
