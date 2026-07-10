@@ -861,36 +861,53 @@ const storage={
   async loadRegistry(){const v=this._ls('layna_registry');if(v)return v;return (await idbGet('kv','registry'))||null},
   async saveRegistry(arr){this._lsSet('layna_registry',arr)},
   _projFileName:'layna.project.json',
+  _enc:new Map(), /* 暗号化プロジェクトの封筒（未解錠時、解錠で復号するため保持） */
+  /* 暗号化封筒ならスタブ（名前だけの空プロジェクト）を返す。中身は解錠時に展開する */
+  _encStub(p){return {v:3,id:p.id,name:p.name,nodes:[{id:p.id,parentId:null,name:p.name||'(保護されたプロジェクト)',type:'section',enc:1,passSalt:p.salt,createdAt:p.createdAt||nowIso(),versions:[]}],submits:[]}},
   async loadProject(id){
     const ph=await this.projRoot(id);
-    if(ph){try{const fh=await ph.getFileHandle(this._projFileName);const t=await (await fh.getFile()).text();return JSON.parse(t)}catch(e){}}
-    return this._ls('layna_proj_'+id)||(await idbGet('kv','proj_'+id))||null;
+    let parsed=null;
+    if(ph){try{const fh=await ph.getFileHandle(this._projFileName);const t=await (await fh.getFile()).text();parsed=JSON.parse(t)}catch(e){}}
+    if(!parsed)parsed=this._ls('layna_proj_'+id)||(await idbGet('kv','proj_'+id))||null;
+    if(!parsed)return null;
+    if(parsed.enc){this._enc.set(id,parsed);return this._encStub(parsed)} /* 暗号化：中身は伏せ、スタブのみ返す */
+    return parsed;
   },
   async saveProject(id,data){
+    /* 暗号化プロジェクトは封筒に変換してから書き込む（鍵が無ければ保存しない＝上書き防止） */
+    let out=data;
+    if(projectIsEncrypted(id)){out=await encryptProjectData(id,data);if(!out)return false}
     const ph=await this.projRoot(id);
-    if(ph){try{const fh=await ph.getFileHandle(this._projFileName,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(data,null,2));await w.close();
+    if(ph){try{const fh=await ph.getFileHandle(this._projFileName,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(out,null,2));await w.close();
       /* フォルダに保存できたら localStorage の複製は残さない（データはフォルダ側を正とする） */
       try{localStorage.removeItem('layna_proj_'+id)}catch(_){}return true}catch(e){toast('フォルダへの保存に失敗しました。接続を確認してください（この変更は未保存です）');return false}}
     /* フォルダ設定済みだが今アクセス権が無い場合：localStorage に書くと次回読込でフォルダ側の旧データが優先されて消失するため書かない */
     if(await this.hasFolderConfigured(id)){toast('フォルダ未接続のため保存できません。保存先フォルダに再接続してください');return false}
     /* フォルダ未設定：メタデータのみ localStorage に保持 */
-    if(!this._lsSet('layna_proj_'+id,data)){toast('プロジェクトデータの保存に失敗（容量超過）');return false}
+    if(!this._lsSet('layna_proj_'+id,out)){toast('プロジェクトデータの保存に失敗（容量超過）');return false}
     return true;
   },
   async delProject(id){try{localStorage.removeItem('layna_proj_'+id)}catch(_){}try{await idbDel('kv','proj_'+id)}catch(_){}try{const ph=await this.projRoot(id);if(ph)await ph.removeEntry(this._projFileName)}catch(_){}},
   /* リール：プロジェクトフォルダ内 reels/reels.json に格納（共有可能）。フォルダ未設定なら localStorage */
   async loadReels(id){
     const ph=await this.projRoot(id);
-    if(ph){try{const dir=await ph.getDirectoryHandle('reels');const fh=await dir.getFileHandle('reels.json');return JSON.parse(await (await fh.getFile()).text())}catch(e){}}
-    return this._ls('layna_reels_'+id)||null;
+    let parsed=null;
+    if(ph){try{const dir=await ph.getDirectoryHandle('reels');const fh=await dir.getFileHandle('reels.json');parsed=JSON.parse(await (await fh.getFile()).text())}catch(e){}}
+    if(!parsed)parsed=this._ls('layna_reels_'+id)||null;
+    if(!parsed)return null;
+    if(parsed.enc)return await decryptReels(id,parsed); /* 暗号化：鍵が無ければ null（解錠後に再読込） */
+    return parsed;
   },
   async saveReels(id,reels){
+    /* 暗号化プロジェクトはリールも暗号化（鍵が無ければ保存しない＝上書き防止） */
+    let out=reels;
+    if(projectIsEncrypted(id)){out=await encryptReels(id,reels);if(!out)return false}
     const ph=await this.projRoot(id);
-    if(ph){try{const dir=await this._subdir('reels',ph,true);const fh=await dir.getFileHandle('reels.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(reels,null,2));await w.close();
+    if(ph){try{const dir=await this._subdir('reels',ph,true);const fh=await dir.getFileHandle('reels.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(out,null,2));await w.close();
       try{localStorage.removeItem('layna_reels_'+id)}catch(_){}return true}catch(e){return false}}
     /* フォルダ設定済みだがアクセス権無し：古い内容で上書きしない（プロジェクトデータと同方針） */
     if(await this.hasFolderConfigured(id))return false;
-    this._lsSet('layna_reels_'+id,reels);return true;
+    this._lsSet('layna_reels_'+id,out);return true;
   },
   /* 旧: 単一DB（移行用に読むだけ） */
   async loadLegacyDb(){return (await idbGet('kv','db'))||null},
@@ -945,6 +962,8 @@ async function persist(){
   const reelsByProj={};
   for(const r of (DB.reels||[])){const pid=r.projectId||reelProjectId(r);if(!pid)continue;r.projectId=pid;(reelsByProj[pid]=reelsByProj[pid]||[]).push(r)}
   for(const e of REG){
+    /* 未解錠の暗号化プロジェクトは中身がスタブしか無いので、絶対に書き込まない（暗号文の消失防止） */
+    if(projEncLocked(e.id))continue;
     const data=projectData(e.id);if(!data)continue;
     const ps=JSON.stringify(data);
     /* 保存に失敗したらキャッシュを更新しない＝次回 persist で再試行される（失敗を「成功扱い」にしない） */
@@ -1016,7 +1035,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.29';
+const APP_VERSION='2026.07.09.30';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -1125,15 +1144,15 @@ async function grantProjectAccess(id){
   const ph=await storage.projRoot(id,true); /* ユーザージェスチャ内で requestPermission */
   if(!ph){toast('フォルダへのアクセスが許可されませんでした');return false}
   const data=await storage.loadProject(id);
-  if(data&&Array.isArray(data.nodes)){
+  /* 解錠済みの暗号化プロジェクトはフォルダから読むとスタブになるため、現在のメモリ内データを保持（上書きしない） */
+  if(data&&Array.isArray(data.nodes)&&!(projectIsEncrypted(id)&&projKey(id))){
     const ids=new Set([id,...DB.nodes.filter(n=>rootOfId(n)===id).map(n=>n.id)]);
     DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
     DB.submits=(DB.submits||[]).filter(s=>s.projectId!==id);
     for(const n of data.nodes)if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
     if(Array.isArray(data.submits))for(const s of data.submits)if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
     const rls=await storage.loadReels(id);
-    DB.reels=(DB.reels||[]).filter(r=>(r.projectId||reelProjectId(r))!==id);
-    if(Array.isArray(rls))for(const r of rls)DB.reels.push(r);
+    if(Array.isArray(rls)){DB.reels=(DB.reels||[]).filter(r=>(r.projectId||reelProjectId(r))!==id);for(const r of rls)DB.reels.push(r)}
     normalizeNodes();
   }
   delete _saveCache.proj[id];delete _saveCache.reels[id];
@@ -1618,8 +1637,21 @@ async function connectProjectFlow(){
   try{handle=await window.showDirectoryPicker({mode:'readwrite'})}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました');return}
   let data=null;
   try{const fh=await handle.getFileHandle(storage._projFileName);data=JSON.parse(await (await fh.getFile()).text())}catch(e){data=null}
-  if(!data||!Array.isArray(data.nodes)||!data.id){toast('選択したフォルダに Layna プロジェクトが見つかりません（layna.project.json が必要です）');return}
+  if(!data||!data.id||(!Array.isArray(data.nodes)&&!data.enc)){toast('選択したフォルダに Layna プロジェクトが見つかりません（layna.project.json が必要です）');return}
   await storage.setProjRoot(data.id,handle);
+  /* 暗号化プロジェクト：中身はスタブのみ取り込み、解錠は開いたときに要求（封筒は保持） */
+  if(data.enc){
+    storage._enc.set(data.id,data);
+    const oldIds=new Set([data.id,...DB.nodes.filter(n=>rootOfId(n)===data.id).map(n=>n.id)]);
+    DB.nodes=DB.nodes.filter(n=>!oldIds.has(n.id));
+    DB.submits=(DB.submits||[]).filter(s=>s.projectId!==data.id);
+    const stub=storage._encStub(data);for(const n of stub.nodes)DB.nodes.push(n);
+    const sroot=getNode(data.id);if(sroot)sroot.folderName=handle.name;
+    if(!REG.some(e=>e.id===data.id))REG.push({id:data.id,name:data.name||'project',folderName:handle.name});
+    normalizeNodes();updateFolderStatus();
+    toast('保護されたプロジェクト「'+(data.name||'project')+'」を接続しました（開くときにパスワードが必要です）');
+    go(data.id);return;
+  }
   /* 既に接続済みなら古いデータを入れ替え */
   const oldIds=new Set([data.id,...DB.nodes.filter(n=>rootOfId(n)===data.id).map(n=>n.id)]);
   DB.nodes=DB.nodes.filter(n=>!oldIds.has(n.id)&&n.id!==data.id);
@@ -2288,7 +2320,7 @@ function renderHome(s){
     body.appendChild(el('div','proj-name',r.name));
     const meta=el('div','proj-meta');
     const pb=projBadge(r);const bd=el('span','proj-badge',pb.label);bd.style.color=pb.color;bd.style.borderColor=hexA(pb.color,.5);bd.style.background=hexA(pb.color,.12);meta.appendChild(bd);
-    if(r.passHash)meta.appendChild(el('span','proj-badge','🔒 保護'));
+    if(r.passHash||r.enc)meta.appendChild(el('span','proj-badge','🔒 保護'));
     if(!r.folderName)meta.appendChild(el('span','proj-badge proj-nofolder','⚠ フォルダ未設定'));
     meta.appendChild(el('span','proj-cnt',childrenOf(r.id).length+' 項目'));
     if(ev)meta.appendChild(el('span','proj-upd','更新 '+fmt(ev.time)));
@@ -3195,11 +3227,12 @@ function openRename(node){
       inner.appendChild(memWrap);
       /* プロジェクトのパスワード保護（画面上のアクセス制限） */
       inner.appendChild(el('div','divider'));
-      inner.appendChild(el('div','form-label','パスワード保護（'+(node.passHash?'設定済み':'未設定')+'）— このプロジェクトを開くときにパスワードを要求します'));
-      pwNew=frow(node.passHash?'新しいパスワード':'パスワード','input');pwNew.f.type='password';pwNew.f.placeholder=node.passHash?'変更する場合のみ入力':'パスワードを設定';inner.appendChild(pwNew.r);
+      const _pwSet=!!(node.passHash||node.enc);
+      inner.appendChild(el('div','form-label','パスワード保護（'+(_pwSet?'設定済み':'未設定')+'）— このプロジェクトを開くときにパスワードを要求します'));
+      pwNew=frow(_pwSet?'新しいパスワード':'パスワード','input');pwNew.f.type='password';pwNew.f.placeholder=_pwSet?'変更する場合のみ入力':'パスワードを設定';inner.appendChild(pwNew.r);
       pwConf=frow('確認（再入力）','input');pwConf.f.type='password';inner.appendChild(pwConf.r);
-      if(node.passHash){const rr=el('label','form-check');rr.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0';pwRemove=el('input');pwRemove.type='checkbox';rr.appendChild(pwRemove);rr.appendChild(el('span','form-label','パスワード保護を解除する（誰でも開けるようになります）'));rr.querySelector('.form-label').style.margin='0';inner.appendChild(rr)}
-      inner.appendChild(el('div','form-label','※ パスワードは画面上のアクセスを制限するものです。データ自体は共有フォルダに保存されるため、フォルダへ直接アクセスできる人には有効ではありません。厳密な権限管理は今後のアクセス権付与方式で対応予定です。'));
+      if(_pwSet){const rr=el('label','form-check');rr.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0';pwRemove=el('input');pwRemove.type='checkbox';rr.appendChild(pwRemove);rr.appendChild(el('span','form-label','パスワード保護を解除する（誰でも開けるようになります）'));rr.querySelector('.form-label').style.margin='0';inner.appendChild(rr)}
+      inner.appendChild(el('div','form-label','※ パスワードを設定すると、プロジェクトデータ（コメント・ノート等のメタデータ）はパスワードから導出した鍵で暗号化して保存されます。パスワードが分からないと中身は復号できません。ただし動画・画像ファイル本体（media/ 配下）は暗号化対象外です。パスワードを紛失すると復号できなくなる点にご注意ください。'));
       /* このユーザーの接続を解除（データは消さない） */
       inner.appendChild(el('div','divider'));
       const dcWrap=el('div');dcWrap.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap';
@@ -3217,7 +3250,7 @@ function openRename(node){
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
       /* プロジェクトのパスワード保護：新規入力があれば設定/変更、解除チェックで削除 */
       if(!node.parentId){
-        if(pwRemove&&pwRemove.checked){delete node.passHash;delete node.passSalt;unlockedSet().delete(node.id)}
+        if(pwRemove&&pwRemove.checked){delete node.passHash;delete node.passSalt;delete node.enc;if(state._projKeys)delete state._projKeys[node.id];storage._enc.delete(node.id);unlockedSet().delete(node.id)}
         else if(pwNew&&pwNew.f.value){if(pwNew.f.value!==(pwConf?pwConf.f.value:'')){toast('パスワードが一致しません');return}await setProjectPassword(node,pwNew.f.value);markUnlocked(node.id)}
       }
       /* プロジェクトサムネイル：新規画像は元のまま thumbnails/ に保存し、トリミングは crop で保持 */
@@ -3338,11 +3371,69 @@ async function hashPass(salt,pw){
   for(let round=0;round<4;round++){for(let i=0;i<bytes.length;i++){h^=bytes[i];h=(h*0x01000193)>>>0}out+=('0000000'+h.toString(16)).slice(-8)}
   return out;
 }
-async function setProjectPassword(root,pw){root.passSalt=genSalt();root.passHash=await hashPass(root.passSalt,pw)}
+/* ===== パスワード保護：内容を暗号化して保存（PBKDF2→AES-GCM） =====
+   ・パスワードから鍵を導出し、プロジェクトデータ本体(JSON)を暗号化してフォルダに保存する。
+   ・未解錠のプロジェクトは復号鍵が無いため、起動時は「スタブ（名前だけ）」のみ読み込み中身は展開しない
+     ＝ DevTools や JSON 直読みでもコメント・ノート等の中身は見えない。
+   ・注意：動画・画像ファイル自体（media/ 配下）は暗号化対象外。メタデータ(layna.project.json)を保護する。 */
+function hasSubtle(){return !!(self.crypto&&self.crypto.subtle)}
+function _unhex(h){h=String(h);const a=new Uint8Array(h.length/2);for(let i=0;i<a.length;i++)a[i]=parseInt(h.substr(i*2,2),16);return a}
+function _b64(buf){let s='';const b=new Uint8Array(buf);for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s)}
+function _unb64(s){const bin=atob(String(s));const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a}
+async function deriveKey(pw,saltHex){
+  const salt=_unhex(saltHex);
+  const base=await self.crypto.subtle.importKey('raw',new TextEncoder().encode(String(pw)),{name:'PBKDF2'},false,['deriveKey']);
+  return self.crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+/* 解錠済みプロジェクトの復号鍵（メモリのみ・永続化しない） */
+function projKey(id){return (state._projKeys&&state._projKeys[id])||null}
+function projectIsEncrypted(id){const r=getNode(id);return !!(r&&r.enc)}
+/* 暗号化プロジェクトだが鍵が無い（＝未解錠）→ persist で上書きしてはいけない */
+function projEncLocked(id){const r=getNode(id);return !!(r&&r.enc&&!projKey(id))}
+/* プロジェクトデータ本体を暗号化した封筒 {enc,id,name,createdAt,salt,iv,ct} を返す（鍵が無ければ null） */
+async function encryptProjectData(id,data){
+  const key=projKey(id);const nodes=data&&data.nodes||[];const root=nodes.find(n=>n.id===id)||nodes[0];
+  if(!key||!root||!hasSubtle())return null;
+  const salt=root.passSalt||genSalt();const iv=self.crypto.getRandomValues(new Uint8Array(12));
+  const ct=await self.crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(data)));
+  return {enc:1,id,name:data.name||root.name||'',createdAt:root.createdAt||nowIso(),salt,iv:_hex(iv.buffer),ct:_b64(ct)};
+}
+/* リール配列を暗号化した封筒（同じプロジェクト鍵を使用） */
+async function encryptReels(id,reels){
+  const key=projKey(id);if(!key||!hasSubtle())return null;
+  const root=getNode(id);const salt=(root&&root.passSalt)||genSalt();const iv=self.crypto.getRandomValues(new Uint8Array(12));
+  const ct=await self.crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify({reels:reels||[]})));
+  return {enc:1,id,kind:'reels',salt,iv:_hex(iv.buffer),ct:_b64(ct)};
+}
+async function decryptReels(id,env){const key=projKey(id);if(!key)return null;try{const iv=_unhex(env.iv);const buf=await self.crypto.subtle.decrypt({name:'AES-GCM',iv},key,_unb64(env.ct));const o=JSON.parse(new TextDecoder().decode(buf));return Array.isArray(o.reels)?o.reels:null}catch(e){return null}}
+/* 未解錠プロジェクトの封筒を復号（パスワード検証も兼ねる：GCMタグ不一致＝パスワード誤り） */
+async function decryptProject(id,pw){
+  const env=storage._enc.get(id);if(!env)return {ok:false};
+  try{
+    const key=await deriveKey(pw,env.salt);const iv=_unhex(env.iv);
+    const buf=await self.crypto.subtle.decrypt({name:'AES-GCM',iv},key,_unb64(env.ct));
+    const data=JSON.parse(new TextDecoder().decode(buf));
+    (state._projKeys=state._projKeys||{})[id]=key;
+    return {ok:true,data};
+  }catch(e){return {ok:false}}
+}
+/* 復号したプロジェクトデータを DB に展開（スタブを実データで置換） */
+function loadDecryptedIntoDB(id,data){
+  const ids=new Set([id,...DB.nodes.filter(n=>rootOfId(n)===id).map(n=>n.id)]);
+  DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
+  DB.submits=(DB.submits||[]).filter(s=>s.projectId!==id);
+  for(const n of (data.nodes||[]))if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
+  if(Array.isArray(data.submits))for(const s of data.submits)if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
+  normalizeNodes();
+}
+async function setProjectPassword(root,pw){
+  if(hasSubtle()){root.passSalt=genSalt();(state._projKeys=state._projKeys||{})[root.id]=await deriveKey(pw,root.passSalt);root.enc=1;delete root.passHash;}
+  else{root.passSalt=genSalt();root.passHash=await hashPass(root.passSalt,pw);delete root.enc;} /* subtle 不可環境は従来のハッシュゲートにフォールバック */
+}
 async function verifyPass(root,pw){if(!root||!root.passHash)return true;return (await hashPass(root.passSalt||'',pw))===root.passHash}
 function unlockedSet(){if(!state._unlocked){state._unlocked=new Set();try{const a=JSON.parse(sessionStorage.getItem('layna.unlocked')||'[]');if(Array.isArray(a))a.forEach(x=>state._unlocked.add(x))}catch(_){}}return state._unlocked}
 function markUnlocked(id){unlockedSet().add(id);try{sessionStorage.setItem('layna.unlocked',JSON.stringify([...state._unlocked]))}catch(_){}}
-function projectLocked(root){return !!(root&&root.passHash&&!unlockedSet().has(root.id))}
+function projectLocked(root){return !!(root&&(root.passHash||root.enc)&&!unlockedSet().has(root.id))}
 /* パスワード解錠画面（プロジェクトを開こうとしたとき） */
 function renderProjectLock(s,root){
   const g=el('div','proj-lock');const box=el('div','pl-box');
@@ -3353,7 +3444,24 @@ function renderProjectLock(s,root){
   const inp=el('input','pl-input');inp.type='password';inp.placeholder='パスワードを入力';
   const btn=el('button','btn btn-primary','解除して開く');
   const err=el('div','pl-err');err.textContent='パスワードが違います';err.style.visibility='hidden';
-  const submit=async()=>{if(await verifyPass(root,inp.value)){markUnlocked(root.id);render();resolveThumbs()}else{err.style.visibility='visible';inp.select()}};
+  const fail=()=>{err.style.visibility='visible';inp.select()};
+  const submit=async()=>{
+    btn.disabled=true;
+    try{
+      if(root.enc){
+        /* 暗号化：復号（＝パスワード検証）→ DB に展開 → リールも読み込む */
+        const res=await decryptProject(root.id,inp.value);
+        if(!res.ok){fail();return}
+        loadDecryptedIntoDB(root.id,res.data);
+        try{const rls=await storage.loadReels(root.id);if(Array.isArray(rls))for(const r of rls)if(!DB.reels.some(x=>x.id===r.id))DB.reels.push(r)}catch(_){}
+        markUnlocked(root.id);render();resolveThumbs();
+      }else if(await verifyPass(root,inp.value)){
+        /* 旧・ハッシュゲート方式：解錠時に暗号化方式へ移行（次回保存から暗号化される） */
+        if(hasSubtle()){try{root.passSalt=root.passSalt||genSalt();(state._projKeys=state._projKeys||{})[root.id]=await deriveKey(inp.value,root.passSalt);root.enc=1;delete root.passHash;}catch(_){}}
+        markUnlocked(root.id);await persist();render();resolveThumbs();
+      }else fail();
+    }finally{btn.disabled=false}
+  };
   btn.onclick=submit;inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();submit()}};
   row.appendChild(inp);row.appendChild(btn);
   box.appendChild(row);box.appendChild(err);
@@ -4543,6 +4651,8 @@ function openReel(){
   if(!reelWin){toast('ポップアップがブロックされました。許可してください');return}
   /* 閉じて開き直したときは常に「空の新規リール」から（前回の作業内容は引き継がない） */
   reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;
+  /* REEL は1プロジェクト内に限定：開いた時点のプロジェクトに束縛する（データはプロジェクトごとに完全分離） */
+  reelUI.projectId=(curRoot()&&curRoot().id)||null;
   const d=reelWin.document;
   d.open();d.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>LayCAT REEL</title></head><body></body></html>');d.close();
   const st=d.createElement('style');
@@ -5044,7 +5154,7 @@ function openReel(){
   function buildNotes(c,curFrame){
     const vv=vOf(c);if(!vv)return [];
     const nd=c&&c.nodeId?getNode(c.nodeId):null;
-    return buildFrameNotes(c.pending||[],{text:c.commentDraft||'',curFrame,dur:parseInt(durS.value)||1,isVideo:true,root:nd?rootOf(nd):curRoot()});
+    return buildFrameNotes(c.pending||[],{text:c.commentDraft||'',curFrame,dur:parseInt(durS.value)||1,isVideo:true,root:nd?rootOf(nd):curRoot(),mentions:c._mentions||[]});
   }
   /* 記入：現在クリップの pending＋コメントを下書き(c.drafts)へ。まだレビューには反映しない */
   function reelRecord(c,curFrame,noShot){
@@ -5060,7 +5170,7 @@ function openReel(){
   function hasUnsent(){return reelUI.clips.some(c=>(c.drafts&&c.drafts.length)||(c.pending&&c.pending.length)||((c.commentDraft||'').trim()))}
   const reelRecordCur=()=>{
     const c=reelUI.clips[reelUI.cur];if(!c)return;
-    c.commentDraft=cta.value;
+    c.commentDraft=cta.value;c._mentions=(cta._mentions||[]).slice(); /* ピッカーで選んだメンションid（同名個人の解決用）を保持 */
     const cnt=reelRecord(c,dispF());if(!cnt)return;
     RV.stroke=null;cta.value='';
     drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
@@ -5069,7 +5179,7 @@ function openReel(){
      まだ「記入」していない pending アノテーション・入力中コメントも自動で記入してから送信するので、
      アノテーションのみ・記入し忘れのカットも含めて全カットが反映される。 */
   async function reelSubmit(){
-    const cc=reelUI.clips[reelUI.cur];if(cc)cc.commentDraft=cta.value; /* 入力途中のコメントも取り込む */
+    const cc=reelUI.clips[reelUI.cur];if(cc){cc.commentDraft=cta.value;cc._mentions=(cta._mentions||[]).slice();} /* 入力途中のコメント・メンションも取り込む */
     let total=0;
     for(const c of reelUI.clips){
       reelRecord(c,c===cc?dispF():null,true); /* 未記入の pending＋コメントをこのカットの下書きへ（描画のみはスクショ省略） */
@@ -5082,7 +5192,7 @@ function openReel(){
     await persist();drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
   }
   csend.onclick=reelRecordCur;
-  cta.oninput=()=>{const c=reelUI.clips[reelUI.cur];if(c)c.commentDraft=cta.value;updUnsent()};
+  cta.oninput=()=>{const c=reelUI.clips[reelUI.cur];if(c){c.commentDraft=cta.value;c._mentions=(cta._mentions||[]).slice();}updUnsent()};
   cta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();reelRecordCur()}};
   /* 送信バー（未送信の記入を全ショットのレビューページへ反映） */
   const unsentBar=ce(d,'div');unsentBar.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #2a2a2f;font-size:11px';
@@ -5327,7 +5437,9 @@ function openReel(){
   }
   function buildShotList(){
     rlist.innerHTML='';
-    const allRevs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
+    /* 追加候補も REEL のプロジェクト内に限定（別プロジェクトのクリップは出さない） */
+    const rpid=reelUI.projectId;
+    const allRevs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video')&&(!rpid||(rootOf(n)||{}).id===rpid));
     populateReelFilters(allRevs);
     const fs=reelUI.filterStatus||'',fa=(reelUI.filterAssignee||'').toLowerCase();
     const revs=allRevs.filter(n=>(!fs||nodeStatus(n)===fs)&&(!fa||String(n.assignee||'').toLowerCase()===fa));
@@ -5432,6 +5544,11 @@ function reelRender(){
 async function reelAddClip(node,v,noDedup){
   if(!reelAlive())return;
   if(v.type!=='video')return;
+  /* REEL は1プロジェクト内に限定：別プロジェクト・ロック中プロジェクトのクリップは追加しない */
+  const proot=rootOf(node);const pid=proot?proot.id:null;
+  if(proot&&projectLocked(proot)){toast('ロック中のプロジェクトのクリップは REEL に追加できません');return}
+  if(reelUI.projectId==null)reelUI.projectId=pid;
+  else if(pid!==reelUI.projectId){toast('REEL には同じプロジェクト内のクリップのみ追加できます');return}
   /* 同じ動画（同ノード・同バージョン）の重複追加を防ぐ（保存リールの復元時は noDedup で許可） */
   if(!noDedup&&reelUI.clips.some(c=>c.nodeId===node.id&&c.vId===v.id)){reelWin.focus();return}
   const url=await storage.getURL(v.file);if(!url)return;
@@ -5537,9 +5654,15 @@ async function openReelFromSaved(reelId){
   const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
   openReel();if(!reelAlive())return;
   reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;
+  /* 保存リールのプロジェクトに束縛（クリップは全て同一プロジェクトのはず。念のため他プロジェクト・ロック中はスキップ） */
+  reelUI.projectId=r.projectId||reelProjectId(r)||null;
   for(const ref of r.clips){
     const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);
-    if(n&&vv)await reelAddClip(n,vv);
+    if(!n||!vv)continue;
+    const pr=rootOf(n);
+    if(pr&&projectLocked(pr))continue;
+    if(reelUI.projectId&&pr&&pr.id!==reelUI.projectId)continue;
+    await reelAddClip(n,vv);
   }
   if(reelUI.loadCur)reelUI.loadCur(false);
   if(reelUI.updTitle)reelUI.updTitle();

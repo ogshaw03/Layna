@@ -26,21 +26,19 @@
 - **[中] `deleteNode` がクリップ1つの巻き添えでリール全削除** … 該当クリップのみ除去、空リールのみ削除。
 - **[中] 未解錠プロジェクトのコメントが通知に漏れる** … `scanMentionsForMe` でロック中ルートをスキップ。
 - **[中] 既読キーが受信者非依存** … `mn:`/`rq:` キーに受信者識別子（selfTag）を付与。
+- **[高] パスワード保護がデータを暗号化するようになった** … パスワードから PBKDF2(SHA-256,15万回)→AES-GCM 鍵を導出し、
+  プロジェクトデータ本体(`layna.project.json`)とリール(`reels.json`)を暗号化して保存。未解錠時はスタブ（名前だけ）しか
+  読み込まず、中身は復号鍵が無いと展開されない（`encryptProjectData`/`decryptProject`/`loadDecryptedIntoDB`）。
+  旧ハッシュゲート方式のプロジェクトは初回解錠時に暗号化方式へ自動移行。※動画・画像ファイル本体は暗号化対象外。
+- **[高/中] REEL をプロジェクト内に限定** … `reelUI.projectId` に束縛し、別プロジェクト・ロック中プロジェクトのクリップは
+  `reelAddClip`/`openReelFromSaved` で拒否。追加候補リストも当該プロジェクト内に絞り込み。これにより
+  「REEL がロックを迂回」「REEL メンションのプロジェクト不一致」を解消。REEL コメントは `buildNotes` で
+  `mentions`（`cta._mentions`）を渡し、ピッカーで選んだメンションid（同名個人の解決用）も反映。
 
 ## 未対応（残す）
 
-### 高
-- **パスワード保護が「表示ゲート」のみ**（`projectLocked` 3293 / `renderBodyMain` 1859）
-  全ノードが `DB` に平文でロードされ、DevTools や IndexedDB 直読みで閲覧可能。`hashPass` も SHA-256 1ラウンド。
-  真の保護には内容の暗号化が必要。当面は「機密保護ではなく軽い隠し」である旨の明示を検討。
-- **REEL が `projectLocked` を迂回**（`openReelFromSaved` 5443 / `reelAddClip` 5339 / `vcard-reel` 2537）
-  → 上記方針（REEL をプロジェクト内限定）に合わせ、ロック中プロジェクトのクリップは REEL に載せない実装を追加する。
-
 ### 中
 - **`persist()` に直列化がない**（915-931）… 並行呼び出しで同一 fileHandle への `createWritable` が競合し得る。単一の直列キューにする。
-- **REEL メンションの候補提示と解決がプロジェクト不一致**（`attachMention` 4703 / `buildNotes` 4954）
-  → REEL をプロジェクト内限定にすれば解消。候補・抽出・描画を「クリップ所属プロジェクト（＝カレント）」に統一。
-- **REEL コメントが tracked mention id を捨てる**（`buildNotes` 4954）… `buildFrameNotes` に `mentions`（`cta._mentions`）を渡す。
 - **`newId` が Date.now＋カウンタのみで複数ユーザー衝突あり**（810）… ユーザー/セッション由来のソルトや `crypto.randomUUID()` を混ぜる。
 - **再帰/ループ系に循環 parentId ガードなし**（`pathOf`/`rootOf`/`descendants`/`renderTreeNode`/`nodeStatus` 944-949 他）
   破損 JSON で無限ループ／スタックオーバーフロー。visited セットで防御。
