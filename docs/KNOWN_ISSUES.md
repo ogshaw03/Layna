@@ -37,6 +37,11 @@
 
 - **[中] `persist()` を直列化**（`_persistChain`）… 全 persist 呼び出しをチェーンで順次実行し、同一ファイルへの
   `createWritable` の並行競合（`NoModificationAllowedError`）とデータ消失を防止。`putMedia` の書き込みも try/catch で保護。
+- **[高] 共有フォルダの競合による他者変更の消失を緩和**（Drive 共有 #1）… `persist` 保存前にフォルダ側を再読込し、
+  最後に同期した内容と異なれば **3-way マージ**（`_merge3`、ノード/サブミット単位・自分の編集優先・相手の追加/編集も保持）。
+  マージ時は元のフォルダ内容を `layna.project.conflict-<時刻>.json` にバックアップ。詳細は `docs/DRIVE_SHARED_OPERATION.md`。
+- **[中] メディア/サムネの同期待ちを自動リトライ**（Drive 共有 #3）… `resolveThumbs` が未解決分をバックオフで再試行、
+  その間は「同期待ち」表示（`.thumb-wait`）。レビュー窓の動画も `getURLRetry` でリトライ。
 
 ## 未対応（残す）
 

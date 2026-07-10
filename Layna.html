@@ -330,6 +330,11 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .vcard-noimg.ph{padding:0}
 /* サムネ未取得タイルのプレースホルダ（未着手ねこ）。グレー背景＋中央に小さめ表示。.xxx .th img{object-fit:cover} より優先させる */
 .thumb-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#2d2d34;box-sizing:border-box}
+/* サムネ/動画が未解決（共有フォルダの同期待ち・オンラインオンリー）の間の表示。自動リトライで解決すると解除される */
+.thumb-wait{background:linear-gradient(100deg,#1a1a1f 30%,#26262d 50%,#1a1a1f 70%);background-size:220% 100%;animation:thumbWait 1.3s linear infinite}
+.thumb-wait[title]:hover{cursor:progress}
+@keyframes thumbWait{0%{background-position:120% 0}100%{background-position:-120% 0}}
+@media (prefers-reduced-motion:reduce){.thumb-wait{animation:none;background:#202026}}
 .thumb-ph img{position:static!important;inset:auto!important;width:auto!important;height:auto!important;max-width:50%!important;max-height:45%!important;object-fit:contain!important;opacity:.9;pointer-events:none;user-select:none}
 .vcard-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:rgba(255,255,255,.85);text-shadow:0 2px 10px rgba(0,0,0,.7);pointer-events:none;transition:opacity .15s}
 .vcard-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
@@ -905,6 +910,24 @@ const storage={
     if(parsed.enc){this._enc.set(id,parsed);return this._encStub(parsed)} /* 暗号化：中身は伏せ、スタブのみ返す */
     return parsed;
   },
+  /* 現在フォルダ（またはlocalStorage）に保存されている実データを読む（暗号化なら復号）。
+     保存前の競合検出・マージ用。鍵が無い暗号化プロジェクトや読めない場合は null。 */
+  async readProjectData(id){
+    const ph=await this.projRoot(id);
+    let parsed=null;
+    if(ph){try{const fh=await ph.getFileHandle(this._projFileName);parsed=JSON.parse(await (await fh.getFile()).text())}catch(e){return null}}
+    else parsed=this._ls('layna_proj_'+id);
+    if(!parsed)return null;
+    if(parsed.enc){const key=projKey(id);if(!key)return null;try{const iv=_unhex(parsed.iv);const buf=await self.crypto.subtle.decrypt({name:'AES-GCM',iv},key,_unb64(parsed.ct));return JSON.parse(new TextDecoder().decode(buf))}catch(e){return null}}
+    return parsed;
+  },
+  /* 競合時：現在フォルダにある内容（他者の版）をそのままバックアップファイルに退避（消失防止） */
+  async backupCurrentProjectFile(id,tsLabel){
+    const ph=await this.projRoot(id);if(!ph)return;
+    try{const fh=await ph.getFileHandle(this._projFileName);const txt=await (await fh.getFile()).text();
+      await this._write(()=>ph,'layna.project.conflict-'+tsLabel+'.json',txt);
+    }catch(e){}
+  },
   async saveProject(id,data){
     /* 暗号化プロジェクトは封筒に変換してから書き込む（鍵が無ければ保存しない＝上書き防止） */
     let out=data;
@@ -957,6 +980,8 @@ const storage={
   async _fileHandle(ref,create){const {proj,path}=this._parseRef(ref);const parts=path.split('/');const fn=parts.pop();let root=this.rootHandle;if(proj){root=await this.projRoot(proj);if(!root)return null}if(!root)return null;let dir=root;for(const p of parts)if(p)dir=await dir.getDirectoryHandle(p,{create:create===true});return{dir,fn};},
   async delMedia(ref){if(!ref)return;try{if(ref.startsWith('idb:'))await idbDel('blobs',ref.slice(4));else{const h=await this._fileHandle(ref);if(h)await h.dir.removeEntry(h.fn)}}catch(e){}const u=this.urlCache.get(ref);if(u){URL.revokeObjectURL(u);this.urlCache.delete(ref)}},
   async getURL(ref){if(!ref)return null;if(this.urlCache.has(ref))return this.urlCache.get(ref);let blob=null;try{if(ref.startsWith('idb:'))blob=await idbGet('blobs',ref.slice(4));else{const h=await this._fileHandle(ref);if(h)blob=await (await h.dir.getFileHandle(h.fn)).getFile()}}catch(e){return null}if(!blob)return null;const url=URL.createObjectURL(blob);this.urlCache.set(ref,url);return url},
+  /* 共有フォルダの同期遅延・オンラインオンリー対策：数回リトライして取得を試みる */
+  async getURLRetry(ref,tries){tries=tries||4;for(let i=0;i<tries;i++){const u=await this.getURL(ref);if(u)return u;if(i<tries-1)await new Promise(r=>setTimeout(r,500*(i+1)))}return null;},
 };
 
 /* ---------- 状態 / DB ---------- */
@@ -1004,16 +1029,35 @@ async function _persistNow(){
   /* リールをプロジェクトごとに集約（フォルダ内 reels/ に格納して共有可能に） */
   const reelsByProj={};
   for(const r of (DB.reels||[])){const pid=r.projectId||reelProjectId(r);if(!pid)continue;r.projectId=pid;(reelsByProj[pid]=reelsByProj[pid]||[]).push(r)}
+  let mergedAny=false;
   for(const e of REG){
     /* 未解錠の暗号化プロジェクトは中身がスタブしか無いので、絶対に書き込まない（暗号文の消失防止） */
     if(projEncLocked(e.id))continue;
-    const data=projectData(e.id);if(!data)continue;
-    const ps=JSON.stringify(data);
+    let data=projectData(e.id);if(!data)continue;
+    let ps=JSON.stringify(data);
     /* 保存に失敗したらキャッシュを更新しない＝次回 persist で再試行される（失敗を「成功扱い」にしない） */
-    if(_saveCache.proj[e.id]!==ps){const ok=await storage.saveProject(e.id,data);if(ok!==false)_saveCache.proj[e.id]=ps}
+    if(_saveCache.proj[e.id]!==ps){
+      /* 保存前チェック：他の人がフォルダ側を更新していたら 3-way マージ（丸ごと上書きによる消失を防止） */
+      const baseline=_saveCache.proj[e.id];
+      if(baseline){
+        let remote=null;try{remote=await storage.readProjectData(e.id)}catch(_){}
+        if(remote){
+          const remoteStr=JSON.stringify({v:3,id:remote.id||e.id,name:remote.name,nodes:remote.nodes||[],submits:remote.submits||[]});
+          if(remoteStr!==baseline){
+            try{await storage.backupCurrentProjectFile(e.id,nowIso().replace(/[:.]/g,'-'))}catch(_){}
+            const merged=_merge3(JSON.parse(baseline),data,remote);
+            applyMergedIntoDB(e.id,merged);
+            data=projectData(e.id);ps=JSON.stringify(data);
+            mergedAny=true;
+          }
+        }
+      }
+      const ok=await storage.saveProject(e.id,data);if(ok!==false)_saveCache.proj[e.id]=ps;
+    }
     const rls=reelsByProj[e.id]||[];const rk=JSON.stringify(rls);
     if(_saveCache.reels[e.id]!==rk){const ok=await storage.saveReels(e.id,rls);if(ok!==false)_saveCache.reels[e.id]=rk}
   }
+  if(mergedAny){try{toast('ほかの人の更新を取り込みました（元の内容はフォルダにバックアップ）')}catch(_){}try{render();resolveThumbs()}catch(_){}}
 }
 
 /* v1(projects/shots) → v2(nodes) 移行 */
@@ -1078,7 +1122,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.37';
+const APP_VERSION='2026.07.09.38';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3019,10 +3063,34 @@ function logItem(node,v){
   return it;
 }
 
-async function resolveThumbs(){
-  for(const img of document.querySelectorAll('#scroll img[data-ref],#scroll .log-thumb[data-ref],#reviewDrawer img[data-ref]')){const ref=img.dataset.ref;const url=await storage.getURL(ref);if(url){if(img.tagName==='IMG')img.src=url;else img.style.backgroundImage='url("'+url+'")'}}
+/* サムネ/動画の解決。共有フォルダ（Google ドライブ等）では実ファイルが遅れて同期される・
+   オンラインオンリーで一時的に読めないことがあるため、解決できなかったものは
+   バックオフで自動リトライし、その間は「同期待ち」表示にする（無言のプレースホルダを避ける）。 */
+let _resolveGen=0;
+function resolveThumbs(){const gen=++_resolveGen;_resolvePass(gen,0);}
+async function _resolvePass(gen,attempt){
+  if(gen!==_resolveGen)return;
+  let pending=0;
+  for(const img of document.querySelectorAll('#scroll img[data-ref],#scroll .log-thumb[data-ref],#reviewDrawer img[data-ref]')){
+    if(img.dataset.res==='1')continue;
+    const url=await storage.getURL(img.dataset.ref);
+    if(gen!==_resolveGen)return;
+    if(url){img.dataset.res='1';img.classList.remove('thumb-wait');if(img.tagName==='IMG')img.src=url;else img.style.backgroundImage='url("'+url+'")'}
+    else{pending++;img.classList.add('thumb-wait')}
+  }
   /* .tvid（ショットタブのホバー再生）は事前ロードしない＝ホバー時のみ getURL する（負荷軽減） */
-  for(const v of document.querySelectorAll('#scroll video[data-vref]:not(.tvid),#reviewDrawer video[data-vref]:not(.tvid)')){if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}const src=await storage.getURL(v.dataset.vref);if(src&&v.src!==src)v.src=src}
+  for(const v of document.querySelectorAll('#scroll video[data-vref]:not(.tvid),#reviewDrawer video[data-vref]:not(.tvid)')){
+    if(v.dataset.res==='1')continue;
+    if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}
+    const src=await storage.getURL(v.dataset.vref);
+    if(gen!==_resolveGen)return;
+    if(src){v.dataset.res='1';if(v.src!==src)v.src=src}else pending++;
+  }
+  /* 未解決が残っていれば同期待ちとみなし、間隔を空けて再試行（最新の描画分のみ継続） */
+  if(pending&&attempt<5&&gen===_resolveGen){
+    const delays=[1200,3000,6000,12000,20000];
+    setTimeout(()=>_resolvePass(gen,attempt+1),delays[attempt]||20000);
+  }
 }
 /* サムネイルのトリミング表示：元画像は変えず、縦横比タイルに合わせて位置・拡大で表示。
    crop={s:拡大率(>=1), fx/fy:パン位置(-0.5..0.5, 0=中央)} は解像度非依存 */
@@ -3530,6 +3598,46 @@ async function decryptProject(id,pw){
     (state._projKeys=state._projKeys||{})[id]=key;
     return {ok:true,data};
   }catch(e){return {ok:false}}
+}
+/* ===== 保存時の競合対策（3-way マージ） =====
+   共有フォルダ（Google ドライブ等）で他者が layna.project.json を更新していた場合、
+   丸ごと上書きすると相手の変更が消える。base（自分が最後に同期した状態）/ ours（自分の現在）/
+   theirs（フォルダ側の現在）を id 単位で 3-way マージし、双方の追加・編集を保持する。
+   ・相手の追加/編集 → 保持（theirs を起点にする）
+   ・自分が編集したノード → 自分優先（ours で上書き）
+   ・自分が削除したノードは、相手が触っていなければ削除、相手が編集していれば残す（消失防止優先） */
+function _merge3(base,ours,theirs){
+  const byId=arr=>{const m=new Map();for(const n of (arr||[]))if(n&&n.id!=null)m.set(n.id,n);return m};
+  const js=x=>JSON.stringify(x);
+  const mergeSet=(baseArr,ourArr,theirArr)=>{
+    const b=byId(baseArr),o=byId(ourArr),t=byId(theirArr),out=new Map();
+    for(const [id,tn] of t)out.set(id,tn);                 /* 相手の版を起点（追加・編集を保持） */
+    for(const [id,on] of o){
+      const bn=b.get(id),tn=t.get(id);
+      if(!tn){out.set(id,on);continue}                     /* 相手に無い（＝相手が削除 or 自分の追加）→ 自分を残す */
+      if(!bn||js(on)!==js(bn))out.set(id,on);              /* 自分が編集した → 自分優先 */
+      /* それ以外（自分は未編集）→ 相手を残す（既に out にある） */
+    }
+    for(const [id,bn] of b){                               /* 自分が削除したもの */
+      if(o.has(id))continue;
+      const tn=t.get(id);
+      if(tn&&js(tn)!==js(bn))continue;                     /* 相手が編集していたら残す */
+      out.delete(id);                                      /* 相手も未編集 → 削除を反映 */
+    }
+    return [...out.values()];
+  };
+  return {v:3,id:ours.id,name:ours.name,
+    nodes:mergeSet(base&&base.nodes,ours.nodes,theirs.nodes),
+    submits:mergeSet(base&&base.submits,ours.submits,theirs.submits)};
+}
+/* マージ結果を DB に反映（当該プロジェクトのノード/サブミットを置換） */
+function applyMergedIntoDB(id,merged){
+  const ids=new Set([id,...DB.nodes.filter(n=>rootOfId(n)===id).map(n=>n.id)]);
+  DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
+  for(const n of (merged.nodes||[]))if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
+  DB.submits=(DB.submits||[]).filter(s=>s.projectId!==id);
+  for(const s of (merged.submits||[]))if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
+  normalizeNodes();
 }
 /* 復号したプロジェクトデータを DB に展開（スタブを実データで置換） */
 function loadDecryptedIntoDB(id,data){
@@ -4409,7 +4517,7 @@ function openReview(nodeId,versionId,opts){
   document.addEventListener('keydown',onKey);
 
   /* --- メディア読み込み --- */
-  (async()=>{const url=await storage.getURL(v.file);if(url)media.src=url;setTimeout(fit,60)})();
+  (async()=>{const url=await storage.getURLRetry(v.file);if(url)media.src=url;else toast('動画ファイルを読み込めませんでした（フォルダの同期待ち・接続を確認してください）');setTimeout(fit,60)})();
   /* 版カードの「⇄ 比較」等から比較対象を指定して開いた場合 */
   if(opts.compare){const bn=getNode(opts.compare.nodeId);const bv=bn&&bn.versions.find(x=>x.id===opts.compare.verId);if(bn&&bv)enterCompare(bn,bv)}
 }
