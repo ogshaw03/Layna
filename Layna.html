@@ -1035,7 +1035,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.30';
+const APP_VERSION='2026.07.09.31';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -1445,8 +1445,7 @@ function subBlockEl(block){
 }
 function openSubPicker(){
   const root=getNode(subS.projectId);
-  const parent=getNode(shotsParentOf(root));
-  const shots=childrenOf(parent.id);
+  const shots=shotsOf(root); /* 選択された全ショット親フォルダのショットを対象に */
   const sel=new Set();
   let filterAsg='';
   const modal=el('div','subpick');
@@ -2143,8 +2142,7 @@ function renderProjCheck(main,root){
 /* ショットタブ：ショット親フォルダ直下の「ショット」ごとに最新動画をグリッド表示
    （ショットの中身＝工程ではなく、ショット単位で表示） */
 function renderProjShots(main,cur){
-  const parentId=shotsParentOf(cur);
-  const allShots=childrenOf(parentId);
+  const allShots=shotsOf(cur);
   main.appendChild(el('div','pm-h','ショット — 各ショットの最新動画'));
   if(!allShots.length){main.appendChild(el('div','pm-empty','ショットがありません。'));return}
   const fb=assignFilterBar(cur);if(fb)main.appendChild(fb); /* 担当フィルタ */
@@ -2205,15 +2203,27 @@ function setupShotAutoplay(){
 }
 /* 進捗タブ用：プロジェクト配下でショット親になり得るノード（孫を持つ） */
 function pmProgressParents(root){const all=[root,...descendants(root.id)];const c=all.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:[root];}
-/* 有効なショット親：プロジェクト設定の指定を優先、なければ自動検出 */
-function shotsParentOf(root){if(root.shotsParentId&&getNode(root.shotsParentId))return root.shotsParentId;return pmProgressParents(root)[0].id;}
+/* 有効なショット親（複数可）：プロジェクト設定の指定を優先、なければ自動検出。
+   エピソードが別フォルダに分かれている場合、複数の親フォルダをまとめて扱う */
+function shotsParentsOf(root){
+  if(Array.isArray(root.shotsParentIds)){const v=root.shotsParentIds.filter(id=>getNode(id));if(v.length)return v;}
+  if(root.shotsParentId&&getNode(root.shotsParentId))return [root.shotsParentId]; /* 旧・単一指定との後方互換 */
+  return [pmProgressParents(root)[0].id];
+}
+/* 後方互換：単一の親が必要な箇所用（先頭を返す） */
+function shotsParentOf(root){return shotsParentsOf(root)[0];}
+/* 選択された全親フォルダ直下のショットを集約（重複除去・順序保持） */
+function shotsOf(root){const seen=new Set(),out=[];for(const pid of shotsParentsOf(root))for(const sh of childrenOf(pid))if(!seen.has(sh.id)){seen.add(sh.id);out.push(sh)}return out;}
+/* ショット親が明示指定されず自動検出になっているか */
+function shotsAuto(root){return !(Array.isArray(root.shotsParentIds)&&root.shotsParentIds.some(id=>getNode(id)))&&!(root.shotsParentId&&getNode(root.shotsParentId));}
 /* 進捗タブ：工程/ステータスの円グラフ＋表（メイン埋め込み版） */
 function renderProjProgress(main,cur){
-  state.pmParentId=shotsParentOf(cur);
+  state.pmParentIds=shotsParentsOf(cur);
   if(state.pmTab!=='status')state.pmTab='stage';
-  /* ショット親フォルダはプロジェクト設定から指定（表示のみ） */
+  /* ショット親フォルダはプロジェクト設定から指定（複数可・表示のみ） */
   const info=el('div','pm-sel');
-  info.appendChild(el('label',null,'ショット親フォルダ： '+pathOf(state.pmParentId).map(x=>x.name).join(' / ')+(cur.shotsParentId?'':'（自動）')));
+  const pnames=state.pmParentIds.map(id=>pathOf(id).map(x=>x.name).join(' / ')).join(' ／ ');
+  info.appendChild(el('label',null,'ショット親フォルダ： '+pnames+(shotsAuto(cur)?'（自動）':'')));
   const cfg=el('button','pm-stab');cfg.textContent='⚙ 設定で変更';cfg.style.cssText='padding:4px 10px;font-size:11px';cfg.onclick=()=>openRename(cur);
   info.appendChild(cfg);
   main.appendChild(info);
@@ -2226,7 +2236,7 @@ function renderProjProgress(main,cur){
   main.appendChild(tabs);
   const fb=assignFilterBar(cur);if(fb)main.appendChild(fb); /* 担当フィルタ */
   const filterOn=!!(state.filterAssignee||state.filterReviewer);
-  const p=progressData(state.pmParentId,state.pmTab,shotFilterPass);
+  const p=progressData(state.pmParentIds,state.pmTab,shotFilterPass);
   if(!p.total){main.appendChild(el('div','pm-empty',filterOn?'フィルタに一致するショットがありません。':'このフォルダ直下にショットがありません。'));return}
   const isStage=state.pmTab==='stage';
   const card=el('div','pm-card');const body=el('div','pm-body');
@@ -3197,14 +3207,22 @@ function openRename(node){
       const addSt=el('button','btn btn-ghost btn-sm','＋ ステータスを追加');addSt.style.marginBottom='12px';
       addSt.onclick=()=>{stArr.push({id:newId('st'),label:'新ステータス',color:'#60a5ff'});redrawSt()};
       inner.appendChild(addSt);
-      /* 進捗（工程/ステータスグラフ）のショット親フォルダ */
-      inner.appendChild(el('div','form-label','進捗グラフのショット親フォルダ（この直下がショット、その下が工程）'));
-      spSel=el('select','form-input');
-      spSel.appendChild(new Option('（自動検出）',''));
+      /* 進捗（工程/ステータスグラフ）のショット親フォルダ（複数選択可） */
+      inner.appendChild(el('div','form-label','進捗・ショットタブのショット親フォルダ（この直下がショット、その下が工程）。エピソードが分かれている場合は複数選択できます'));
+      const spWrap=el('div','sp-parents');spWrap.style.cssText='display:flex;flex-direction:column;gap:2px;max-height:190px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px';
       const folders=[node,...descendants(node.id).filter(n=>n.type==='section')];
-      for(const f of folders){const label=(f.id===node.id?'（プロジェクト直下）':pathOf(f.id).slice(1).map(x=>x.name).join(' / '));spSel.appendChild(new Option(label,f.id))}
-      spSel.value=(node.shotsParentId&&getNode(node.shotsParentId))?node.shotsParentId:'';
-      inner.appendChild(spSel);
+      const spCur=new Set(Array.isArray(node.shotsParentIds)?node.shotsParentIds:(node.shotsParentId?[node.shotsParentId]:[]));
+      const spBoxes=[];
+      for(const f of folders){
+        const label=(f.id===node.id?'（プロジェクト直下）':pathOf(f.id).slice(1).map(x=>x.name).join(' / '));
+        const row=el('label','sp-parent');row.style.cssText='display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:3px 4px;border-radius:6px';
+        const cb=el('input');cb.type='checkbox';cb.value=f.id;cb.checked=spCur.has(f.id);cb.style.cssText='width:auto;margin:0;flex:0 0 auto';
+        row.appendChild(cb);row.appendChild(el('span',null,label));
+        spWrap.appendChild(row);spBoxes.push(cb);
+      }
+      inner.appendChild(spWrap);
+      inner.appendChild(el('div','form-label','※ 何も選択しない場合は自動検出（最初に見つかったショット親フォルダ）を使用します。'));
+      spSel={get:()=>spBoxes.filter(b=>b.checked).map(b=>b.value)};
       /* プロジェクト別の保存先フォルダ（ブラウザが使用するフォルダパス。サブミット等を格納） */
       if(storage.supportsFolder()){
         inner.appendChild(el('div','form-label','保存先フォルダ（このプロジェクト専用。動画・画像を格納。未指定ならブラウザ内保存）'));
@@ -3247,7 +3265,7 @@ function openRename(node){
       inner.appendChild(delWrap);
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
+    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){const ids=spSel.get();if(ids.length)node.shotsParentIds=ids;else delete node.shotsParentIds;delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
       /* プロジェクトのパスワード保護：新規入力があれば設定/変更、解除チェックで削除 */
       if(!node.parentId){
         if(pwRemove&&pwRemove.checked){delete node.passHash;delete node.passSalt;delete node.enc;if(state._projKeys)delete state._projKeys[node.id];storage._enc.delete(node.id);unlockedSet().delete(node.id)}
@@ -4407,9 +4425,10 @@ function shotParentCandidates(){const c=DB.nodes.filter(n=>childrenOf(n.id).some
 /* ノード配下の最新動画バージョン（{v,node,t}／なければnull） */
 function latestVideoVersionUnder(nodeId){let best=null;for(const n of [getNode(nodeId),...descendants(nodeId)])if(n)for(const v of (n.versions||[]))if(v.type==='video'){const t=v.uploadedAt||'';if(!best||t>best.t)best={v,node:n,t}}return best;}
 /* tab: 'stage'（工程別）| 'status'（ステータス別）。各ショットに key（分類）を付与 */
-function progressData(parentId,tab,filterFn){
-  const parent=getNode(parentId);
-  let shots=childrenOf(parentId);
+function progressData(parentIds,tab,filterFn){
+  const ids=Array.isArray(parentIds)?parentIds:[parentIds]; /* 複数の親フォルダを集約（単一idも可） */
+  const parent=getNode(ids[0]);
+  let shots=[];{const seen=new Set();for(const pid of ids)for(const sh of childrenOf(pid))if(!seen.has(sh.id)){seen.add(sh.id);shots.push(sh)}}
   if(filterFn)shots=shots.filter(filterFn);
   const statuses=projStatuses(parent||shots[0]||{});
   const perShot=shots.map(shot=>{
