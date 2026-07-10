@@ -1122,7 +1122,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.40';
+const APP_VERSION='2026.07.09.41';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2306,7 +2306,11 @@ function shotsAuto(root){return !(Array.isArray(root.shotsParentIds)&&root.shots
 /* 進捗タブ：工程/ステータスの円グラフ＋表（メイン埋め込み版） */
 function renderProjProgress(main,cur){
   state.pmParentIds=shotsParentsOf(cur);
-  if(state.pmTab!=='status')state.pmTab='stage';
+  const parents=state.pmParentIds;
+  /* 工程（子ノード）を持つショットが1つでもあるか。無ければ「工程グラフ」は無意味なのでステータスのみ表示 */
+  const hasStages=parents.some(pid=>childrenOf(pid).some(sh=>childrenOf(sh.id).length>0));
+  if(!hasStages)state.pmTab='status';
+  else if(state.pmTab!=='status')state.pmTab='stage';
   /* ショット親フォルダはプロジェクト設定から指定（複数可・表示のみ） */
   const info=el('div','pm-sel');
   const pnames=state.pmParentIds.map(id=>pathOf(id).map(x=>x.name).join(' / ')).join(' ／ ');
@@ -2314,14 +2318,17 @@ function renderProjProgress(main,cur){
   const cfg=el('button','pm-stab');cfg.textContent='⚙ 設定で変更';cfg.style.cssText='padding:4px 10px;font-size:11px';cfg.onclick=()=>openRename(cur);
   info.appendChild(cfg);
   main.appendChild(info);
-  const tabs=el('div','pm-tabs');
-  for(const [id,lab] of [['stage','工程グラフ'],['status','ステータスグラフ']]){
-    const b=el('button','pm-stab'+(state.pmTab===id?' on':''),lab);
-    b.onclick=()=>{if(state.pmTab!==id){state.pmTab=id;state.pmPick=null;renderBody();resolveThumbs()}};
-    tabs.appendChild(b);
+  if(hasStages){
+    const tabs=el('div','pm-tabs');
+    for(const [id,lab] of [['stage','工程グラフ'],['status','ステータスグラフ']]){
+      const b=el('button','pm-stab'+(state.pmTab===id?' on':''),lab);
+      b.onclick=()=>{if(state.pmTab!==id){state.pmTab=id;state.pmPick=null;renderBody();resolveThumbs()}};
+      tabs.appendChild(b);
+    }
+    main.appendChild(tabs);
+  }else{
+    const note=el('div');note.style.cssText='font-size:12px;color:var(--text3);margin:2px 2px 12px';note.textContent='このプロジェクトは工程が無いため、ステータスのみ表示しています。';main.appendChild(note);
   }
-  main.appendChild(tabs);
-  const parents=state.pmParentIds;
   /* 円グラフの表示（複数エピソード時のみ選択可）：全エピソードを並べる／特定のエピソードのみ */
   if(state.pmDonutMode==null){try{state.pmDonutMode=localStorage.getItem('layna_pmDonutMode')||'all'}catch(_){state.pmDonutMode='all'}}
   /* 選択が現在の親フォルダに存在しない（別プロジェクト等）場合は「並べる」に戻す */
@@ -2358,7 +2365,7 @@ function renderProjProgress(main,cur){
       main.appendChild(el('div','pm-eph2',(d.node?d.node.name:'—')));
       const pre=d.pid+'::';
       const myPick=(state.pmPick&&String(state.pmPick).startsWith(pre))?String(state.pmPick).slice(pre.length):null;
-      pmShotBreakdown(main,d.p,isStage,myPick);
+      pmShotBreakdown(main,d.p,isStage,myPick,hasStages);
     }
     return;
   }
@@ -2368,7 +2375,7 @@ function renderProjProgress(main,cur){
   if(!p.total){main.appendChild(el('div','pm-empty',emptyMsg));return}
   const onePick=(state.pmPick&&String(state.pmPick).includes('::'))?null:state.pmPick; /* エピソード別の選択キーは無視 */
   main.appendChild(pmDonutCard(p,isStage,r=>r.id,{}));
-  pmShotBreakdown(main,p,isStage,onePick);
+  pmShotBreakdown(main,p,isStage,onePick,hasStages);
 }
 /* 円グラフ＋集計表カード。keyOf(row) が state.pmPick と一致する行をハイライト。small=横並び用の小型（進捗バー列なし） */
 function pmDonutCard(p,isStage,keyOf,opts){
@@ -2393,7 +2400,7 @@ function pmDonutCard(p,isStage,keyOf,opts){
   body.appendChild(tbl);card.appendChild(body);return card;
 }
 /* ショット別の内訳（円グラフの行を選択中はそのショット一覧グリッド、未選択は一覧表） */
-function pmShotBreakdown(main,p,isStage,pickId){
+function pmShotBreakdown(main,p,isStage,pickId,hasStages){
   if(pickId!=null){
     const row=p.rows.find(r=>r.id===pickId);const hits=p.perShot.filter(ps=>ps.key===pickId);
     main.appendChild(el('div','pm-h','「'+(row?row.label:'')+'」のショット（'+hits.length+'件）'));
@@ -2416,11 +2423,13 @@ function pmShotBreakdown(main,p,isStage,pickId){
     /* 現在のステータスセル（ステータスバッジ） */
     const statusCell=ps=>{const td=el('td');const si=stInfo(ps.curNode||ps.shot);if(ps.curNode){const b=el('span','pm-badge',si.label);b.style.background=si.color;td.appendChild(b)}else td.appendChild(el('span','pm-pct','未着手'));return td};
     const t=el('table','pm-stbl');const th=el('tr');
-    /* 工程グラフ・ステータスグラフとも列順を統一（現在の工程→現在のステータス）で視認性を確保 */
-    ['ショット','現在の工程','現在のステータス','担当'].forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
+    /* 工程が無いプロジェクトでは「現在の工程」列を省略（全て未着手になって紛らわしいため） */
+    const cols=hasStages?['ショット','現在の工程','現在のステータス','担当']:['ショット','現在のステータス','担当'];
+    cols.forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
     for(const ps of p.perShot){
       const tr=el('tr');const c1=el('td');c1.appendChild(el('span','sn',ps.shot.name));tr.appendChild(c1);
-      tr.appendChild(stageCell(ps));tr.appendChild(statusCell(ps));
+      if(hasStages)tr.appendChild(stageCell(ps));
+      tr.appendChild(statusCell(ps));
       const c4=el('td');const ab=taskAssignBadges(ps.curNode);if(ab)c4.appendChild(ab);else c4.appendChild(el('span','pm-pct','—'));tr.appendChild(c4);
       t.appendChild(tr);
     }
