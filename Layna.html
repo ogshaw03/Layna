@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.25';
+const APP_VERSION='2026.07.09.26';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3485,7 +3485,7 @@ function openReview(nodeId,versionId,opts){
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
 
-  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;if(typeof flushCommitted==='function')flushCommitted();document.removeEventListener('keydown',onKey);try{document.removeEventListener('keydown',fbKeyDownSpin);document.removeEventListener('keyup',fbKeyUpSpin)}catch(_){}ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未保存の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;if(typeof flushCommitted==='function')flushCommitted();document.removeEventListener('keydown',onKey);try{document.removeEventListener('keydown',fbKeyDownSpin);document.removeEventListener('keyup',fbKeyUpSpin)}catch(_){}ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
   /* 表示モード（モーダル⇄全画面） */
   function fbBackdropEnsure(){let bd=$('#fbBackdrop');if(!bd){bd=el('div','fb-backdrop');bd.id='fbBackdrop';bd.onclick=()=>close();if(ov.parentNode)ov.parentNode.insertBefore(bd,ov);else document.body.appendChild(bd)}return bd}
   function fbApplyMode(){if(fbFullscreen){ov.classList.remove('fb-modal');const bd=$('#fbBackdrop');if(bd)bd.remove()}else{ov.classList.add('fb-modal');fbBackdropEnsure()}if(fsBtn){fsBtn.textContent=fbFullscreen?'❐':'⛶';fsBtn.title=fbFullscreen?'モーダル表示に戻す':'全画面表示'}}
@@ -3652,12 +3652,12 @@ function openReview(nodeId,versionId,opts){
   const list=el('div','fb-notes');side.appendChild(list);
   const iw=el('div','fb-input');
   const ta=el('textarea');ta.placeholder=isVideo?'このフレームにコメント…（@でメンション・Shift+Enterで改行）':'コメント…（@でメンション・Shift+Enterで改行）';
-  const sb=el('button','btn btn-primary btn-sm','記入');sb.title='コメント／アノテーションを記入（送信するまでタスクページには反映されません）';
+  const sb=el('button','btn btn-primary btn-sm','送信');sb.title='コメント／アノテーションを送信（保存するまでタスクページには反映されません）';
   iw.appendChild(ta);iw.appendChild(sb);side.appendChild(iw);attachMention(ta,rootOf(node));
   /* 送信バー：記入した内容をまとめてレビューページに反映 */
   const submitBar=el('div','fb-submit-bar');
   const submitLab=el('span','fb-unsent-lab');
-  const submitBtn=el('button','btn btn-primary btn-sm','送信');submitBtn.title='記入した内容をタスクページに反映';
+  const submitBtn=el('button','btn btn-primary btn-sm','保存');submitBtn.title='送信した内容をタスクページに保存（反映）';
   submitBar.appendChild(submitLab);submitBar.appendChild(submitBtn);side.appendChild(submitBar);
   body.appendChild(side);
   ov.appendChild(body);
@@ -4029,7 +4029,7 @@ function openReview(nodeId,versionId,opts){
   function draftBlock(n){
     const b=el('div','log-note draft-note');
     const m=el('div','m');
-    m.appendChild(el('span','draft-chip','未送信'));
+    m.appendChild(el('span','draft-chip','未保存'));
     m.appendChild(el('span',null,(n.author||'-')+'・'+fmt(n.time)));
     if(n.frame!=null){const fc=el('span','frame-chip'+(isVideo?' link':''),'F'+n.frame);if(isVideo)fc.onclick=()=>seekFrame(n.frame);m.appendChild(fc)}
     if(n.drawing&&n.drawing.length)m.appendChild(el('span','frame-chip','✎ 描画'));
@@ -4042,7 +4042,7 @@ function openReview(nodeId,versionId,opts){
   }
   /* 未送信＝記入済み下書き(drafts)＋未記入の pending アノテ＋入力中コメント。
      どれかあれば送信バーを表示（アノテのみ・記入し忘れでも送信できるようにリールと統一） */
-  function updSubmit(){const has=drafts.length||pending.length||(ta&&ta.value.trim());submitLab.textContent=drafts.length?('未送信の記入: '+drafts.length+'件'):(has?'未送信の内容があります':'');submitBar.style.display=has?'':'none';}
+  function updSubmit(){const has=drafts.length||pending.length||(ta&&ta.value.trim());submitLab.textContent=drafts.length?('未保存: '+drafts.length+'件'):(has?'未保存の内容があります':'');submitBar.style.display=has?'':'none';}
   function renderNotes(){
     list.innerHTML='';
     const shown=v.review.notes.filter(n=>!noteEmbedOnly(n)); /* 描画のみは動画に埋め込むだけでコメント欄には出さない */
