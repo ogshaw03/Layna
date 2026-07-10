@@ -1043,7 +1043,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.34';
+const APP_VERSION='2026.07.09.35';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -4495,8 +4495,10 @@ function progressData(parentIds,tab,filterFn){
   const perShot=shots.map(shot=>{
     const stages=childrenOf(shot.id).map(st=>({node:st,time:latestVideoTimeUnder(st.id)}));
     const withVid=stages.filter(s=>s.time).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
-    const curNode=withVid.length?withVid[withVid.length-1].node:null;
-    return {shot,stageName:curNode?curNode.name:null,curNode,
+    let curNode=withVid.length?withVid[withVid.length-1].node:null;
+    /* ショット自身がレビューノード（直下に工程が無い2階層構造）なら、ショット自身を現在ノードとして状態を拾う */
+    if(!curNode&&shot.type==='review'&&shot.versions&&shot.versions.length)curNode=shot;
+    return {shot,stageName:(curNode&&curNode!==shot)?curNode.name:null,curNode,
             statusId:curNode?nodeStatus(curNode):'empty',
             latest:latestVideoVersionUnder(shot.id),stageCount:childrenOf(shot.id).length};
   });
