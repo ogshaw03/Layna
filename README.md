@@ -2,7 +2,7 @@
 
 単一 HTML で動く、映像制作向けのレビュー／進行管理ツール（ShotGrid ライク）。
 動画・画像をアップロードしてディレクターがチェック（OK / リテイク / NG）し、ショット・工程ごとに進行を管理します。
-バニラ JS・ビルド工程なしの `Layna.html` 1ファイルで完結します。
+バニラ JS・ビルド工程なしの `laycat.html` 1ファイルで完結します。
 
 ## 🔗 公開URL
 
@@ -31,13 +31,13 @@
 - 🔒 **アクセス制御**：ログイン許可リスト（下記）＋プロジェクト個別パスワード保護。
 - 🎞️ **REEL**：動画クリップを並べて連続再生・提出。
 
-バージョンはヘッダ左上に表示（`Layna.html` 内の `APP_VERSION` で管理。更新のたびに番号を上げます）。
+バージョンはヘッダ左上に表示（`laycat.html` 内の `APP_VERSION` で管理。更新のたびに番号を上げます）。
 
 ---
 
 ## 使い方（単一HTML版・推奨）
 
-`Layna.html`（＝公開URL）をブラウザで開くだけ。localhost もインストールも不要です。
+`laycat.html`（＝公開URL）をブラウザで開くだけ。localhost もインストールも不要です。
 
 ### データはプロジェクト単位で保存（チーム共有向け）
 - 各プロジェクトのデータ（ステータス・コメント・動画）は、そのプロジェクトの**フォルダ内 `laycat.project.json` と `media/`** に保存されます（旧 `layna.project.json` は自動で読み込み・保存時に新名へ移行）。ファイルサーバー上のフォルダを指定すれば、それがチームの「1つの正」になります。
@@ -74,10 +74,11 @@
 
 ```
 Layna/
-├── Layna.html            # 本体（LayCAT）。単一HTML・アセットは base64 でインライン埋め込み
+├── laycat.html           # 本体（LayCAT）。単一HTML・アセットは base64 でインライン埋め込み
 ├── access-console.html   # アクセス管理コンソール
 ├── access.json           # ログイン許可リスト（authRequired / adminEmails / allowedEmails / allowedDomains）
-├── index.html            # Layna.html へのリダイレクト（GitHub Pages エントリ）
+├── index.html            # laycat.html へのリダイレクト（GitHub Pages エントリ）
+├── Layna.html            # 旧ファイル名。laycat.html へ転送する互換用スタブ
 ├── laycat_icon.png       # ロゴ ／ mityakushu_icon.png … 未着手プレースホルダ
 ├── docs/                 # 設計メモ（プラグイン構想・アクセス制御・比較再生の同期方針 など）
 └── server/ public/ data/ storage/  # サーバー版（下記・任意）

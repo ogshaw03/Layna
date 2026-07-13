@@ -413,7 +413,7 @@ function paint(){
 }
 
 /* ---- 招待リンク（承認不要URL） ---- */
-function inviteBase(){const dir=location.pathname.replace(/[^/]*$/,'');return location.origin+dir+'Layna.html#invite=';}
+function inviteBase(){const dir=location.pathname.replace(/[^/]*$/,'');return location.origin+dir+'laycat.html#invite=';}
 function genToken(){const a=new Uint8Array(12);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(36).padStart(2,'0')).join('').slice(0,16);}
 function usesOf(token){return Object.values(invitedEmails||{}).filter(x=>x&&x.byToken===token).length;}
 function renderInvites(){
