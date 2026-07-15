@@ -111,7 +111,9 @@ Layna/
 └── server/ public/ data/ storage/  # サーバー版（下記・任意）
 ```
 
-## docs（設計メモ）
+## docs（使い方・設計メモ）
+- `docs/LayCAT_操作ガイド.docx` … 使い方ガイド（Word）
+- `docs/LayCAT_紹介プレゼン.pptx` … 紹介プレゼン（PowerPoint）
 - `docs/PROJECT_ACCESS_PLAN.md` … アクセス制御の現状と今後（名簿ベース／Firebase 付与式）
 - `docs/PLUGIN_SYSTEM_PLAN.md` … プラグイン制度の構想
 - `docs/COMPARE_PLAYBACK_PLAN.md` … 比較再生の同期方式と今後（フレームキャッシュ案）
