@@ -82,6 +82,9 @@
 - **T1【低】** `isDoneStatus` 正規表現(`1200`)が英字カスタムラベル(`fixing`/`OK待ち`等)に部分一致し完了誤判定。既定の日本語ラベルでは発生せず。
 - **T2【低/理論上】** `descendants`/`rootOf`/`nodeStatus`/`projStatuses`(`1164`ほか)に循環ガード無し。破損データ（parentId 循環）が union で混入すると無限ループ。防御的に visited ガードを入れる価値あり。
 - **T3【低】** `migrate`(`1153`) が旧データの notifications 等をガードせず（レガシー移行時のみ）。
+- **V1【低-中】** `buildVPlayer`(`3243-3247`) が `seeked` を監視せず、一時停止中に外部シーク（フレームチップ/`seekInline`）で `currentTime` を変えるとシークバー(fill/knob/time)表示が旧位置に残りズレる。修正: `vid.addEventListener('seeked',update)` を追加。
+- **V2【低】** `buildVPlayer` の track に `onpointercancel` が無く(`3254-3256`)、ジェスチャ割り込みで `pointerup` が来ないと `drag` が残留し次回タッチで即シーク。修正: `track.onpointercancel=()=>drag=false`。
+- **V3【低】** `annotShotInto` のキャッシュキー(`3263`)が `fileRef|time|frame` のみで `drawing`/note id を含まず、同一 time+frame の別描画ノートでスクショを取り違え得る（実害小）。
 
 ---
 
@@ -96,4 +99,4 @@
 
 ## 補足
 - 高（High）深刻度の項目は無し。
-- 未精査で残った領域: 描画/プレイヤー(3000-4074)の一部（buildVPlayer・genThumb・downloadVersion・buildFrameNotes は別経路で確認済み）。必要なら追加精査。
+- 全9領域＋access-console を精査完了。描画/プレイヤー(3000-4074)も精査済みで、paintStrokeList・eraseFromList・resolveThumbs・backfillThumbs・genThumbFromUrl は問題なしと確認。
