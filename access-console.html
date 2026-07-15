@@ -169,22 +169,9 @@
         <div class="card-title">🔐 アクセス管理 / 権限付与</div>
         <div class="card-desc">3区分でアクセスを管理します。<b>運営</b>=この設定を編集可、<b>管理者</b>=権限付与可、<b>メンバー</b>=利用のみ。許可したメールアドレスの Google アカウントが LayCAT を利用できます。行ごとのボタンで権限を変更・削除できます。</div>
 
-        <label class="field-label">ユーザーを追加（メールアドレス）</label>
-        <div class="add-row">
-          <input id="addEmail" type="email" placeholder="user@example.com" autocomplete="off">
-          <select id="addRole"><option value="member">メンバー</option><option value="admin">管理者</option><option value="operator">運営</option></select>
-          <button class="btn btn-primary" id="addBtn">追加</button>
-        </div>
-
-        <div class="search"><input id="search" type="text" placeholder="メールアドレスで検索…" autocomplete="off"></div>
-        <div class="counts" id="counts"></div>
-
-        <div class="sub-label">運営（この設定を編集可）</div>
-        <div class="u-list" id="opList"></div>
-        <div class="sub-label">管理者（権限付与のみ可）</div>
-        <div class="u-list" id="adminList"></div>
-        <div class="sub-label">メンバー（利用のみ）</div>
-        <div class="u-list" id="memberList"></div>
+        <div class="counts" id="counts" style="margin:6px 0 12px"></div>
+        <button class="btn btn-primary" id="openAccessBtn">🪟 別ウィンドウで開く（ユーザー追加・権限変更・削除）</button>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px">ユーザーの追加・権限変更・削除は別ウィンドウで行います（確認ダイアログが確実に表示されるため）。</div>
       </div>
 
       <!-- 招待リンク（承認不要URL） -->
@@ -486,16 +473,9 @@ function paint(){
     });
     return row;
   };
-  const opL=$('opList'),adL=$('adminList'),meL=$('memberList');
-  opL.innerHTML='';adL.innerHTML='';meL.innerHTML='';
-  const fo=flt(operators),fa=flt(admins),fm=flt(members);
-  fo.forEach(e=>opL.appendChild(mkRow(e,{cls:'op',label:'運営'},[['→管理者',()=>setRole(e,'admin')],['→メンバー',()=>setRole(e,'member')],['削除',()=>setRole(e,'remove'),true]])));
-  if(!fo.length)opL.innerHTML='<div class="empty">'+(q?'該当なし':'運営はいません')+'</div>';
-  fa.forEach(e=>adL.appendChild(mkRow(e,{cls:'admin',label:'管理者'},[['→運営',()=>setRole(e,'operator')],['→メンバー',()=>setRole(e,'member')],['削除',()=>setRole(e,'remove'),true]])));
-  if(!fa.length)adL.innerHTML='<div class="empty">'+(q?'該当なし':'管理者はいません')+'</div>';
-  fm.forEach(e=>meL.appendChild(mkRow(e,{cls:'member',label:'メンバー'},[['→運営',()=>setRole(e,'operator')],['→管理者',()=>setRole(e,'admin')],['削除',()=>setRole(e,'remove'),true]])));
-  if(!fm.length)meL.innerHTML='<div class="empty">'+(q?'該当なし':'メンバーはいません')+'</div>';
-  $('counts').textContent=`運営 ${operators.length} ・ 管理者 ${admins.length} ・ メンバー ${members.length}`+(q?`　／　「${query}」で絞込: ${fo.length+fa.length+fm.length}件`:'');
+  /* ユーザー一覧（運営/管理者/メンバー）は別ウィンドウに描画。inline はサマリのみ */
+  $('counts').textContent=`運営 ${operators.length} ・ 管理者 ${admins.length} ・ メンバー ${members.length}`;
+  paintAccessWin();
 
   // domains
   const dL=$('domList');dL.innerHTML='';
@@ -533,6 +513,89 @@ function paint(){
     }
   }
   renderInvites();
+}
+
+/* ===== アクセス管理を別ウィンドウで表示（確認ダイアログをその窓で出すため。OGREF相当） ===== */
+let accessWin=null, accessQuery='';
+function awNotify(msg){ try{ if(accessWin&&!accessWin.closed){ const n=accessWin.document.getElementById('awNote'); if(n){ n.textContent=msg; n.style.display='block'; clearTimeout(n._t); n._t=setTimeout(()=>{n.style.display='none';},3500);} } }catch(_){} notify(msg); }
+function awConfirm(msg){ const w=(accessWin&&!accessWin.closed)?accessWin:window; return w.confirm(msg); }
+const ACCESS_WIN_HTML=`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>アクセス管理 / 権限付与 — LayCAT</title><style>
+:root{--bg:#0d0d0f;--bg2:#141416;--bg3:#1c1c1f;--bg4:#232327;--border2:#3a3a42;--text:#e8e8ec;--text2:#9a9aaa;--text3:#5a5a6a;--accent:#c7c7cf;--red:#e06a6a;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',system-ui,sans-serif;font-size:13px;padding:18px}
+h1{font-size:15px;margin-bottom:4px}.desc{color:var(--text3);font-size:12px;margin-bottom:14px;line-height:1.6}.desc b{color:var(--text2)}
+input,select{font-family:inherit;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 11px;border-radius:6px;font-size:13px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+.add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.add-row input{flex:1;min-width:160px}.add-row select{width:auto}
+.search{margin:14px 0 6px}.counts{font-size:11px;color:var(--text3);margin:6px 0 10px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer}
+.btn:hover{background:var(--bg4)}.btn-primary{background:#ececf0;border-color:#ececf0;color:#16161a;font-weight:600}
+.btn-danger{background:transparent;border-color:var(--red);color:var(--red)}.btn-sm{padding:4px 9px;font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
+.sub-label{font-size:12px;color:var(--text2);font-weight:700;margin:16px 0 6px}
+.u-list{display:flex;flex-direction:column;gap:8px}
+.u-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:10px;background:var(--bg3)}
+.u-email{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.u-name{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-mail{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+.role.op{background:rgba(214,169,95,.16);color:#d6a95f;border:1px solid rgba(214,169,95,.4)}
+.role.admin{background:rgba(199,199,207,.14);color:#c7c7cf;border:1px solid rgba(199,199,207,.32)}
+.role.member{background:rgba(127,191,154,.14);color:#7fbf9a;border:1px solid rgba(127,191,154,.34)}
+.empty{font-size:12px;color:var(--text3);padding:6px 2px}
+#awNote{display:none;position:fixed;top:0;left:0;right:0;background:#2d3550;color:#fff;padding:9px;text-align:center;font-size:12px;z-index:10}
+</style></head><body>
+<div id="awNote"></div>
+<h1>🔐 アクセス管理 / 権限付与</h1>
+<div class="desc"><b>運営</b>=この設定を編集可、<b>管理者</b>=権限付与可、<b>メンバー</b>=利用のみ。行ごとのボタンで権限を変更・削除できます。</div>
+<div class="add-row">
+  <input id="awAddEmail" type="email" placeholder="user@example.com" autocomplete="off">
+  <select id="awAddRole"><option value="member">メンバー</option><option value="admin">管理者</option><option value="operator">運営</option></select>
+  <button class="btn btn-primary" id="awAddBtn">追加</button>
+</div>
+<div class="search"><input id="awSearch" type="text" placeholder="メールアドレスで検索…" autocomplete="off"></div>
+<div class="counts" id="awCounts"></div>
+<div class="sub-label">運営（この設定を編集可）</div><div class="u-list" id="awOpList"></div>
+<div class="sub-label">管理者（権限付与のみ可）</div><div class="u-list" id="awAdminList"></div>
+<div class="sub-label">メンバー（利用のみ）</div><div class="u-list" id="awMemberList"></div>
+</body></html>`;
+function openAccessWindow(){
+  if(!cfg||!isEditor()){ notify('運営・管理者のみ操作できます'); return; }
+  if(accessWin&&!accessWin.closed){ accessWin.focus(); paintAccessWin(); return; }
+  accessWin=window.open('','laycat_access','width=780,height=880');
+  if(!accessWin){ notify('ポップアップがブロックされました。ポップアップを許可してから再度お試しください。'); return; }
+  accessWin.document.open(); accessWin.document.write(ACCESS_WIN_HTML); accessWin.document.close();
+  const d=accessWin.document;
+  d.getElementById('awAddBtn').onclick=addUser;
+  d.getElementById('awAddEmail').addEventListener('keydown',e=>{if(e.key==='Enter')addUser();});
+  const sb=d.getElementById('awSearch'); sb.addEventListener('input',()=>{ accessQuery=sb.value; paintAccessWin(); });
+  accessWin.addEventListener('beforeunload',()=>{ accessWin=null; });
+  paintAccessWin();
+}
+function paintAccessWin(){
+  if(!accessWin||accessWin.closed||!cfg)return;
+  const d=accessWin.document;
+  const {operators,admins,members}=tiers(cfg);
+  const q=lc((accessQuery||'').trim());
+  const flt=a=>q?a.filter(e=>lc(e).includes(q)):a;
+  const editor=isEditor();
+  const idHtml=(email,self)=>{const nm=nameOf(email);return nm?`<span class="u-name">${escH(nm)}${self}</span><span class="u-mail">${escH(email)}</span>`:`<span class="u-name">${escH(email)}${self}</span>`;};
+  const mkRow=(email,role,btns)=>{
+    const self=(me&&email===me.email)?'（あなた）':'';
+    const row=d.createElement('div');row.className='u-row';
+    row.innerHTML=`<span class="u-email">${idHtml(email,self)}</span><span class="role ${role.cls}">${role.label}</span>`;
+    btns.forEach(([label,fn,danger])=>{const b=d.createElement('button');b.className='btn btn-sm'+(danger?' btn-danger':'');b.textContent=label;b.disabled=!editor;b.onclick=fn;row.appendChild(b);});
+    return row;
+  };
+  const opL=d.getElementById('awOpList'),adL=d.getElementById('awAdminList'),meL=d.getElementById('awMemberList');
+  opL.innerHTML='';adL.innerHTML='';meL.innerHTML='';
+  const fo=flt(operators),fa=flt(admins),fm=flt(members);
+  fo.forEach(e=>opL.appendChild(mkRow(e,{cls:'op',label:'運営'},[['→管理者',()=>setRole(e,'admin')],['→メンバー',()=>setRole(e,'member')],['削除',()=>setRole(e,'remove'),true]])));
+  if(!fo.length)opL.innerHTML='<div class="empty">'+(q?'該当なし':'運営はいません')+'</div>';
+  fa.forEach(e=>adL.appendChild(mkRow(e,{cls:'admin',label:'管理者'},[['→運営',()=>setRole(e,'operator')],['→メンバー',()=>setRole(e,'member')],['削除',()=>setRole(e,'remove'),true]])));
+  if(!fa.length)adL.innerHTML='<div class="empty">'+(q?'該当なし':'管理者はいません')+'</div>';
+  fm.forEach(e=>meL.appendChild(mkRow(e,{cls:'member',label:'メンバー'},[['→運営',()=>setRole(e,'operator')],['→管理者',()=>setRole(e,'admin')],['削除',()=>setRole(e,'remove'),true]])));
+  if(!fm.length)meL.innerHTML='<div class="empty">'+(q?'該当なし':'メンバーはいません')+'</div>';
+  d.getElementById('awCounts').textContent=`運営 ${operators.length} ・ 管理者 ${admins.length} ・ メンバー ${members.length}`+(q?`　／　「${accessQuery}」で絞込: ${fo.length+fa.length+fm.length}件`:'');
 }
 
 /* ---- 招待リンク（承認不要URL） ---- */
@@ -631,12 +694,12 @@ async function setRole(email,target){
   const {operators:curOp}=tiers(data);
   // 最後の運営は降格・削除不可（運営ゼロによるロック防止）
   if(target!=='operator' && curOp.includes(email) && curOp.length<=1){
-    return notify('最後の運営は降格・削除できません。先に別の運営を追加してください。');
+    return awNotify('最後の運営は降格・削除できません。先に別の運営を追加してください。');
   }
   if(email===me.email && target!=='operator'){
-    if(!confirm('自分自身の権限を変更します。編集できなくなる可能性があります。続行しますか？'))return;
+    if(!awConfirm('自分自身の権限を変更します。編集できなくなる可能性があります。続行しますか？'))return;
   } else if(target==='remove'){
-    if(!confirm(email+' を削除しますか？'))return;
+    if(!awConfirm(email+' を削除しますか？'))return;
   }
   try{
     let operators=arr(data.operatorEmails).filter(e=>e!==email);
@@ -646,20 +709,22 @@ async function setRole(email,target){
     else if(target==='admin')admins.push(email);
     else if(target==='member')members.push(email);
     await setDoc(doc(db,...CFG_PATH),{operatorEmails:operators,adminEmails:admins,allowedEmails:members,updatedBy:me.email,updatedAt:new Date().toISOString()},{merge:true});
-    notify(target==='remove'?('削除しました: '+email):(roleLabel[target]+'に変更しました: '+email));
+    awNotify(target==='remove'?('削除しました: '+email):(roleLabel[target]+'に変更しました: '+email));
   }catch(e){notify('失敗: '+e.message)}
 }
 
 async function addUser(){
-  if(!isEditor())return notify('運営・管理者のみ実行できます');
-  const email=lc(($('addEmail').value||'').trim());
-  if(!email)return notify('メールアドレスを入力してください');
-  const role=$('addRole').value;
+  if(!isEditor())return awNotify('運営・管理者のみ実行できます');
+  const eEl=(accessWin&&!accessWin.closed)?accessWin.document.getElementById('awAddEmail'):null;
+  const rEl=(accessWin&&!accessWin.closed)?accessWin.document.getElementById('awAddRole'):null;
+  const email=lc(((eEl&&eEl.value)||'').trim());
+  if(!email)return awNotify('メールアドレスを入力してください');
+  const role=(rEl&&rEl.value)||'member';
   const data=await readConfig();
   const {operators,admins,members}=tiers(data);
-  if(operators.includes(email)||admins.includes(email)||members.includes(email))return notify('既に追加されています（権限変更は一覧のボタンから）');
+  if(operators.includes(email)||admins.includes(email)||members.includes(email))return awNotify('既に追加されています（権限変更は一覧のボタンから）');
   await setRole(email,role);
-  $('addEmail').value='';$('addRole').value='member';
+  if(eEl)eEl.value=''; if(rEl)rEl.value='member';
 }
 
 async function addDomain(){
@@ -695,13 +760,11 @@ $('bootBtn').onclick=async()=>{
   }catch(e){ notify('初期化失敗: '+e.message+'（Firestore のルールを確認してください）'); }
 };
 
-$('addBtn').onclick=addUser;
-$('addEmail').addEventListener('keydown',e=>{if(e.key==='Enter')addUser();});
+$('openAccessBtn').onclick=openAccessWindow;
 $('domAddBtn').onclick=addDomain;
 $('domInput').addEventListener('keydown',e=>{if(e.key==='Enter')addDomain();});
 $('invCreateBtn').onclick=createInvite;
 $('invLabel').addEventListener('keydown',e=>{if(e.key==='Enter')createInvite();});
-$('search').addEventListener('input',()=>{query=$('search').value;if(cfg&&isEditor())paint();});
 </script>
 </body>
 </html>
