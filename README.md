@@ -106,7 +106,8 @@ Layna/
 ├── index.html            # laycat.html へのリダイレクト（GitHub Pages エントリ）
 ├── Layna.html            # 旧ファイル名。laycat.html へ転送する互換用スタブ
 ├── laycat_icon.png       # ロゴ ／ mityakushu_icon.png … 未着手プレースホルダ
-├── docs/                 # 設計メモ（プラグイン構想・アクセス制御・比較再生の同期方針 など）
+├── docs/                 # 設計メモ・監査バックログ など
+├── reference/            # 他プロジェクトの参照資料（OGREF・OGPipeline。アプリからは未使用）
 └── server/ public/ data/ storage/  # サーバー版（下記・任意）
 ```
 
